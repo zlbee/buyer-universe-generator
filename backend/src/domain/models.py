@@ -27,6 +27,14 @@ class SourceStrength(str, Enum):
     D = "D"
 
 
+class SourceType(str, Enum):
+    sec_filing = "sec_filing"
+    sec_company_mapping = "sec_company_mapping"
+    exchange_profile = "exchange_profile"
+    news_article = "news_article"
+    source_policy = "source_policy"
+
+
 class FeatureLabel(str, Enum):
     verified_fact = "verified_fact"
     derived_keyword = "derived_keyword"
@@ -38,6 +46,81 @@ class PipelineRunStatus(str, Enum):
     running = "running"
     completed = "completed"
     failed = "failed"
+
+
+class ResolvedTarget(StrictBaseModel):
+    """Canonical target identity resolved from public data sources."""
+
+    canonical_name: str = Field(min_length=1)
+    ticker: str = Field(min_length=1)
+    cik: str = Field(min_length=1)
+    exchange: str | None = None
+    sic: str | None = None
+    resolution_confidence: float = Field(ge=0.0, le=1.0)
+    matched_input: str = Field(min_length=1)
+    source_provenance: list[str] = Field(default_factory=list)
+
+
+class FilingMetadata(StrictBaseModel):
+    """SEC filing metadata cached for later feature extraction."""
+
+    form: str = Field(min_length=1)
+    filing_date: str | None = None
+    accession_number: str = Field(min_length=1)
+    period_of_report: str | None = None
+    url: str | None = None
+    source_type: SourceType = SourceType.sec_filing
+
+
+class SourceDocument(StrictBaseModel):
+    """Cached source material or metadata collected during ingestion."""
+
+    source_id: str = Field(min_length=1)
+    source_type: SourceType
+    source_strength: SourceStrength
+    target_cik: str | None = None
+    target_ticker: str | None = None
+    url: str | None = None
+    filing_accession: str | None = None
+    raw_text: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    retrieved_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    expires_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def require_reference_or_metadata(self) -> "SourceDocument":
+        if not self.url and not self.filing_accession and not self.metadata:
+            raise ValueError("SourceDocument requires url, filing_accession, or metadata")
+        return self
+
+
+class TargetIngestionResult(StrictBaseModel):
+    """Phase 1 output containing resolved target identity and cached source metadata."""
+
+    target: ResolvedTarget
+    filings: list[FilingMetadata] = Field(default_factory=list)
+    source_documents: list[SourceDocument] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class DataSourceConfig(StrictBaseModel):
+    """One declarative data-source policy entry."""
+
+    provider: str = Field(min_length=1)
+    enabled: bool = True
+    required: bool = False
+    api_key_env: str | None = None
+    source_strength: SourceStrength
+    cache_ttl_hours: int = Field(default=24, ge=0)
+    field_coverage: list[str] = Field(default_factory=list)
+
+
+class DataSourcePolicy(StrictBaseModel):
+    """Validated data-source selection policy loaded from YAML."""
+
+    version: int = 1
+    sources: dict[str, DataSourceConfig]
+    use_cases: dict[str, list[str]]
 
 
 class Evidence(StrictBaseModel):
@@ -135,4 +218,3 @@ class PipelineRun(StrictBaseModel):
     warnings: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-

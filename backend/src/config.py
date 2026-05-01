@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +17,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         env_prefix="BUG_",
         extra="ignore",
+        populate_by_name=True,
     )
 
     app_name: str = "Buyer Universe Generator"
@@ -25,8 +26,15 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./data/buyer_universe.db"
     cache_dir: Path = Path("./data/cache")
+    datasource_policy_path: Path = Path("./config/datasources.yaml")
 
+    edgar_identity: str = Field(
+        default="buyer-universe-generator/0.1 contact@example.com",
+        validation_alias=AliasChoices("BUG_EDGAR_IDENTITY", "EDGAR_IDENTITY"),
+    )
     sec_user_agent: str = "buyer-universe-generator/0.1 contact@example.com"
+    polygon_api_key: str | None = None
+    news_api_key: str | None = None
     openrouter_api_key: str | None = None
     llm_model: str = "openrouter/auto"
 

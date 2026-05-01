@@ -44,6 +44,29 @@ input {
   margin-bottom: 28px;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.debug-entry-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid #b8c2cc;
+  border-radius: 6px;
+  color: #244f7a;
+  background: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.debug-entry-link:hover {
+  border-color: #2867a8;
+}
+
 .eyebrow {
   margin: 0 0 6px;
   color: #5d6b7a;
@@ -198,6 +221,216 @@ h2 {
   border-top: 4px solid #c08721;
 }
 
+.debug-panel {
+  margin-top: 18px;
+  padding: 24px;
+  border: 1px solid #cfd6de;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.debug-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.debug-state {
+  min-width: 92px;
+  padding: 7px 10px;
+  border: 1px solid #cfd6de;
+  border-radius: 999px;
+  color: #344252;
+  background: #f4f6f8;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.debug-state--success {
+  border-color: #8ac2aa;
+  color: #176947;
+  background: #eff8f4;
+}
+
+.debug-state--error {
+  border-color: #dfa2a2;
+  color: #9a2626;
+  background: #fff3f3;
+}
+
+.debug-state--loading {
+  border-color: #8fb6dc;
+  color: #244f7a;
+  background: #eef6ff;
+}
+
+.debug-empty,
+.debug-error {
+  padding: 16px;
+  border: 1px solid #cfd6de;
+  border-radius: 6px;
+  color: #4d5a68;
+  background: #f8fafc;
+}
+
+.debug-error {
+  border-color: #dfa2a2;
+  color: #9a2626;
+  background: #fff7f7;
+}
+
+.debug-result {
+  display: grid;
+  gap: 18px;
+}
+
+.debug-warning-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.debug-warning-list span {
+  padding: 6px 9px;
+  border: 1px solid #e2c477;
+  border-radius: 999px;
+  color: #71510d;
+  background: #fff9e8;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.debug-section {
+  display: grid;
+  gap: 12px;
+}
+
+.debug-section h3 {
+  margin: 0;
+  color: #243241;
+  font-size: 1rem;
+}
+
+.debug-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.debug-metrics div {
+  min-height: 74px;
+  padding: 12px;
+  border: 1px solid #dce3ea;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.debug-metrics dt {
+  margin-bottom: 8px;
+  color: #5d6b7a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.debug-metrics dd {
+  margin: 0;
+  color: #17202a;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.debug-json-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.36fr);
+  gap: 12px;
+}
+
+.debug-json-grid pre,
+.debug-raw pre {
+  max-height: 440px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid #dce3ea;
+  border-radius: 6px;
+  color: #17202a;
+  background: #f8fafc;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.debug-field-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #dce3ea;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.debug-field-list strong {
+  color: #344252;
+}
+
+.debug-field-list span {
+  color: #5d6b7a;
+  font-size: 0.9rem;
+}
+
+.debug-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #dce3ea;
+  border-radius: 6px;
+}
+
+.debug-table-wrap table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  background: #ffffff;
+}
+
+.debug-table-wrap th,
+.debug-table-wrap td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #dce3ea;
+  text-align: left;
+  vertical-align: top;
+}
+
+.debug-table-wrap th {
+  color: #344252;
+  background: #f8fafc;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.debug-table-wrap tr:last-child td {
+  border-bottom: 0;
+}
+
+.debug-table-wrap a,
+.debug-raw summary {
+  color: #2867a8;
+  font-weight: 700;
+}
+
+.debug-raw {
+  display: grid;
+  gap: 10px;
+}
+
+.debug-raw summary {
+  cursor: pointer;
+}
+
 @media (max-width: 760px) {
   .app-shell {
     padding: 20px;
@@ -209,12 +442,23 @@ h2 {
     display: grid;
   }
 
+  .topbar-actions {
+    display: grid;
+    width: 100%;
+  }
+
+  .debug-entry-link {
+    justify-content: center;
+  }
+
   .backend-status {
     width: 100%;
   }
 
   .input-row,
-  .status-grid {
+  .status-grid,
+  .debug-metrics,
+  .debug-json-grid {
     grid-template-columns: 1fr;
   }
 }

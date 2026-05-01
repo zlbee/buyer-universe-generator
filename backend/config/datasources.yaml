@@ -1,0 +1,53 @@
+version: 1
+
+sources:
+  edgar:
+    provider: edgartools
+    enabled: true
+    required: true
+    source_strength: A
+    cache_ttl_hours: 24
+    field_coverage:
+      - identity
+      - cik
+      - ticker
+      - exchange
+      - sic
+      - filing_metadata
+      - company_submissions
+
+  polygon:
+    provider: polygon.io
+    enabled: true
+    required: false
+    api_key_env: BUG_POLYGON_API_KEY
+    source_strength: C
+    cache_ttl_hours: 24
+    field_coverage:
+      - exchange_profile
+      - market_cap
+      - homepage_url
+      - company_description
+      - employee_count
+
+  newsapi:
+    provider: newsapi.org
+    enabled: true
+    required: false
+    api_key_env: BUG_NEWS_API_KEY
+    source_strength: B
+    cache_ttl_hours: 12
+    field_coverage:
+      - news_discovery
+      - article_metadata
+
+use_cases:
+  target_resolution:
+    - edgar
+    - polygon
+  sec_filings:
+    - edgar
+  exchange_profile:
+    - polygon
+  news_discovery:
+    - newsapi

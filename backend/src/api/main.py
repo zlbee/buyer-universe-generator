@@ -5,12 +5,14 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from src import __version__
 from src.config import Settings, get_settings
-from src.repositories.database import init_db
+from src.pipelines.factory import build_source_ingestion_service
+from src.pipelines.target_resolution import AmbiguousTargetError, TargetNotFoundError
+from src.repositories.database import create_session_factory, init_db
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -44,6 +46,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "environment": active_settings.environment,
             "version": __version__,
         }
+
+    @app.get("/targets/resolve", tags=["targets"])
+    def resolve_target(request: Request, query: str = Query(min_length=1)) -> dict:
+        session_factory = create_session_factory(request.app.state.engine)
+        with session_factory() as session:
+            service = build_source_ingestion_service(active_settings, session)
+            try:
+                result = service.ingest(query)
+            except AmbiguousTargetError as error:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "message": str(error),
+                        "candidates": [candidate.model_dump(mode="json") for candidate in error.candidates],
+                    },
+                ) from error
+            except TargetNotFoundError as error:
+                raise HTTPException(status_code=404, detail={"message": str(error)}) from error
+
+        return result.model_dump(mode="json")
 
     return app
 

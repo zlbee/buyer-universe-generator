@@ -1,6 +1,8 @@
 # Buyer Universe Generator Backend
 
-This backend package contains the FastAPI application, CLI, domain contracts, SQLAlchemy persistence setup, source adapter interfaces, retriever interfaces, LLM abstraction, and exporter interfaces for the Buyer Universe Generator.
+This backend package contains the FastAPI application, CLI, domain contracts, SQLAlchemy persistence setup, source adapters, retriever interfaces, LLM abstraction, and exporter interfaces for the Buyer Universe Generator.
+
+Phase 1 adds target resolution and source ingestion. SEC/EDGAR is the required primary source; Polygon.io and NewsAPI are optional enrichers controlled by `config/datasources.yaml` and API key settings.
 
 ## Local Commands
 
@@ -23,9 +25,28 @@ Run the API:
 uv run uvicorn src.api.main:app --reload
 ```
 
+Resolve a target through the CLI:
+
+```powershell
+uv run bug resolve-target AAPL
+```
+
+Resolve a target through the API:
+
+```text
+GET /targets/resolve?query=AAPL
+```
+
 Run CLI helpers:
 
 ```powershell
 uv run bug show-config
 uv run bug init-db
+```
+
+Optional source keys:
+
+```powershell
+$env:BUG_POLYGON_API_KEY = "..."
+$env:BUG_NEWS_API_KEY = "..."
 ```
