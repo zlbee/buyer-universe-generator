@@ -38,15 +38,39 @@ def test_data_source_policy_disables_optional_sources_without_keys(tmp_path: Pat
 
     target_sources = strategy.select("target_resolution", include_disabled=True)
     assert target_sources[0].source_id == "edgar"
+    assert target_sources[0].dimension_id == "seller_profile.identity_resolution"
+    assert target_sources[0].source_strength == SourceStrength.A
     assert target_sources[0].enabled is True
 
     polygon_source = next(source for source in target_sources if source.source_id == "polygon")
+    assert polygon_source.dimension_id == "seller_profile.exchange_profile"
+    assert polygon_source.source_strength == SourceStrength.B
     assert polygon_source.enabled is False
     assert polygon_source.disabled_reason == "missing BUG_POLYGON_API_KEY"
 
     news_source = strategy.select("news_discovery", include_disabled=True)[0]
+    assert news_source.dimension_id == "seller_profile.recent_news_context"
+    assert news_source.source_strength == SourceStrength.B
     assert news_source.enabled is False
     assert news_source.disabled_reason == "missing BUG_NEWS_API_KEY"
+
+
+def test_data_source_policy_scopes_strength_by_dimension(tmp_path: Path) -> None:
+    strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path))
+
+    identity_source = strategy.selected_source("target_resolution", "edgar", include_disabled=True)
+    transaction_source = strategy.selected_source("buyer_recall_transaction_signals", "edgar", include_disabled=True)
+    news_context_source = strategy.selected_source("news_discovery", "newsapi", include_disabled=True)
+    sponsor_source = strategy.selected_source("buyer_recall_financial_sponsors", "newsapi", include_disabled=True)
+
+    assert identity_source is not None
+    assert transaction_source is not None
+    assert news_context_source is not None
+    assert sponsor_source is not None
+    assert identity_source.source_strength == SourceStrength.A
+    assert transaction_source.source_strength == SourceStrength.C
+    assert news_context_source.source_strength == SourceStrength.B
+    assert sponsor_source.source_strength == SourceStrength.C
 
 
 def test_sec_client_resolves_mapping_and_recent_filings(tmp_path: Path) -> None:
@@ -247,11 +271,18 @@ class FakeSecClient:
             FilingMetadata(form="8-K", filing_date="2026-03-01", accession_number="0000320193-26-000003"),
         ]
 
-    def source_document_for_mapping(self, target: ResolvedTarget, ttl_hours: int) -> SourceDocument:
+    def source_document_for_mapping(
+        self,
+        target: ResolvedTarget,
+        ttl_hours: int,
+        source_strength: SourceStrength = SourceStrength.A,
+        source_dimension: str | None = None,
+    ) -> SourceDocument:
         return SourceDocument(
             source_id="edgar",
+            source_dimension=source_dimension,
             source_type=SourceType.sec_company_mapping,
-            source_strength=SourceStrength.A,
+            source_strength=source_strength,
             target_cik=target.cik,
             target_ticker=target.ticker,
             metadata=target.model_dump(mode="json"),
@@ -259,11 +290,19 @@ class FakeSecClient:
             expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours),
         )
 
-    def source_document_for_filing(self, target: ResolvedTarget, filing: FilingMetadata, ttl_hours: int) -> SourceDocument:
+    def source_document_for_filing(
+        self,
+        target: ResolvedTarget,
+        filing: FilingMetadata,
+        ttl_hours: int,
+        source_strength: SourceStrength = SourceStrength.A,
+        source_dimension: str | None = None,
+    ) -> SourceDocument:
         return SourceDocument(
             source_id="edgar",
+            source_dimension=source_dimension,
             source_type=SourceType.sec_filing,
-            source_strength=SourceStrength.A,
+            source_strength=source_strength,
             target_cik=target.cik,
             target_ticker=target.ticker,
             filing_accession=filing.accession_number,

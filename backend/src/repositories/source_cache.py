@@ -70,6 +70,7 @@ class SourceCache:
         self.session.add(
             SourceDocumentRecord(
                 source_id=document.source_id,
+                source_dimension=document.source_dimension,
                 source_type=document.source_type.value,
                 source_strength=document.source_strength.value,
                 target_cik=document.target_cik,
@@ -89,6 +90,7 @@ class SourceCache:
             self.session.add(
                 SourceDocumentRecord(
                     source_id=document.source_id,
+                    source_dimension=document.source_dimension,
                     source_type=document.source_type.value,
                     source_strength=document.source_strength.value,
                     target_cik=document.target_cik,
@@ -106,6 +108,7 @@ class SourceCache:
     def _document_from_record(self, record: SourceDocumentRecord) -> SourceDocument:
         return SourceDocument(
             source_id=record.source_id,
+            source_dimension=record.source_dimension,
             source_type=SourceType(record.source_type),
             source_strength=SourceStrength(record.source_strength),
             target_cik=record.target_cik,

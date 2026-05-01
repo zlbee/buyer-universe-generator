@@ -76,6 +76,7 @@ class SourceDocument(StrictBaseModel):
     """Cached source material or metadata collected during ingestion."""
 
     source_id: str = Field(min_length=1)
+    source_dimension: str | None = None
     source_type: SourceType
     source_strength: SourceStrength
     target_cik: str | None = None
@@ -103,16 +104,36 @@ class TargetIngestionResult(StrictBaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class DataSourceDimensionConfig(StrictBaseModel):
+    """Dimension-scoped support policy for one data source."""
+
+    source_strength: SourceStrength
+    field_coverage: list[str] = Field(default_factory=list)
+    rationale: str | None = None
+
+
 class DataSourceConfig(StrictBaseModel):
-    """One declarative data-source policy entry."""
+    """Provider-level data-source policy that avoids dimension-specific scoring."""
 
     provider: str = Field(min_length=1)
     enabled: bool = True
     required: bool = False
     api_key_env: str | None = None
-    source_strength: SourceStrength
     cache_ttl_hours: int = Field(default=24, ge=0)
-    field_coverage: list[str] = Field(default_factory=list)
+    dimensions: dict[str, DataSourceDimensionConfig] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def require_dimension_policies(self) -> "DataSourceConfig":
+        if not self.dimensions:
+            raise ValueError("DataSourceConfig requires at least one dimension policy")
+        return self
+
+
+class DataSourceUseCaseConfig(StrictBaseModel):
+    """A concrete source selection for a specific pipeline use case."""
+
+    source_id: str = Field(min_length=1)
+    dimension: str = Field(min_length=1)
 
 
 class DataSourcePolicy(StrictBaseModel):
@@ -120,7 +141,21 @@ class DataSourcePolicy(StrictBaseModel):
 
     version: int = 1
     sources: dict[str, DataSourceConfig]
-    use_cases: dict[str, list[str]]
+    use_cases: dict[str, list[DataSourceUseCaseConfig]]
+
+    @model_validator(mode="after")
+    def validate_use_case_references(self) -> "DataSourcePolicy":
+        for use_case, selections in self.use_cases.items():
+            for selection in selections:
+                source = self.sources.get(selection.source_id)
+                if source is None:
+                    raise ValueError(f"use case {use_case} references unknown source {selection.source_id}")
+                if selection.dimension not in source.dimensions:
+                    raise ValueError(
+                        f"use case {use_case} references unknown dimension "
+                        f"{selection.source_id}.{selection.dimension}"
+                    )
+        return self
 
 
 class Evidence(StrictBaseModel):

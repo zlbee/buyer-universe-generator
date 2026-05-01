@@ -221,11 +221,19 @@ class SecEdgarClient:
             url=f"https://www.sec.gov/Archives/edgar/data/{cik_no_padding}/{accession_no_dashes}/{accession}-index.html",
         )
 
-    def source_document_for_filing(self, target: ResolvedTarget, filing: FilingMetadata, ttl_hours: int) -> SourceDocument:
+    def source_document_for_filing(
+        self,
+        target: ResolvedTarget,
+        filing: FilingMetadata,
+        ttl_hours: int,
+        source_strength: SourceStrength = SourceStrength.A,
+        source_dimension: str | None = None,
+    ) -> SourceDocument:
         return SourceDocument(
             source_id="edgar",
+            source_dimension=source_dimension,
             source_type=SourceType.sec_filing,
-            source_strength=SourceStrength.A,
+            source_strength=source_strength,
             target_cik=target.cik,
             target_ticker=target.ticker,
             url=filing.url,
@@ -235,11 +243,18 @@ class SecEdgarClient:
             expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours) if ttl_hours else None,
         )
 
-    def source_document_for_mapping(self, target: ResolvedTarget, ttl_hours: int) -> SourceDocument:
+    def source_document_for_mapping(
+        self,
+        target: ResolvedTarget,
+        ttl_hours: int,
+        source_strength: SourceStrength = SourceStrength.A,
+        source_dimension: str | None = None,
+    ) -> SourceDocument:
         return SourceDocument(
             source_id="edgar",
+            source_dimension=source_dimension,
             source_type=SourceType.sec_company_mapping,
-            source_strength=SourceStrength.A,
+            source_strength=source_strength,
             target_cik=target.cik,
             target_ticker=target.ticker,
             url=self.company_tickers_exchange_url,

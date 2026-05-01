@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 
 from src.config import Settings
-from src.domain import DataSourceConfig, DataSourcePolicy
+from src.domain import DataSourceConfig, DataSourceDimensionConfig, DataSourcePolicy, SourceStrength
 
 
 @dataclass(frozen=True)
@@ -17,9 +17,19 @@ class SelectedDataSource:
     """A source selected for a use case, including disabled-state diagnostics."""
 
     source_id: str
+    dimension_id: str
     config: DataSourceConfig
+    dimension: DataSourceDimensionConfig
     enabled: bool
     disabled_reason: str | None = None
+
+    @property
+    def source_strength(self) -> SourceStrength:
+        return self.dimension.source_strength
+
+    @property
+    def field_coverage(self) -> list[str]:
+        return self.dimension.field_coverage
 
 
 class DataSourceStrategy:
@@ -36,15 +46,32 @@ class DataSourceStrategy:
 
     def select(self, use_case: str, include_disabled: bool = False) -> list[SelectedDataSource]:
         selected: list[SelectedDataSource] = []
-        for source_id in self.policy.use_cases.get(use_case, []):
+        for source_reference in self.policy.use_cases.get(use_case, []):
+            source_id = source_reference.source_id
             config = self.policy.sources[source_id]
+            dimension = config.dimensions[source_reference.dimension]
             enabled, reason = self._is_source_enabled(source_id, config)
             if enabled or include_disabled:
-                selected.append(SelectedDataSource(source_id=source_id, config=config, enabled=enabled, disabled_reason=reason))
+                selected.append(
+                    SelectedDataSource(
+                        source_id=source_id,
+                        dimension_id=source_reference.dimension,
+                        config=config,
+                        dimension=dimension,
+                        enabled=enabled,
+                        disabled_reason=reason,
+                    )
+                )
         return selected
 
     def source(self, source_id: str) -> DataSourceConfig:
         return self.policy.sources[source_id]
+
+    def selected_source(self, use_case: str, source_id: str, include_disabled: bool = False) -> SelectedDataSource | None:
+        return next(
+            (source for source in self.select(use_case, include_disabled=include_disabled) if source.source_id == source_id),
+            None,
+        )
 
     def cache_ttl_hours(self, source_id: str) -> int:
         return self.policy.sources[source_id].cache_ttl_hours

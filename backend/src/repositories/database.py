@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from src.config import Settings, get_settings
@@ -38,6 +38,26 @@ def create_session_factory(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 
+def _ensure_sqlite_compatible_schema(engine: Engine) -> None:
+    if engine.dialect.name != "sqlite":
+        return
+
+    inspector = inspect(engine)
+    if "source_documents" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("source_documents")}
+    if "source_dimension" in columns:
+        return
+
+    # Phase 1 is still pre-migration-framework, so local SQLite gets a narrow additive migration.
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE source_documents ADD COLUMN source_dimension VARCHAR(128)"))
+        connection.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_source_documents_source_dimension ON source_documents (source_dimension)")
+        )
+
+
 def init_db(settings: Settings | None = None) -> Engine:
     active_settings = settings or get_settings()
     active_settings.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -48,4 +68,5 @@ def init_db(settings: Settings | None = None) -> Engine:
     from src.repositories import models as _models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _ensure_sqlite_compatible_schema(engine)
     return engine

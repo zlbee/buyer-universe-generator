@@ -82,7 +82,7 @@ $env:BUG_POLYGON_API_KEY = "..."
 $env:BUG_NEWS_API_KEY = "..."
 ```
 
-Data-source priority and enablement are configured in:
+Data-source enablement, use-case routing, and dimension-scoped source strength are configured in:
 
 ```text
 backend/config/datasources.yaml

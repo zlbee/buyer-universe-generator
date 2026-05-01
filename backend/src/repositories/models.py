@@ -53,6 +53,7 @@ class SourceDocumentRecord(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     source_id: Mapped[str] = mapped_column(String(64), index=True)
+    source_dimension: Mapped[str | None] = mapped_column(String(128), index=True, nullable=True)
     source_type: Mapped[str] = mapped_column(String(64), index=True)
     source_strength: Mapped[str] = mapped_column(String(4))
     target_cik: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)

@@ -34,6 +34,7 @@ type FilingMetadata = {
 
 type SourceDocument = {
   source_id: string;
+  source_dimension: string | null;
   source_type: string;
   source_strength: string;
   target_cik: string | null;
@@ -416,6 +417,7 @@ function DebugResult({
             <thead>
               <tr>
                 <th>Source</th>
+                <th>Dimension</th>
                 <th>Type</th>
                 <th>Strength</th>
                 <th>Retrieved</th>
@@ -426,6 +428,7 @@ function DebugResult({
               {data.source_documents.map((document, index) => (
                 <tr key={`${document.source_id}-${document.filing_accession ?? document.url ?? index}`}>
                   <td>{document.source_id}</td>
+                  <td>{document.source_dimension ?? "N/A"}</td>
                   <td>{document.source_type}</td>
                   <td>{document.source_strength}</td>
                   <td>{formatDate(document.retrieved_at)}</td>

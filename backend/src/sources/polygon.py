@@ -20,7 +20,13 @@ class PolygonClient:
         self.settings = settings
         self.http_client = http_client or httpx.Client(timeout=settings.request_timeout_seconds)
 
-    def fetch_ticker_profile(self, target: ResolvedTarget, ttl_hours: int) -> SourceDocument:
+    def fetch_ticker_profile(
+        self,
+        target: ResolvedTarget,
+        ttl_hours: int,
+        source_strength: SourceStrength = SourceStrength.C,
+        source_dimension: str | None = None,
+    ) -> SourceDocument:
         response = self.http_client.get(
             f"{self.base_url}/v3/reference/tickers/{target.ticker}",
             params={"apiKey": self.settings.polygon_api_key},
@@ -30,8 +36,9 @@ class PolygonClient:
         result = payload.get("results", payload)
         return SourceDocument(
             source_id="polygon",
+            source_dimension=source_dimension,
             source_type=SourceType.exchange_profile,
-            source_strength=SourceStrength.C,
+            source_strength=source_strength,
             target_cik=target.cik,
             target_ticker=target.ticker,
             url=f"{self.base_url}/v3/reference/tickers/{target.ticker}",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.domain import FilingMetadata, SourceDocument, SourceType, TargetIngestionResult
+from src.domain import FilingMetadata, SourceDocument, SourceStrength, SourceType, TargetIngestionResult
 from src.pipelines.target_resolution import TargetResolver
 from src.repositories.source_cache import SourceCache
 from src.sources.newsapi import NewsApiClient
@@ -36,15 +36,28 @@ class SourceIngestionService:
         documents = self.cache.get_valid_documents(target.cik)
 
         if not any(document.source_type == SourceType.sec_company_mapping for document in documents):
-            mapping_document = self.edgar_client.source_document_for_mapping(target, self.strategy.cache_ttl_hours("edgar"))
+            mapping_source = self.strategy.selected_source("target_resolution", "edgar", include_disabled=True)
+            mapping_document = self.edgar_client.source_document_for_mapping(
+                target,
+                self.strategy.cache_ttl_hours("edgar"),
+                source_strength=mapping_source.source_strength if mapping_source else SourceStrength.A,
+                source_dimension=mapping_source.dimension_id if mapping_source else None,
+            )
             self.cache.save_document(mapping_document)
             documents.append(mapping_document)
 
         filings = self._filings_from_documents(documents)
         if not filings:
+            filing_source = self.strategy.selected_source("sec_filings", "edgar", include_disabled=True)
             filings = self.edgar_client.fetch_recent_filings(target)
             filing_documents = [
-                self.edgar_client.source_document_for_filing(target, filing, self.strategy.cache_ttl_hours("edgar"))
+                self.edgar_client.source_document_for_filing(
+                    target,
+                    filing,
+                    self.strategy.cache_ttl_hours("edgar"),
+                    source_strength=filing_source.source_strength if filing_source else SourceStrength.A,
+                    source_dimension=filing_source.dimension_id if filing_source else None,
+                )
                 for filing in filings
             ]
             self.cache.save_documents(filing_documents)
@@ -69,7 +82,12 @@ class SourceIngestionService:
             warnings.append("polygon disabled: adapter unavailable")
             return []
 
-        document = self.polygon_client.fetch_ticker_profile(target, self.strategy.cache_ttl_hours("polygon"))
+        document = self.polygon_client.fetch_ticker_profile(
+            target,
+            self.strategy.cache_ttl_hours("polygon"),
+            source_strength=polygon_source.source_strength,
+            source_dimension=polygon_source.dimension_id,
+        )
         self.cache.save_document(document)
         return [document]
 
@@ -87,7 +105,12 @@ class SourceIngestionService:
             warnings.append("newsapi disabled: adapter unavailable")
             return []
 
-        news_documents = self.newsapi_client.fetch_target_articles(target, self.strategy.cache_ttl_hours("newsapi"))
+        news_documents = self.newsapi_client.fetch_target_articles(
+            target,
+            self.strategy.cache_ttl_hours("newsapi"),
+            source_strength=news_source.source_strength,
+            source_dimension=news_source.dimension_id,
+        )
         self.cache.save_documents(news_documents)
         return news_documents
 

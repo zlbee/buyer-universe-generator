@@ -20,7 +20,14 @@ class NewsApiClient:
         self.settings = settings
         self.http_client = http_client or httpx.Client(timeout=settings.request_timeout_seconds)
 
-    def fetch_target_articles(self, target: ResolvedTarget, ttl_hours: int, page_size: int = 5) -> list[SourceDocument]:
+    def fetch_target_articles(
+        self,
+        target: ResolvedTarget,
+        ttl_hours: int,
+        page_size: int = 5,
+        source_strength: SourceStrength = SourceStrength.B,
+        source_dimension: str | None = None,
+    ) -> list[SourceDocument]:
         response = self.http_client.get(
             self.everything_url,
             params={
@@ -42,8 +49,9 @@ class NewsApiClient:
             documents.append(
                 SourceDocument(
                     source_id="newsapi",
+                    source_dimension=source_dimension,
                     source_type=SourceType.news_article,
-                    source_strength=SourceStrength.B,
+                    source_strength=source_strength,
                     target_cik=target.cik,
                     target_ticker=target.ticker,
                     url=url,
