@@ -1,1 +1,13 @@
 .obsidian/
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.env
+data/
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.log
+*.tsbuildinfo

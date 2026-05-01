@@ -1,0 +1,2 @@
+"""Buyer candidate retriever package."""
+

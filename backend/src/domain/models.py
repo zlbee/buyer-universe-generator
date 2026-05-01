@@ -1,0 +1,138 @@
+"""Pydantic models shared across API, pipeline, persistence, and exports."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class StrictBaseModel(BaseModel):
+    """Base model that rejects unknown fields to keep pipeline contracts explicit."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class BuyerType(str, Enum):
+    strategic = "strategic"
+    financial = "financial"
+
+
+class SourceStrength(str, Enum):
+    A = "A"
+    B = "B"
+    C = "C"
+    D = "D"
+
+
+class FeatureLabel(str, Enum):
+    verified_fact = "verified_fact"
+    derived_keyword = "derived_keyword"
+    llm_inference = "llm_inference"
+
+
+class PipelineRunStatus(str, Enum):
+    created = "created"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+
+
+class Evidence(StrictBaseModel):
+    """A citation-backed claim used to defend target features or buyer candidates."""
+
+    claim: str = Field(min_length=1)
+    source_type: str = Field(min_length=1)
+    source_strength: SourceStrength
+    url: str | None = None
+    filing_accession: str | None = None
+    retrieved_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    quote_or_snippet: str | None = None
+    verified_fact: bool = True
+
+    @model_validator(mode="after")
+    def require_source_reference(self) -> "Evidence":
+        # Every evidence item must be independently traceable to a URL or SEC filing.
+        if not self.url and not self.filing_accession:
+            raise ValueError("Evidence requires either url or filing_accession")
+        return self
+
+
+class TargetProfile(StrictBaseModel):
+    """Minimum target profile required to anchor long-list candidate retrieval."""
+
+    target_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    ticker: str = Field(min_length=1)
+    cik: str = Field(min_length=1)
+    exchange: str | None = None
+    sic: str | None = None
+    business_summary: str | None = None
+    products: list[str] = Field(default_factory=list)
+    customer_segments: list[str] = Field(default_factory=list)
+    channels: list[str] = Field(default_factory=list)
+    geographies: list[str] = Field(default_factory=list)
+    size_metrics: dict[str, Any] = Field(default_factory=dict)
+    keywords: list[str] = Field(default_factory=list)
+    adjacent_categories: list[str] = Field(default_factory=list)
+    feature_labels: dict[str, FeatureLabel] = Field(default_factory=dict)
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
+class CandidateHit(StrictBaseModel):
+    """Raw buyer candidate emitted by one retriever before dedupe and filtering."""
+
+    candidate_name: str = Field(min_length=1)
+    buyer_type: BuyerType
+    retriever_name: str = Field(min_length=1)
+    source_path: list[str] = Field(default_factory=list)
+    fit_reason: str = Field(min_length=1)
+    evidence: list[Evidence] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    pending_verification: bool = False
+
+    @model_validator(mode="after")
+    def require_evidence_or_pending_status(self) -> "CandidateHit":
+        # Retrievers may emit unverified leads, but they must mark them explicitly.
+        if not self.evidence and not self.pending_verification:
+            raise ValueError("CandidateHit requires evidence or pending_verification=True")
+        return self
+
+
+class LongListCandidate(StrictBaseModel):
+    """Canonical buyer candidate after normalization, filtering, and pre-scoring."""
+
+    canonical_name: str = Field(min_length=1)
+    buyer_type: BuyerType
+    ticker: str | None = None
+    cik: str | None = None
+    domain: str | None = None
+    source_paths: list[str] = Field(default_factory=list)
+    hit_count: int = Field(default=1, ge=1)
+    initial_score: float = Field(default=0.0, ge=0.0, le=100.0)
+    fit_reasons: list[str] = Field(default_factory=list)
+    risk_flags: list[str] = Field(default_factory=list)
+    evidence: list[Evidence] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def require_formal_long_list_evidence(self) -> "LongListCandidate":
+        # Formal long-list entries must be defensible; weak leads belong in pending queues.
+        if not self.evidence:
+            raise ValueError("LongListCandidate requires at least one evidence item")
+        return self
+
+
+class PipelineRun(StrictBaseModel):
+    """Serializable run envelope used by the API, CLI, and persistence layer."""
+
+    run_id: str = Field(min_length=1)
+    input_query: str = Field(min_length=1)
+    status: PipelineRunStatus = PipelineRunStatus.created
+    target_profile: TargetProfile | None = None
+    long_list: list[LongListCandidate] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+

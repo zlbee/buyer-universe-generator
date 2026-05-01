@@ -1,0 +1,29 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      BUG_DATABASE_URL: sqlite:////app/data/buyer_universe.db
+      BUG_CACHE_DIR: /app/data/cache
+      BUG_ENVIRONMENT: docker
+      BUG_SEC_USER_AGENT: buyer-universe-generator/0.1 contact@example.com
+      BUG_CORS_ORIGINS: '["http://localhost:5173","http://127.0.0.1:5173"]'
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend-data:/app/data
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  backend-data:
