@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
 import logging
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+import yaml
 
 from src.config import Settings
 from src.domain import (
@@ -41,6 +44,22 @@ class TargetProfileExtractionError(RuntimeError):
         self.error_code = error_code
         self.status_code = status_code
         self.details = details or {}
+
+
+@dataclass
+class CanonicalKeywordResult:
+    values: list[str]
+    groups: dict[str, list[str]]
+    evidence: list[Evidence]
+    derivation_counts: dict[str, int]
+    taxonomy_version: int | None = None
+
+
+@dataclass(frozen=True)
+class KeywordTaxonomy:
+    version: int | None
+    sic_keywords: dict[str, list[str]]
+    fingerprint: str
 
 
 class LLMTargetFeatureOutput(BaseModel):
@@ -153,6 +172,32 @@ def target_profile_llm_system_prompt(schema_name: str) -> str:
     )
 
 
+def load_keyword_taxonomy(path: Path) -> KeywordTaxonomy:
+    if not path.exists():
+        logger.warning("Keyword taxonomy file not found: path=%s", path)
+        return KeywordTaxonomy(version=None, sic_keywords={}, fingerprint="missing")
+
+    with path.open("r", encoding="utf-8") as taxonomy_file:
+        raw_taxonomy = yaml.safe_load(taxonomy_file) or {}
+
+    raw_sic_keywords = raw_taxonomy.get("sic_keywords", {})
+    sic_keywords: dict[str, list[str]] = {}
+    if isinstance(raw_sic_keywords, dict):
+        for sic, entry in raw_sic_keywords.items():
+            keywords = entry.get("keywords", []) if isinstance(entry, dict) else []
+            if not isinstance(keywords, list):
+                continue
+            sic_keywords[str(sic)] = _dedupe_strings([str(keyword) for keyword in keywords])
+
+    version = raw_taxonomy.get("version")
+    fingerprint = hashlib.sha256(json.dumps(raw_taxonomy, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+    return KeywordTaxonomy(
+        version=version if isinstance(version, int) else None,
+        sic_keywords=sic_keywords,
+        fingerprint=fingerprint,
+    )
+
+
 class TargetProfileExtractor:
     """Builds a retrieval-ready TargetProfile from Phase 1 source metadata and LLM extraction."""
 
@@ -177,6 +222,7 @@ class TargetProfileExtractor:
         self.edgar_client = edgar_client
         self.llm_client = llm_client
         self.company_page_client = company_page_client
+        self.keyword_taxonomy = load_keyword_taxonomy(settings.keyword_taxonomy_path)
 
     def build_profile(self, query: str) -> TargetProfileExtractionResult:
         logger.info("TargetProfile extraction started: query=%s", query)
@@ -212,9 +258,10 @@ class TargetProfileExtractor:
             )
 
         source_fingerprint = fingerprint_source_documents(source_documents)
+        effective_extractor_version = self._effective_extractor_version()
         cached = self.profile_cache.get_valid(
             target_cik=ingestion.target.cik,
-            extractor_version=self.settings.target_profile_extractor_version,
+            extractor_version=effective_extractor_version,
             source_fingerprint=source_fingerprint,
         )
         if cached:
@@ -244,7 +291,7 @@ class TargetProfileExtractor:
         self.profile_cache.save(
             target_cik=ingestion.target.cik,
             target_ticker=ingestion.target.ticker,
-            extractor_version=self.settings.target_profile_extractor_version,
+            extractor_version=effective_extractor_version,
             source_fingerprint=source_fingerprint,
             result=result,
             ttl_hours=self.settings.target_profile_cache_ttl_hours,
@@ -257,6 +304,9 @@ class TargetProfileExtractor:
             len(result.warnings),
         )
         return result
+
+    def _effective_extractor_version(self) -> str:
+        return f"{self.settings.target_profile_extractor_version}:keyword-taxonomy:{self.keyword_taxonomy.fingerprint[:12]}"
 
     def _ensure_filing_text(
         self,
@@ -436,7 +486,6 @@ class TargetProfileExtractor:
             "customer_segments": llm_output.customer_segments,
             "channels": llm_output.channels,
             "geographies": llm_output.geographies,
-            "keywords": llm_output.keywords,
             "adjacent_categories": llm_output.adjacent_categories,
         }
         for field_name, value in llm_field_values.items():
@@ -445,6 +494,16 @@ class TargetProfileExtractor:
             mapped_evidence = _evidence_from_support(field_name, llm_output.field_support.get(field_name, []), source_documents)
             if mapped_evidence:
                 feature_evidence[field_name] = mapped_evidence
+
+        keyword_result = _build_canonical_keywords(
+            ingestion,
+            source_documents,
+            llm_output,
+            feature_evidence,
+            self.keyword_taxonomy,
+        )
+        if keyword_result.evidence:
+            feature_evidence["keywords"] = keyword_result.evidence
 
         for field_name in ("target_id", "name", "ticker", "cik", "exchange", "sic"):
             if field_name in feature_evidence:
@@ -456,7 +515,7 @@ class TargetProfileExtractor:
             if not llm_field_values[field_name]:
                 continue
             feature_labels[field_name] = FeatureLabel.verified_fact if feature_evidence.get(field_name) else FeatureLabel.llm_inference
-        if llm_output.keywords:
+        if keyword_result.values:
             feature_labels["keywords"] = FeatureLabel.derived_keyword
         if llm_output.adjacent_categories:
             feature_labels["adjacent_categories"] = FeatureLabel.llm_inference
@@ -475,7 +534,8 @@ class TargetProfileExtractor:
             channels=_dedupe_strings(llm_output.channels),
             geographies=_dedupe_strings(llm_output.geographies),
             size_metrics=size_metrics,
-            keywords=_dedupe_strings(llm_output.keywords),
+            keywords=keyword_result.values,
+            keyword_groups=keyword_result.groups,
             adjacent_categories=_dedupe_strings(llm_output.adjacent_categories),
             feature_labels=feature_labels,
             feature_evidence=feature_evidence,
@@ -487,13 +547,15 @@ class TargetProfileExtractor:
             source_documents=source_documents,
             warnings=warnings,
             extraction_metadata={
-                "extractor_version": self.settings.target_profile_extractor_version,
+                "extractor_version": self._effective_extractor_version(),
                 "source_fingerprint": source_fingerprint,
                 "llm_provider": self.settings.llm_provider,
                 "llm_model": self.settings.llm_model,
                 "cache_hit": False,
                 "source_document_count": len(source_documents),
                 "source_text_document_count": len([document for document in source_documents if document.raw_text]),
+                "keyword_derivation_counts": keyword_result.derivation_counts,
+                "keyword_taxonomy_version": keyword_result.taxonomy_version,
             },
         )
 
@@ -583,7 +645,7 @@ products: string[]
 customer_segments: string[]
 channels: string[]
 geographies: string[]
-keywords: string[]
+keywords: supplemental string[] for source-grounded retrieval terms not already captured above
 adjacent_categories: string[]
 field_support: object with the same field names above mapped to short exact source snippets.
 
@@ -592,6 +654,7 @@ Rules:
 - Keep values concise and useful for retrieval.
 - field_support snippets must be copied from the source text when possible.
 - Use [] in field_support when a field is empty or has no exact supporting snippet.
+- Treat keywords as supplemental source-grounded terms; deterministic post-processing derives canonical keywords from verified fields and SIC taxonomy.
 - adjacent_categories may be inference, but keep them grounded in source text.
 
 Sources:
@@ -692,6 +755,149 @@ def _evidence_from_support(
             )
         )
     return evidence
+
+
+def _build_canonical_keywords(
+    ingestion: TargetIngestionResult,
+    source_documents: list[SourceDocument],
+    llm_output: LLMTargetFeatureOutput,
+    feature_evidence: dict[str, list[Evidence]],
+    keyword_taxonomy: KeywordTaxonomy,
+) -> CanonicalKeywordResult:
+    values: list[str] = []
+    groups: dict[str, list[str]] = {}
+    seen_values: set[str] = set()
+    evidence: list[Evidence] = []
+    seen_evidence: set[str] = set()
+    derivation_counts: dict[str, int] = {}
+
+    def add_keyword(value: str, source: str, keyword_evidence: Evidence | None = None) -> None:
+        normalized = _normalize_keyword(value)
+        if not normalized:
+            return
+        value_key = normalized.casefold()
+        if value_key not in seen_values:
+            values.append(normalized)
+            seen_values.add(value_key)
+            groups.setdefault(source, []).append(normalized)
+            derivation_counts[source] = derivation_counts.get(source, 0) + 1
+        if not keyword_evidence:
+            return
+        evidence_key = keyword_evidence.model_dump_json()
+        if evidence_key not in seen_evidence:
+            evidence.append(keyword_evidence)
+            seen_evidence.add(evidence_key)
+
+    for field_name in ("products", "customer_segments", "channels"):
+        field_evidence = feature_evidence.get(field_name, [])
+        if not field_evidence:
+            continue
+        for value in getattr(llm_output, field_name):
+            add_keyword(
+                value,
+                f"verified_{field_name}",
+                _keyword_evidence_from_field(value, field_name, field_evidence[0]),
+            )
+
+    sic_evidence = (feature_evidence.get("sic") or feature_evidence.get("target_id") or [None])[0]
+    for value in keyword_taxonomy.sic_keywords.get(str(ingestion.target.sic or "").strip(), []):
+        add_keyword(value, "sic_taxonomy", _keyword_evidence_from_sic(value, ingestion.target.sic, sic_evidence))
+
+    for value in llm_output.adjacent_categories:
+        matched_evidence = _keyword_evidence_from_source_match(value, source_documents, "source-matched adjacent category")
+        if matched_evidence:
+            add_keyword(value, "source_matched_adjacent_category", matched_evidence)
+
+    for value in llm_output.keywords:
+        matched_evidence = _keyword_evidence_from_source_match(value, source_documents, "source-matched LLM keyword")
+        if matched_evidence:
+            add_keyword(value, "source_matched_llm_keyword", matched_evidence)
+
+    if not values:
+        for value in llm_output.keywords:
+            add_keyword(value, "llm_fallback")
+
+    return CanonicalKeywordResult(
+        values=values,
+        groups=groups,
+        evidence=evidence,
+        derivation_counts=derivation_counts,
+        taxonomy_version=keyword_taxonomy.version,
+    )
+
+
+def _normalize_keyword(value: str) -> str:
+    normalized = " ".join(str(value).split())
+    return normalized if len(normalized) >= 3 else ""
+
+
+def _keyword_evidence_from_field(keyword: str, field_name: str, source_evidence: Evidence) -> Evidence:
+    return Evidence(
+        claim=f"Keyword '{_normalize_keyword(keyword)}' is derived from verified {field_name}.",
+        source_type=source_evidence.source_type,
+        source_dimension=source_evidence.source_dimension,
+        source_strength=source_evidence.source_strength,
+        url=source_evidence.url,
+        filing_accession=source_evidence.filing_accession,
+        retrieved_at=source_evidence.retrieved_at,
+        quote_or_snippet=source_evidence.quote_or_snippet,
+        verified_fact=True,
+    )
+
+
+def _keyword_evidence_from_sic(keyword: str, sic: str | None, source_evidence: Evidence | None) -> Evidence | None:
+    if not sic or not source_evidence:
+        return None
+    return Evidence(
+        claim=f"Keyword '{_normalize_keyword(keyword)}' is derived from SEC SIC code {sic}.",
+        source_type=source_evidence.source_type,
+        source_dimension=source_evidence.source_dimension,
+        source_strength=source_evidence.source_strength,
+        url=source_evidence.url,
+        filing_accession=source_evidence.filing_accession,
+        retrieved_at=source_evidence.retrieved_at,
+        quote_or_snippet=f"SIC {sic}",
+        verified_fact=True,
+    )
+
+
+def _keyword_evidence_from_source_match(
+    keyword: str,
+    source_documents: list[SourceDocument],
+    derivation_method: str,
+) -> Evidence | None:
+    document = _document_containing_keyword(source_documents, keyword)
+    if not document:
+        return None
+    if not document.url and not document.filing_accession:
+        return None
+    normalized = _normalize_keyword(keyword)
+    return Evidence(
+        claim=f"Keyword '{normalized}' is retained as a {derivation_method}.",
+        source_type=document.source_type.value,
+        source_dimension=document.source_dimension,
+        source_strength=document.source_strength,
+        url=document.url,
+        filing_accession=document.filing_accession,
+        retrieved_at=document.retrieved_at,
+        quote_or_snippet=normalized,
+        verified_fact=True,
+    )
+
+
+def _document_containing_keyword(source_documents: list[SourceDocument], keyword: str) -> SourceDocument | None:
+    normalized_keyword = _normalize_keyword(keyword).casefold()
+    if not normalized_keyword:
+        return None
+    for document in source_documents:
+        haystacks = []
+        if document.raw_text:
+            haystacks.append(" ".join(document.raw_text.split()).casefold())
+        if document.metadata:
+            haystacks.append(json.dumps(document.metadata, sort_keys=True, default=str).casefold())
+        if any(normalized_keyword in haystack for haystack in haystacks):
+            return document
+    return None
 
 
 def _document_containing_snippet(source_documents: list[SourceDocument], snippet: str) -> SourceDocument | None:

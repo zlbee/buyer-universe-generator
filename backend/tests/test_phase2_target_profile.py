@@ -38,6 +38,7 @@ def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:
         "database_url": f"sqlite:///{tmp_path / 'buyer_universe.db'}",
         "cache_dir": tmp_path / "cache",
         "datasource_policy_path": Path("config/datasources.yaml"),
+        "keyword_taxonomy_path": Path("config/keyword_taxonomy.yaml"),
         "edgar_identity": "buyer-universe-generator/0.1 contact@example.com",
         "openrouter_api_key": "openrouter-test-key",
         "polygon_api_key": None,
@@ -199,7 +200,7 @@ def test_target_profile_extractor_assembles_profile_and_reuses_cache(tmp_path: P
             "customer_segments": ["retail consumers"],
             "channels": ["retail", "e-commerce"],
             "geographies": ["United States"],
-            "keywords": ["cosmetics", "beauty"],
+            "keywords": ["cosmetics", "beauty", "unsupported trend"],
             "adjacent_categories": ["personal care"],
             "field_support": {
                 "business_summary": ["sells cosmetics through retail and e-commerce"],
@@ -219,10 +220,37 @@ def test_target_profile_extractor_assembles_profile_and_reuses_cache(tmp_path: P
     profile = first_result.target_profile
     assert profile.ticker == "ELF"
     assert profile.products == ["cosmetics"]
+    assert profile.keywords == [
+        "cosmetics",
+        "retail consumers",
+        "retail",
+        "e-commerce",
+        "beauty products",
+        "personal care",
+        "toiletries",
+        "beauty",
+    ]
+    assert profile.keyword_groups == {
+        "verified_products": ["cosmetics"],
+        "verified_customer_segments": ["retail consumers"],
+        "verified_channels": ["retail", "e-commerce"],
+        "sic_taxonomy": ["beauty products", "personal care", "toiletries"],
+        "source_matched_llm_keyword": ["beauty"],
+    }
+    assert "unsupported trend" not in profile.keywords
     assert profile.feature_labels["business_summary"] == "verified_fact"
     assert profile.feature_labels["keywords"] == "derived_keyword"
     assert profile.feature_labels["adjacent_categories"] == "llm_inference"
     assert profile.feature_evidence["business_summary"][0].source_dimension == "seller_profile.business_description"
+    assert profile.feature_evidence["keywords"][0].claim == "Keyword 'cosmetics' is derived from verified products."
+    assert first_result.extraction_metadata["keyword_derivation_counts"] == {
+        "verified_products": 1,
+        "verified_customer_segments": 1,
+        "verified_channels": 2,
+        "sic_taxonomy": 3,
+        "source_matched_llm_keyword": 1,
+    }
+    assert first_result.extraction_metadata["keyword_taxonomy_version"] == 1
     assert first_result.extraction_metadata["cache_hit"] is False
     assert second_result.extraction_metadata["cache_hit"] is True
     assert fake_llm.calls == 1
@@ -261,8 +289,60 @@ def test_target_profile_extractor_normalizes_repairable_llm_shape(tmp_path: Path
 
     assert result.target_profile.products == ["cosmetics"]
     assert result.target_profile.channels == ["retail"]
-    assert result.target_profile.keywords == ["beauty"]
+    assert result.target_profile.keywords == [
+        "cosmetics",
+        "retail",
+        "beauty products",
+        "personal care",
+        "toiletries",
+        "beauty",
+    ]
     assert result.target_profile.feature_labels["business_summary"] == "verified_fact"
+
+
+def test_target_profile_extractor_loads_keyword_taxonomy_from_config(tmp_path: Path) -> None:
+    taxonomy_path = tmp_path / "keyword_taxonomy.yaml"
+    taxonomy_path.write_text(
+        "\n".join(
+            [
+                "version: 7",
+                "sic_keywords:",
+                '  "2844":',
+                "    keywords:",
+                "      - color cosmetics",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    settings = settings_for_tests(tmp_path, keyword_taxonomy_path=taxonomy_path)
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
+    fake_llm = FakeLLMClient(
+        {
+            "business_summary": "e.l.f. Beauty sells cosmetics through retail and e-commerce.",
+            "products": ["cosmetics"],
+            "customer_segments": [],
+            "channels": [],
+            "geographies": [],
+            "keywords": [],
+            "adjacent_categories": [],
+            "field_support": {
+                "business_summary": ["sells cosmetics through retail and e-commerce"],
+                "products": ["sells cosmetics"],
+            },
+        }
+    )
+
+    with session_factory() as session:
+        extractor = build_test_extractor(settings, session, fake_llm)
+        result = extractor.build_profile("ELF")
+
+    assert result.target_profile.keywords == ["cosmetics", "color cosmetics"]
+    assert result.target_profile.keyword_groups == {
+        "verified_products": ["cosmetics"],
+        "sic_taxonomy": ["color cosmetics"],
+    }
+    assert result.extraction_metadata["keyword_taxonomy_version"] == 7
 
 
 def test_target_profile_extractor_requires_openrouter_key(tmp_path: Path) -> None:
@@ -371,6 +451,7 @@ def sample_profile_result() -> TargetProfileExtractionResult:
         channels=["retail"],
         geographies=["United States"],
         keywords=["beauty"],
+        keyword_groups={"llm_fallback": ["beauty"]},
         adjacent_categories=["personal care"],
     )
     return TargetProfileExtractionResult(

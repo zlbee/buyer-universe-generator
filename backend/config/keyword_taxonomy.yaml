@@ -1,0 +1,11 @@
+version: 1
+
+sic_keywords:
+  "2844":
+    label: Perfumes, cosmetics, and other toilet preparations
+    keywords:
+      - cosmetics
+      - beauty products
+      - personal care
+      - toiletries
+    source: sec_sic_taxonomy_seed

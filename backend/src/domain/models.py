@@ -200,6 +200,7 @@ class TargetProfile(StrictBaseModel):
     geographies: list[str] = Field(default_factory=list)
     size_metrics: dict[str, Any] = Field(default_factory=dict)
     keywords: list[str] = Field(default_factory=list)
+    keyword_groups: dict[str, list[str]] = Field(default_factory=dict)
     adjacent_categories: list[str] = Field(default_factory=list)
     feature_labels: dict[str, FeatureLabel] = Field(default_factory=dict)
     feature_evidence: dict[str, list[Evidence]] = Field(default_factory=dict)

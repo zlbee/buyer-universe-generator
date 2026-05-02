@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/buyer_universe.db"
     cache_dir: Path = Path("./data/cache")
     datasource_policy_path: Path = Path("./config/datasources.yaml")
+    keyword_taxonomy_path: Path = Path("./config/keyword_taxonomy.yaml")
 
     edgar_identity: str = Field(
         default="buyer-universe-generator/0.1 contact@example.com",

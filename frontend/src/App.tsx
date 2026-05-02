@@ -64,6 +64,7 @@ type TargetProfile = {
   geographies: string[];
   size_metrics: Record<string, unknown>;
   keywords: string[];
+  keyword_groups: Record<string, string[]>;
   adjacent_categories: string[];
   feature_labels: Record<string, "verified_fact" | "derived_keyword" | "llm_inference">;
   feature_evidence: Record<string, Evidence[]>;
