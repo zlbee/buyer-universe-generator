@@ -8,12 +8,20 @@ from pathlib import Path
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+def _default_env_file() -> Path:
+    source_root = Path(__file__).resolve().parents[1]
+    if source_root.name == "backend":
+        # Local checkout layout is <repo>/backend/src/config.py; keep one shared .env at <repo>/.env.
+        return source_root.parent / ".env"
+    # Container layout is /app/src/config.py; Compose injects env vars, but /app/.env remains the natural fallback.
+    return source_root / ".env"
+
 
 class Settings(BaseSettings):
     """Runtime settings shared by the API, CLI, and pipeline modules."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_default_env_file(),
         env_file_encoding="utf-8",
         env_prefix="BUG_",
         extra="ignore",
@@ -36,7 +44,13 @@ class Settings(BaseSettings):
     polygon_api_key: str | None = None
     news_api_key: str | None = None
     openrouter_api_key: str | None = None
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    llm_provider: str = "openrouter"
     llm_model: str = "openrouter/auto"
+    llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+    llm_max_input_chars: int = Field(default=24_000, ge=1_000)
+    target_profile_extractor_version: str = "target-profile-v1"
+    target_profile_cache_ttl_hours: int = Field(default=24, ge=0)
 
     enable_sec_edgar: bool = True
     enable_company_pages: bool = True

@@ -1,0 +1,11 @@
+hatchling>=1.25
+editables>=0.5
+edgartools>=3.0,<4.0
+fastapi>=0.115,<1.0
+httpx>=0.27,<1.0
+pydantic>=2.8,<3.0
+pydantic-settings>=2.4,<3.0
+pytz>=2024.1
+pyyaml>=6.0,<7.0
+sqlalchemy>=2.0,<3.0
+uvicorn[standard]>=0.30,<1.0

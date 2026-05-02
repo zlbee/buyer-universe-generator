@@ -64,3 +64,18 @@ class SourceDocumentRecord(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
     retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TargetProfileCacheRecord(Base):
+    """Cached Phase 2 target profile keyed by source fingerprint and extractor version."""
+
+    __tablename__ = "target_profile_cache"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    target_cik: Mapped[str] = mapped_column(String(32), index=True)
+    target_ticker: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    extractor_version: Mapped[str] = mapped_column(String(64), index=True)
+    source_fingerprint: Mapped[str] = mapped_column(String(128), index=True)
+    payload_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

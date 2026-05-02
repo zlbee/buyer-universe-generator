@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from src.config import Settings
+from src.sources.company_pages import CompanyPageClient
 from src.sources.newsapi import NewsApiClient
 from src.sources.polygon import PolygonClient
 from src.sources.sec import SecEdgarClient
@@ -19,6 +20,11 @@ class SourceRegistry:
 
     def polygon(self) -> PolygonClient:
         return PolygonClient(self.settings)
+
+    def company_pages(self) -> CompanyPageClient | None:
+        if not self.settings.enable_company_pages:
+            return None
+        return CompanyPageClient(self.settings)
 
     def newsapi(self) -> NewsApiClient:
         return NewsApiClient(self.settings)

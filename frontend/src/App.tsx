@@ -23,13 +23,16 @@ type ResolvedTarget = {
   source_provenance: string[];
 };
 
-type FilingMetadata = {
-  form: string;
-  filing_date: string | null;
-  accession_number: string;
-  period_of_report: string | null;
-  url: string | null;
+type Evidence = {
+  claim: string;
   source_type: string;
+  source_dimension: string | null;
+  source_strength: string;
+  url: string | null;
+  filing_accession: string | null;
+  retrieved_at: string;
+  quote_or_snippet: string | null;
+  verified_fact: boolean;
 };
 
 type SourceDocument = {
@@ -47,14 +50,7 @@ type SourceDocument = {
   expires_at: string | null;
 };
 
-type TargetIngestionResult = {
-  target: ResolvedTarget;
-  filings: FilingMetadata[];
-  source_documents: SourceDocument[];
-  warnings: string[];
-};
-
-type TargetProfileDraft = {
+type TargetProfile = {
   target_id: string;
   name: string;
   ticker: string;
@@ -66,24 +62,31 @@ type TargetProfileDraft = {
   customer_segments: string[];
   channels: string[];
   geographies: string[];
-  size_metrics: Record<string, string | number>;
+  size_metrics: Record<string, unknown>;
   keywords: string[];
   adjacent_categories: string[];
   feature_labels: Record<string, "verified_fact" | "derived_keyword" | "llm_inference">;
-  pending_fields: string[];
-  evidence_source_count: number;
+  feature_evidence: Record<string, Evidence[]>;
+  evidence: Evidence[];
+};
+
+type TargetProfileExtractionResult = {
+  target_profile: TargetProfile;
+  source_documents: SourceDocument[];
+  warnings: string[];
+  extraction_metadata: Record<string, unknown>;
 };
 
 type TargetProfileDebugState =
   | { status: "idle" }
   | { status: "loading"; query: string }
-  | { status: "success"; query: string; data: TargetIngestionResult; draft: TargetProfileDraft }
-  | { status: "error"; query: string; message: string; candidates?: ResolvedTarget[] };
+  | { status: "success"; query: string; data: TargetProfileExtractionResult }
+  | { status: "error"; query: string; message: string; errorCode?: string; candidates?: ResolvedTarget[] };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 
 function App() {
-  const [targetInput, setTargetInput] = useState("");
+  const [targetInput, setTargetInput] = useState("ELF");
   const [health, setHealth] = useState<HealthState>({ status: "checking" });
   const [debugState, setDebugState] = useState<TargetProfileDebugState>({ status: "idle" });
 
@@ -129,25 +132,21 @@ function App() {
     setDebugState({ status: "loading", query: trimmedTarget });
 
     try {
-      const response = await fetch(`${API_BASE_URL}/targets/resolve?query=${encodeURIComponent(trimmedTarget)}`);
+      const response = await fetch(`${API_BASE_URL}/targets/profile?query=${encodeURIComponent(trimmedTarget)}`);
 
       if (!response.ok) {
         throw await readTargetProfileDebugError(response);
       }
 
-      const data = (await response.json()) as TargetIngestionResult;
-      setDebugState({
-        status: "success",
-        query: trimmedTarget,
-        data,
-        draft: buildTargetProfileDraft(data)
-      });
+      const data = (await response.json()) as TargetProfileExtractionResult;
+      setDebugState({ status: "success", query: trimmedTarget, data });
     } catch (error) {
       if (isDebugError(error)) {
         setDebugState({
           status: "error",
           query: trimmedTarget,
           message: error.message,
+          errorCode: error.errorCode,
           candidates: error.candidates
         });
         return;
@@ -181,9 +180,9 @@ function App() {
           <div className="panel-copy">
             <h2 id="target-form-title">Start a buyer universe run</h2>
             <p>
-              Enter a US-listed ticker or exact company name. The current debug path runs
-              target resolution and source ingestion, then renders the TargetProfile draft
-              inputs for inspection.
+              Enter a US-listed ticker or exact company name. The current debug path resolves
+              the target, fetches source text, runs required LLM extraction, and renders the
+              evidence-backed TargetProfile.
             </p>
           </div>
 
@@ -199,16 +198,16 @@ function App() {
                 autoComplete="off"
               />
               <button type="submit" disabled={!trimmedTarget || debugState.status === "loading"}>
-                {debugState.status === "loading" ? "Building" : "Debug Profile"}
+                {debugState.status === "loading" ? "Building" : "Build Profile"}
               </button>
             </div>
           </form>
         </section>
 
         <section className="status-grid" aria-label="Implementation status">
-          <StatusTile label="Target Feature Extractor" value="Debug Path Ready" tone="ready" />
+          <StatusTile label="Target Feature Extractor" value="Phase 2 Ready" tone="ready" />
           <StatusTile label="Buyer Candidate Retriever" value="Planned" tone="pending" />
-          <StatusTile label="Evidence Store" value="Foundation Ready" tone="ready" />
+          <StatusTile label="Evidence Store" value="Profile Cache Ready" tone="ready" />
           <StatusTile label="API Health" value={health.status === "online" ? "Online" : "Checking"} tone="ready" />
         </section>
 
@@ -275,20 +274,16 @@ function TargetProfileDebugPanel({ state }: { state: TargetProfileDebugState }) 
         <span className={`debug-state debug-state--${state.status}`}>{state.status}</span>
       </div>
 
-      {state.status === "idle" && (
-        <div className="debug-empty">
-          Run a debug profile from the target input above.
-        </div>
-      )}
+      {state.status === "idle" && <div className="debug-empty">Build a profile from the target input above.</div>}
 
       {state.status === "loading" && (
         <div className="debug-empty">
-          Resolving and ingesting public source metadata for {state.query}.
+          Resolving, fetching source text, and extracting profile features for {state.query}.
         </div>
       )}
 
       {state.status === "error" && (
-        <DebugError message={state.message} candidates={state.candidates} />
+        <DebugError message={state.message} errorCode={state.errorCode} candidates={state.candidates} />
       )}
 
       {state.status === "success" && <DebugResult state={state} />}
@@ -298,14 +293,17 @@ function TargetProfileDebugPanel({ state }: { state: TargetProfileDebugState }) 
 
 function DebugError({
   message,
+  errorCode,
   candidates
 }: {
   message: string;
+  errorCode?: string;
   candidates?: ResolvedTarget[];
 }) {
   return (
     <div className="debug-error">
       <strong>{message}</strong>
+      {errorCode && <p>{errorCode}</p>}
       {candidates && candidates.length > 0 && (
         <div className="debug-table-wrap">
           <table>
@@ -339,7 +337,8 @@ function DebugResult({
 }: {
   state: Extract<TargetProfileDebugState, { status: "success" }>;
 }) {
-  const { data, draft } = state;
+  const { data } = state;
+  const profile = data.target_profile;
 
   return (
     <div className="debug-result">
@@ -354,57 +353,63 @@ function DebugResult({
       <div className="debug-section">
         <h3>Resolved Target</h3>
         <dl className="debug-metrics">
-          <DebugMetric label="Name" value={data.target.canonical_name} />
-          <DebugMetric label="Ticker" value={data.target.ticker} />
-          <DebugMetric label="CIK" value={data.target.cik} />
-          <DebugMetric label="Exchange" value={data.target.exchange ?? "N/A"} />
-          <DebugMetric label="SIC" value={data.target.sic ?? "N/A"} />
-          <DebugMetric label="Confidence" value={formatPercent(data.target.resolution_confidence)} />
+          <DebugMetric label="Name" value={profile.name} />
+          <DebugMetric label="Ticker" value={profile.ticker} />
+          <DebugMetric label="CIK" value={profile.cik} />
+          <DebugMetric label="Exchange" value={profile.exchange ?? "N/A"} />
+          <DebugMetric label="SIC" value={profile.sic ?? "N/A"} />
+          <DebugMetric label="Evidence" value={String(profile.evidence.length)} />
         </dl>
       </div>
 
       <div className="debug-section">
-        <h3>TargetProfile Draft</h3>
+        <h3>TargetProfile</h3>
         <div className="debug-json-grid">
-          <pre>{JSON.stringify(draft, null, 2)}</pre>
+          <pre>{JSON.stringify(profile, null, 2)}</pre>
           <div className="debug-field-list">
-            <strong>Pending extractor fields</strong>
-            {draft.pending_fields.map((field) => (
-              <span key={field}>{field}</span>
+            <strong>Feature labels</strong>
+            {Object.entries(profile.feature_labels).map(([field, label]) => (
+              <span key={field}>
+                {field}: {label}
+              </span>
             ))}
           </div>
         </div>
       </div>
 
       <div className="debug-section">
-        <h3>Filings</h3>
+        <h3>Feature Evidence</h3>
         <div className="debug-table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Form</th>
-                <th>Filing date</th>
-                <th>Period</th>
-                <th>Accession</th>
+                <th>Field</th>
+                <th>Strength</th>
+                <th>Dimension</th>
+                <th>Claim</th>
+                <th>Reference</th>
               </tr>
             </thead>
             <tbody>
-              {data.filings.map((filing) => (
-                <tr key={`${filing.form}-${filing.accession_number}`}>
-                  <td>{filing.form}</td>
-                  <td>{filing.filing_date ?? "N/A"}</td>
-                  <td>{filing.period_of_report ?? "N/A"}</td>
-                  <td>
-                    {filing.url ? (
-                      <a href={filing.url} target="_blank" rel="noreferrer">
-                        {filing.accession_number}
-                      </a>
-                    ) : (
-                      filing.accession_number
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {Object.entries(profile.feature_evidence).flatMap(([field, evidenceItems]) =>
+                evidenceItems.map((evidence, index) => (
+                  <tr key={`${field}-${index}-${evidence.filing_accession ?? evidence.url}`}>
+                    <td>{field}</td>
+                    <td>{evidence.source_strength}</td>
+                    <td>{evidence.source_dimension ?? "N/A"}</td>
+                    <td>{evidence.claim}</td>
+                    <td>
+                      {evidence.url ? (
+                        <a href={evidence.url} target="_blank" rel="noreferrer">
+                          Open
+                        </a>
+                      ) : (
+                        evidence.filing_accession ?? "N/A"
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -420,7 +425,7 @@ function DebugResult({
                 <th>Dimension</th>
                 <th>Type</th>
                 <th>Strength</th>
-                <th>Retrieved</th>
+                <th>Text</th>
                 <th>Reference</th>
               </tr>
             </thead>
@@ -431,7 +436,7 @@ function DebugResult({
                   <td>{document.source_dimension ?? "N/A"}</td>
                   <td>{document.source_type}</td>
                   <td>{document.source_strength}</td>
-                  <td>{formatDate(document.retrieved_at)}</td>
+                  <td>{document.raw_text ? `${document.raw_text.length} chars` : "metadata"}</td>
                   <td>
                     {document.url ? (
                       <a href={document.url} target="_blank" rel="noreferrer">
@@ -447,6 +452,11 @@ function DebugResult({
           </table>
         </div>
       </div>
+
+      <details className="debug-raw">
+        <summary>Extraction metadata</summary>
+        <pre>{JSON.stringify(data.extraction_metadata, null, 2)}</pre>
+      </details>
 
       <details className="debug-raw">
         <summary>Raw API response</summary>
@@ -465,88 +475,12 @@ function DebugMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function buildTargetProfileDraft(data: TargetIngestionResult): TargetProfileDraft {
-  const polygonDocument = data.source_documents.find((document) => document.source_id === "polygon");
-  const polygonMetadata = polygonDocument?.metadata ?? {};
-  const businessSummary = stringField(polygonMetadata, "description");
-  const sizeMetrics = sizeMetricFields(polygonMetadata);
-
-  const featureLabels: TargetProfileDraft["feature_labels"] = {
-    target_id: "verified_fact",
-    name: "verified_fact",
-    ticker: "verified_fact",
-    cik: "verified_fact"
-  };
-
-  if (data.target.exchange) {
-    featureLabels.exchange = "verified_fact";
-  }
-  if (data.target.sic) {
-    featureLabels.sic = "verified_fact";
-  }
-  if (businessSummary) {
-    featureLabels.business_summary = "verified_fact";
-  }
-  if (Object.keys(sizeMetrics).length > 0) {
-    featureLabels.size_metrics = "verified_fact";
-  }
-
-  return {
-    target_id: data.target.cik,
-    name: data.target.canonical_name,
-    ticker: data.target.ticker,
-    cik: data.target.cik,
-    exchange: data.target.exchange,
-    sic: data.target.sic,
-    business_summary: businessSummary,
-    products: [],
-    customer_segments: [],
-    channels: [],
-    geographies: [],
-    size_metrics: sizeMetrics,
-    keywords: [],
-    adjacent_categories: [],
-    feature_labels: featureLabels,
-    pending_fields: [
-      "products",
-      "customer_segments",
-      "channels",
-      "geographies",
-      "keywords",
-      "adjacent_categories",
-      "evidence"
-    ],
-    evidence_source_count: data.source_documents.length
-  };
-}
-
-function stringField(metadata: Record<string, unknown>, key: string): string | null {
-  const value = metadata[key];
-  return typeof value === "string" && value.trim() ? value : null;
-}
-
-function sizeMetricFields(metadata: Record<string, unknown>): Record<string, string | number> {
-  const metricKeys = [
-    "market_cap",
-    "weighted_shares_outstanding",
-    "share_class_shares_outstanding",
-    "total_employees",
-    "employee_count"
-  ];
-
-  return metricKeys.reduce<Record<string, string | number>>((metrics, key) => {
-    const value = metadata[key];
-    if (typeof value === "string" || typeof value === "number") {
-      metrics[key] = value;
-    }
-    return metrics;
-  }, {});
-}
-
-async function readTargetProfileDebugError(response: Response): Promise<Error & { candidates?: ResolvedTarget[] }> {
+async function readTargetProfileDebugError(
+  response: Response
+): Promise<Error & { candidates?: ResolvedTarget[]; errorCode?: string }> {
   try {
     const payload = (await response.json()) as {
-      detail?: string | { message?: string; candidates?: ResolvedTarget[] };
+      detail?: string | { message?: string; error_code?: string; candidates?: ResolvedTarget[] };
     };
     const detail = payload.detail;
     if (typeof detail === "string") {
@@ -554,28 +488,16 @@ async function readTargetProfileDebugError(response: Response): Promise<Error & 
     }
 
     return Object.assign(new Error(detail?.message ?? `Backend returned HTTP ${response.status}`), {
-      candidates: detail?.candidates
+      candidates: detail?.candidates,
+      errorCode: detail?.error_code
     });
   } catch {
     return Object.assign(new Error(`Backend returned HTTP ${response.status}`), {});
   }
 }
 
-function isDebugError(error: unknown): error is Error & { candidates?: ResolvedTarget[] } {
+function isDebugError(error: unknown): error is Error & { candidates?: ResolvedTarget[]; errorCode?: string } {
   return error instanceof Error;
-}
-
-function formatPercent(value: number): string {
-  return `${Math.round(value * 100)}%`;
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString();
 }
 
 export default App;

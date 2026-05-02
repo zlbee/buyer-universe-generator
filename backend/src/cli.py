@@ -7,7 +7,8 @@ import json
 from typing import Sequence
 
 from src.config import get_settings
-from src.pipelines.factory import build_source_ingestion_service
+from src.pipelines.factory import build_source_ingestion_service, build_target_profile_extractor
+from src.pipelines.target_profile_extraction import TargetProfileExtractionError
 from src.pipelines.target_resolution import AmbiguousTargetError, TargetNotFoundError
 from src.repositories.database import create_session_factory, init_db
 
@@ -19,6 +20,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     subparsers.add_parser("show-config", help="Print effective non-secret configuration")
     resolve_parser = subparsers.add_parser("resolve-target", help="Resolve and ingest source metadata for a target")
     resolve_parser.add_argument("query", help="Ticker, CIK, or exact company name")
+    profile_parser = subparsers.add_parser("build-target-profile", help="Build a Phase 2 TargetProfile for a target")
+    profile_parser.add_argument("query", help="Ticker, CIK, or exact company name")
 
     args = parser.parse_args(argv)
     settings = get_settings()
@@ -54,6 +57,46 @@ def main(argv: Sequence[str] | None = None) -> int:
             except TargetNotFoundError as error:
                 print(json.dumps({"status": "not_found", "message": str(error)}, indent=2))
                 return 1
+
+        print(result.model_dump_json(indent=2))
+        return 0
+
+    if args.command == "build-target-profile":
+        engine = init_db(settings)
+        session_factory = create_session_factory(engine)
+        with session_factory() as session:
+            service = build_target_profile_extractor(settings, session)
+            try:
+                result = service.build_profile(args.query)
+            except AmbiguousTargetError as error:
+                print(
+                    json.dumps(
+                        {
+                            "status": "ambiguous",
+                            "message": str(error),
+                            "error_code": "ambiguous_target",
+                            "candidates": [candidate.model_dump(mode="json") for candidate in error.candidates],
+                        },
+                        indent=2,
+                    )
+                )
+                return 2
+            except TargetNotFoundError as error:
+                print(json.dumps({"status": "not_found", "message": str(error), "error_code": "target_not_found"}, indent=2))
+                return 1
+            except TargetProfileExtractionError as error:
+                print(
+                    json.dumps(
+                        {
+                            "status": "failed",
+                            "message": error.message,
+                            "error_code": error.error_code,
+                            **error.details,
+                        },
+                        indent=2,
+                    )
+                )
+                return 3
 
         print(result.model_dump_json(indent=2))
         return 0

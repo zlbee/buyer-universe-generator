@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -243,6 +244,45 @@ class SecEdgarClient:
             expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours) if ttl_hours else None,
         )
 
+    def fetch_filing_text_document(
+        self,
+        target: ResolvedTarget,
+        filing: FilingMetadata,
+        ttl_hours: int,
+        source_strength: SourceStrength = SourceStrength.B,
+        source_dimension: str | None = None,
+    ) -> SourceDocument:
+        raw_text, retrieval_method = self._fetch_filing_text_with_edgartools(target, filing)
+        if not raw_text and filing.url:
+            raw_text, retrieval_method = self._fetch_filing_text_with_http(filing)
+
+        cleaned_text = _clean_filing_text(raw_text)
+        business_section = _extract_business_section(cleaned_text)
+        selected_text = business_section or cleaned_text
+        if not selected_text:
+            raise ValueError(f"Could not retrieve filing text for accession {filing.accession_number}")
+
+        return SourceDocument(
+            source_id="edgar",
+            source_dimension=source_dimension,
+            source_type=SourceType.sec_filing,
+            source_strength=source_strength,
+            target_cik=target.cik,
+            target_ticker=target.ticker,
+            url=filing.url,
+            filing_accession=filing.accession_number,
+            raw_text=selected_text,
+            metadata={
+                **filing.model_dump(mode="json"),
+                "text_retrieval_method": retrieval_method,
+                "text_scope": "item_1_business" if business_section else "full_filing_text",
+                "raw_text_char_count": len(cleaned_text),
+                "cached_text_char_count": len(selected_text),
+            },
+            retrieved_at=datetime.now(UTC),
+            expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours) if ttl_hours else None,
+        )
+
     def source_document_for_mapping(
         self,
         target: ResolvedTarget,
@@ -262,6 +302,41 @@ class SecEdgarClient:
             retrieved_at=datetime.now(UTC),
             expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours) if ttl_hours else None,
         )
+
+    def _fetch_filing_text_with_edgartools(self, target: ResolvedTarget, filing: FilingMetadata) -> tuple[str, str]:
+        edgar = self._edgar()
+        if not edgar or not hasattr(edgar, "Filing"):
+            return "", ""
+
+        try:
+            filing_object = edgar.Filing(
+                cik=int(target.cik),
+                company=target.canonical_name,
+                form=filing.form,
+                filing_date=filing.filing_date or filing.period_of_report or "",
+                accession_no=filing.accession_number,
+            )
+        except Exception:
+            return "", ""
+
+        for method_name in ("text", "markdown", "full_text_submission"):
+            method = getattr(filing_object, method_name, None)
+            if not callable(method):
+                continue
+            try:
+                text = method()
+            except Exception:
+                continue
+            if isinstance(text, str) and text.strip():
+                return text, f"edgartools:Filing.{method_name}"
+        return "", ""
+
+    def _fetch_filing_text_with_http(self, filing: FilingMetadata) -> tuple[str, str]:
+        if not filing.url:
+            return "", ""
+        response = self.http_client.get(filing.url, headers={"User-Agent": self.settings.sec_user_agent})
+        response.raise_for_status()
+        return response.text, "http:fallback"
 
     def _load_company_mapping(self) -> list[dict[str, Any]]:
         if self._company_mapping is not None:
@@ -308,6 +383,27 @@ def _safe_index(values: list[Any], index: int) -> Any:
 
 def _first_or_none(values: list[Any]) -> Any | None:
     return values[0] if values else None
+
+
+def _clean_filing_text(value: str) -> str:
+    lines = [" ".join(line.split()) for line in value.replace("\r", "\n").split("\n")]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(line for line in lines if line)).strip()
+
+
+def _extract_business_section(text: str) -> str | None:
+    start_match = re.search(r"\bitem\s+1[\.\s:-]+business\b", text, flags=re.IGNORECASE)
+    if not start_match:
+        return None
+
+    after_start = text[start_match.start() :]
+    end_match = re.search(
+        r"\bitem\s+(1a[\.\s:-]+risk\s+factors|2[\.\s:-]+properties)\b",
+        after_start,
+        flags=re.IGNORECASE,
+    )
+    if not end_match:
+        return after_start.strip()
+    return after_start[: end_match.start()].strip()
 
 
 def _rows_from_search_results(search_results: Any) -> list[dict[str, Any]]:

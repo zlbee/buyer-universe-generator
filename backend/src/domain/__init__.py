@@ -19,6 +19,7 @@ from src.domain.models import (
     SourceType,
     TargetIngestionResult,
     TargetProfile,
+    TargetProfileExtractionResult,
 )
 
 __all__ = [
@@ -40,4 +41,5 @@ __all__ = [
     "SourceType",
     "TargetIngestionResult",
     "TargetProfile",
+    "TargetProfileExtractionResult",
 ]

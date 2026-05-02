@@ -1,6 +1,6 @@
 # Buyer Universe Generator
 
-Buyer Universe Generator is a public-data MVP for generating a traceable buyer long-list for US-listed targets. Phase 0 establishes the runnable project foundation: backend package structure, frontend shell, shared domain contracts, configuration, SQLite persistence, Docker Compose orchestration, and smoke tests.
+Buyer Universe Generator is a public-data MVP for generating a traceable buyer long-list for US-listed targets. The current implementation resolves US-listed targets, ingests public source metadata, and builds an evidence-backed TargetProfile for downstream long-list retrieval.
 
 ## Current Implementation Status
 
@@ -10,6 +10,7 @@ Implemented:
 - Backend source layout under `backend/`.
 - FastAPI application entrypoint with a health endpoint.
 - Phase 1 target resolution and source ingestion endpoint.
+- Phase 2 Target Feature Extractor with SEC filing text, required OpenRouter extraction, and profile caching.
 - React 18 + TypeScript + Vite frontend shell.
 - CLI entrypoint for database initialization and config inspection.
 - Configurable data-source policy for EDGAR, Polygon.io, and NewsAPI.
@@ -21,7 +22,6 @@ Implemented:
 
 Not implemented yet:
 
-- Target feature extraction.
 - Buyer candidate retrieval.
 - Long-list filtering, scoring, and export.
 
@@ -75,9 +75,10 @@ $env:BUG_DATABASE_URL = "sqlite:///./data/buyer_universe.db"
 ```
 
 EDGAR identity can be configured with either `EDGAR_IDENTITY` or `BUG_EDGAR_IDENTITY`.
-Polygon.io and NewsAPI are optional Phase 1 enrichers:
+OpenRouter is required for Phase 2 TargetProfile extraction. Polygon.io and NewsAPI are optional enrichers:
 
 ```powershell
+$env:BUG_OPENROUTER_API_KEY = "..."
 $env:BUG_POLYGON_API_KEY = "..."
 $env:BUG_NEWS_API_KEY = "..."
 ```
@@ -107,6 +108,12 @@ Resolve and ingest source metadata for a target:
 http://127.0.0.1:8000/targets/resolve?query=AAPL
 ```
 
+Build an evidence-backed TargetProfile:
+
+```text
+http://127.0.0.1:8000/targets/profile?query=ELF
+```
+
 ## Run The Frontend
 
 ```powershell
@@ -127,9 +134,9 @@ http://127.0.0.1:8000
 ```
 
 The home page includes a TargetProfile Debug entry. Enter a ticker or exact company name,
-then run the debug profile action to inspect the resolved target, TargetProfile draft,
-SEC filings, source documents, warnings, and raw API response returned by
-`/targets/resolve`.
+then run the debug profile action to inspect the final TargetProfile, feature labels,
+feature evidence, source documents, extraction metadata, warnings, and raw API response
+returned by `/targets/profile`.
 
 ## Run The CLI
 
@@ -152,6 +159,13 @@ Resolve a target and cache Phase 1 source metadata:
 ```powershell
 cd backend
 uv run bug resolve-target AAPL
+```
+
+Build a Phase 2 TargetProfile:
+
+```powershell
+cd backend
+uv run bug build-target-profile ELF
 ```
 
 The same commands can be run without installing the console script:
@@ -207,3 +221,4 @@ The Phase 0 smoke test validates:
 - Data-source policy disables optional sources when API keys are missing.
 - SEC/Polygon/NewsAPI adapters are covered with mocked responses.
 - Target resolution and source cache reuse are covered with deterministic fixtures.
+- SEC filing text extraction, OpenRouter structured requests, TargetProfile assembly, profile caching, API, and CLI are covered with mocked Phase 2 fixtures.

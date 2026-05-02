@@ -105,6 +105,22 @@ sources:
           - homepage_url
         rationale: Descriptions and SIC codes can seed adjacency, but they are too coarse for final fit claims.
 
+  company_pages:
+    provider: official_company_pages
+    enabled: true
+    required: false
+    cache_ttl_hours: 24
+    dimensions:
+      seller_profile.business_description:
+        source_strength: A
+        field_coverage:
+          - official_homepage
+          - product_lines
+          - customer_segments
+          - channels
+          - geographies
+        rationale: Official company pages can support product, channel, and geography extraction when discoverable.
+
   newsapi:
     provider: newsapi.org
     enabled: true
@@ -162,6 +178,8 @@ use_cases:
 
   seller_profile_business_description:
     - source_id: edgar
+      dimension: seller_profile.business_description
+    - source_id: company_pages
       dimension: seller_profile.business_description
     - source_id: polygon
       dimension: seller_profile.business_description

@@ -31,6 +31,7 @@ class SourceType(str, Enum):
     sec_filing = "sec_filing"
     sec_company_mapping = "sec_company_mapping"
     exchange_profile = "exchange_profile"
+    company_page = "company_page"
     news_article = "news_article"
     source_policy = "source_policy"
 
@@ -70,6 +71,10 @@ class FilingMetadata(StrictBaseModel):
     period_of_report: str | None = None
     url: str | None = None
     source_type: SourceType = SourceType.sec_filing
+    text_retrieval_method: str | None = None
+    text_scope: str | None = None
+    raw_text_char_count: int | None = Field(default=None, ge=0)
+    cached_text_char_count: int | None = Field(default=None, ge=0)
 
 
 class SourceDocument(StrictBaseModel):
@@ -163,6 +168,7 @@ class Evidence(StrictBaseModel):
 
     claim: str = Field(min_length=1)
     source_type: str = Field(min_length=1)
+    source_dimension: str | None = None
     source_strength: SourceStrength
     url: str | None = None
     filing_accession: str | None = None
@@ -196,7 +202,17 @@ class TargetProfile(StrictBaseModel):
     keywords: list[str] = Field(default_factory=list)
     adjacent_categories: list[str] = Field(default_factory=list)
     feature_labels: dict[str, FeatureLabel] = Field(default_factory=dict)
+    feature_evidence: dict[str, list[Evidence]] = Field(default_factory=dict)
     evidence: list[Evidence] = Field(default_factory=list)
+
+
+class TargetProfileExtractionResult(StrictBaseModel):
+    """Phase 2 output containing the retrieval-ready target profile and provenance."""
+
+    target_profile: TargetProfile
+    source_documents: list[SourceDocument] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    extraction_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class CandidateHit(StrictBaseModel):

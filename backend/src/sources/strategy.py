@@ -82,6 +82,8 @@ class DataSourceStrategy:
 
         if source_id == "edgar" and not self.settings.enable_sec_edgar:
             return False, "disabled by application settings"
+        if source_id == "company_pages" and not self.settings.enable_company_pages:
+            return False, "disabled by application settings"
         if source_id == "polygon" and not self.settings.polygon_api_key:
             return False, "missing BUG_POLYGON_API_KEY"
         if source_id == "newsapi" and not self.settings.news_api_key:
