@@ -10,15 +10,27 @@ from urllib.parse import urljoin, urlparse
 import httpx
 
 from src.config import Settings
-from src.domain import ResolvedTarget, SourceDocument, SourceStrength, SourceType
+from src.domain import DataSourceRawRecord, ResolvedTarget, SourceDocument, SourceStrength, SourceType
+from src.sources.base import DataSourceRequestContext, DataSourceRequestRecorder, ExternalDataSourceClient
 
 
-class CompanyPageClient:
+class CompanyPageClient(ExternalDataSourceClient):
     """Fetches official pages only when a structured source already discovered the URL."""
 
-    def __init__(self, settings: Settings, http_client: httpx.Client | None = None) -> None:
-        self.settings = settings
-        self.http_client = http_client or httpx.Client(timeout=settings.request_timeout_seconds, follow_redirects=True)
+    def __init__(
+        self,
+        settings: Settings,
+        http_client: httpx.Client | None = None,
+        request_recorder: DataSourceRequestRecorder | None = None,
+        provider: str = "official_investor_relations_pages",
+    ) -> None:
+        super().__init__(
+            settings,
+            source_id="company_pages",
+            provider=provider,
+            http_client=http_client or httpx.Client(timeout=settings.request_timeout_seconds, follow_redirects=True),
+            request_recorder=request_recorder,
+        )
 
     def fetch_official_page(
         self,
@@ -42,11 +54,26 @@ class CompanyPageClient:
         if not _is_http_url(url):
             return []
 
-        response = self.http_client.get(url, headers={"User-Agent": self.settings.sec_user_agent})
-        response.raise_for_status()
+        html, _raw_records = self._get_text(
+            operation="company_page_seed",
+            url=url,
+            headers={"User-Agent": self.settings.sec_user_agent},
+            target=target,
+            source_dimension=source_dimension,
+            raw_records_from_text=lambda value, context, retrieved_at, response: [
+                _company_page_raw_record(
+                    value,
+                    context,
+                    retrieved_at,
+                    response,
+                    page_role="link_discovery_seed",
+                    discovered_from=url,
+                )
+            ],
+        )
 
         documents: list[SourceDocument] = []
-        for candidate_url, page_role in _prioritized_company_page_links(response.text, url):
+        for candidate_url, page_role in _prioritized_company_page_links(html, url):
             document = self._fetch_page_document(
                 target,
                 candidate_url,
@@ -75,20 +102,37 @@ class CompanyPageClient:
         discovered_from: str,
     ) -> SourceDocument | None:
         try:
-            response = self.http_client.get(url, headers={"User-Agent": self.settings.sec_user_agent})
-            response.raise_for_status()
+            html, raw_records = self._get_text(
+                operation="company_page_candidate",
+                url=url,
+                headers={"User-Agent": self.settings.sec_user_agent},
+                target=target,
+                source_dimension=source_dimension,
+                raw_records_from_text=lambda value, context, retrieved_at, response: [
+                    _company_page_raw_record(
+                        value,
+                        context,
+                        retrieved_at,
+                        response,
+                        page_role=page_role,
+                        discovered_from=discovered_from,
+                    )
+                ],
+            )
         except httpx.HTTPError:
             return None
 
+        retrieved_at = raw_records[0].retrieved_at if raw_records else datetime.now(UTC)
         return _source_document_from_html(
             target,
             url,
-            response.text,
+            html,
             ttl_hours,
             source_strength,
             source_dimension,
             page_role=page_role,
             discovered_from=discovered_from,
+            retrieved_at=retrieved_at,
         )
 
 
@@ -101,11 +145,13 @@ def _source_document_from_html(
     source_dimension: str | None,
     page_role: str,
     discovered_from: str,
+    retrieved_at: datetime | None = None,
 ) -> SourceDocument | None:
     text = _clean_page_text(html)
     if not text:
         return None
 
+    retrieved_at = retrieved_at or datetime.now(UTC)
     return SourceDocument(
         source_id="company_pages",
         source_dimension=source_dimension,
@@ -120,8 +166,43 @@ def _source_document_from_html(
             "domain": urlparse(url).netloc,
             "page_role": page_role,
         },
-        retrieved_at=datetime.now(UTC),
-        expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours) if ttl_hours else None,
+        retrieved_at=retrieved_at,
+        expires_at=retrieved_at + timedelta(hours=ttl_hours) if ttl_hours else None,
+    )
+
+
+def _company_page_raw_record(
+    html: str,
+    context: DataSourceRequestContext,
+    retrieved_at: datetime,
+    response: httpx.Response,
+    *,
+    page_role: str,
+    discovered_from: str,
+) -> DataSourceRawRecord:
+    final_url = str(response.url)
+    return DataSourceRawRecord(
+        request_id=context.request_id,
+        source_id=context.source_id,
+        provider=context.provider,
+        source_dimension=context.source_dimension,
+        source_type=SourceType.company_page,
+        target_cik=context.target_cik,
+        target_ticker=context.target_ticker,
+        record_id=final_url,
+        url=final_url,
+        raw_payload={
+            "url": final_url,
+            "status_code": response.status_code,
+            "content_type": response.headers.get("content-type"),
+        },
+        raw_text=html,
+        metadata={
+            "discovered_from": discovered_from,
+            "domain": urlparse(final_url).netloc,
+            "page_role": page_role,
+        },
+        retrieved_at=retrieved_at,
     )
 
 

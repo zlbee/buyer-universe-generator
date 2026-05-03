@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -7,12 +8,15 @@ from typing import Any
 
 import httpx
 import pytest
+from sqlalchemy import select
 
 from src.config import Settings
 from src.domain import FilingMetadata, ResolvedTarget, SourceDocument, SourceStrength, SourceType
 from src.pipelines.source_ingestion import SourceIngestionService
 from src.pipelines.target_resolution import AmbiguousTargetError, TargetNotFoundError, TargetResolver
+from src.repositories.data_source_audit_log import DataSourceAuditLog
 from src.repositories.database import create_session_factory, init_db
+from src.repositories.models import DataSourceRawRecordRecord, DataSourceRequestRecord
 from src.repositories.source_cache import SourceCache
 from src.sources.newsapi import NewsApiClient
 from src.sources.polygon import PolygonClient
@@ -159,6 +163,45 @@ def test_polygon_client_returns_supporting_profile_document(tmp_path: Path) -> N
     assert document.source_type == SourceType.exchange_profile
     assert document.source_strength == SourceStrength.C
     assert document.metadata["market_cap"] == 1_000_000
+
+
+def test_polygon_client_persists_audited_request_and_raw_record(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["apiKey"] == "polygon-test-key"
+        return httpx.Response(200, json={"status": "OK", "results": {"ticker": "AAPL", "market_cap": 1_000_000}})
+
+    settings = settings_for_tests(tmp_path, polygon_api_key="polygon-test-key")
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
+
+    with session_factory() as session:
+        client = PolygonClient(
+            settings,
+            http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+            request_recorder=DataSourceAuditLog(session),
+            provider="polygon.io",
+        )
+
+        document = client.fetch_ticker_profile(
+            sample_target(),
+            ttl_hours=24,
+            source_strength=SourceStrength.B,
+            source_dimension="seller_profile.exchange_profile",
+        )
+
+        request_record = session.execute(select(DataSourceRequestRecord)).scalar_one()
+        raw_record = session.execute(select(DataSourceRawRecordRecord)).scalar_one()
+
+    assert document.metadata["market_cap"] == 1_000_000
+    assert request_record.source_id == "polygon"
+    assert request_record.provider == "polygon.io"
+    assert request_record.operation == "ticker_profile"
+    assert request_record.status == "success"
+    assert json.loads(request_record.request_params_json)["apiKey"] == "<redacted>"
+    assert raw_record.request_id == request_record.request_id
+    assert raw_record.source_type == SourceType.exchange_profile.value
+    assert raw_record.source_dimension == "seller_profile.exchange_profile"
+    assert json.loads(raw_record.raw_payload_json)["market_cap"] == 1_000_000
 
 
 def test_newsapi_client_returns_article_documents(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:

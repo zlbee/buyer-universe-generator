@@ -9,6 +9,7 @@ from src.llm import LLMClient, OpenRouterProvider
 from src.pipelines.source_ingestion import SourceIngestionService
 from src.pipelines.target_profile_extraction import TargetProfileExtractor
 from src.pipelines.target_resolution import TargetResolver
+from src.repositories.data_source_audit_log import DataSourceAuditLog
 from src.repositories.llm_interaction_log import LLMInteractionLog
 from src.repositories.source_cache import SourceCache
 from src.repositories.target_profile_cache import TargetProfileCache
@@ -19,7 +20,8 @@ from src.sources.strategy import DataSourceStrategy
 
 def build_source_ingestion_service(settings: Settings, session: Session) -> SourceIngestionService:
     strategy = DataSourceStrategy.from_settings(settings)
-    registry = SourceRegistry(settings)
+    request_recorder = DataSourceAuditLog(session)
+    registry = SourceRegistry(settings, strategy=strategy, request_recorder=request_recorder)
     cache = SourceCache(session)
     edgar_client = registry.edgar()
     resolver = TargetResolver(strategy=strategy, edgar_client=edgar_client, source_cache=cache)
@@ -39,7 +41,8 @@ def build_target_profile_extractor(
     llm_client: LLMClient | None = None,
 ) -> TargetProfileExtractor:
     strategy = DataSourceStrategy.from_settings(settings)
-    registry = SourceRegistry(settings)
+    request_recorder = DataSourceAuditLog(session)
+    registry = SourceRegistry(settings, strategy=strategy, request_recorder=request_recorder)
     cache = SourceCache(session)
     edgar_client = registry.edgar()
     resolver = TargetResolver(strategy=strategy, edgar_client=edgar_client, source_cache=cache)
@@ -53,7 +56,7 @@ def build_target_profile_extractor(
     )
     provider = llm_client or OpenRouterProvider(settings, interaction_recorder=LLMInteractionLog(session))
     ir_page_discovery = (
-        InvestorRelationsPageDiscovery(settings, provider)
+        InvestorRelationsPageDiscovery(settings, provider, request_recorder=request_recorder)
         if settings.enable_ir_page_discovery and hasattr(provider, "generate_json_with_web_search")
         else None
     )

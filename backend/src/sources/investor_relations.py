@@ -15,8 +15,9 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from src.config import Settings
-from src.domain import ResolvedTarget, SourceDocument, SourceStrength, SourceType
+from src.domain import DataSourceRawRecord, ResolvedTarget, SourceDocument, SourceStrength, SourceType
 from src.llm import LLMResponseError, MissingLLMConfigurationError, WebSearchJSONClient
+from src.sources.base import DataSourceRequestContext, DataSourceRequestRecorder, ExternalDataSourceClient
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,7 @@ class _CandidateValidation:
     validated_signals: list[str] | None = None
 
 
-class InvestorRelationsPageDiscovery:
+class InvestorRelationsPageDiscovery(ExternalDataSourceClient):
     """Finds and validates official investor relations pages using LLM web search."""
 
     schema_name = "InvestorRelationsPageDiscovery"
@@ -79,10 +80,17 @@ class InvestorRelationsPageDiscovery:
         settings: Settings,
         web_search_client: WebSearchJSONClient,
         http_client: httpx.Client | None = None,
+        request_recorder: DataSourceRequestRecorder | None = None,
+        provider: str = "official_investor_relations_pages",
     ) -> None:
-        self.settings = settings
+        super().__init__(
+            settings,
+            source_id="company_pages",
+            provider=provider,
+            http_client=http_client or httpx.Client(timeout=settings.request_timeout_seconds, follow_redirects=True),
+            request_recorder=request_recorder,
+        )
         self.web_search_client = web_search_client
-        self.http_client = http_client or httpx.Client(timeout=settings.request_timeout_seconds, follow_redirects=True)
 
     def discover(
         self,
@@ -175,19 +183,35 @@ class InvestorRelationsPageDiscovery:
             return _CandidateValidation(False, "candidate URL is not http(s)")
 
         try:
-            response = self.http_client.get(candidate_url, headers={"User-Agent": self.settings.sec_user_agent})
-            response.raise_for_status()
+            html, raw_records = self._get_text(
+                operation="ir_candidate_validation",
+                url=candidate_url,
+                headers={"User-Agent": self.settings.sec_user_agent},
+                target=target,
+                source_dimension=source_dimension,
+                raw_records_from_text=lambda value, context, retrieved_at, response: [
+                    _ir_candidate_raw_record(
+                        value,
+                        context,
+                        retrieved_at,
+                        response,
+                        candidate=candidate,
+                        rank=rank,
+                        homepage_url=homepage_url,
+                    )
+                ],
+            )
         except httpx.HTTPStatusError as error:
             return _CandidateValidation(False, f"HTTP {error.response.status_code}")
         except httpx.HTTPError as error:
             return _CandidateValidation(False, f"HTTP error: {type(error).__name__}")
 
-        html = response.text
         raw_text = _clean_page_text(html)
         if not raw_text:
             return _CandidateValidation(False, "page text is empty")
 
-        final_url = str(response.url)
+        raw_record = raw_records[0] if raw_records else None
+        final_url = raw_record.url if raw_record and raw_record.url else candidate_url
         title = _extract_title(html)
         high_context = " ".join(
             value
@@ -213,6 +237,7 @@ class InvestorRelationsPageDiscovery:
             return _CandidateValidation(False, "candidate does not match company identity")
 
         validated_signals = _dedupe_strings([*ir_signals, *company_signals])
+        retrieved_at = raw_record.retrieved_at if raw_record else datetime.now(UTC)
         document = SourceDocument(
             source_id="company_pages",
             source_dimension=source_dimension,
@@ -237,10 +262,54 @@ class InvestorRelationsPageDiscovery:
                 "homepage_context_url": homepage_url,
                 "validated_signals": validated_signals,
             },
-            retrieved_at=datetime.now(UTC),
-            expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours) if ttl_hours else None,
+            retrieved_at=retrieved_at,
+            expires_at=retrieved_at + timedelta(hours=ttl_hours) if ttl_hours else None,
         )
         return _CandidateValidation(True, "accepted", document=document, validated_signals=validated_signals)
+
+
+def _ir_candidate_raw_record(
+    html: str,
+    context: DataSourceRequestContext,
+    retrieved_at: datetime,
+    response: httpx.Response,
+    *,
+    candidate: IRPageCandidateOutput,
+    rank: int,
+    homepage_url: str | None,
+) -> DataSourceRawRecord:
+    final_url = str(response.url)
+    return DataSourceRawRecord(
+        request_id=context.request_id,
+        source_id=context.source_id,
+        provider=context.provider,
+        source_dimension=context.source_dimension,
+        source_type=SourceType.company_page,
+        target_cik=context.target_cik,
+        target_ticker=context.target_ticker,
+        record_id=final_url,
+        url=final_url,
+        raw_payload={
+            "url": final_url,
+            "status_code": response.status_code,
+            "content_type": response.headers.get("content-type"),
+        },
+        raw_text=html,
+        metadata={
+            "page_role": "investor_relations_candidate",
+            "discovered_from": "llm_web_search",
+            "domain": urlparse(final_url).netloc,
+            "source_candidate_url": candidate.url,
+            "candidate_rank": rank,
+            "candidate_title": candidate.title,
+            "candidate_snippet": candidate.snippet,
+            "candidate_confidence": candidate.confidence,
+            "candidate_reason": candidate.reason,
+            "candidate_source": candidate.source,
+            "homepage_context_url": homepage_url,
+        },
+        retrieved_at=retrieved_at,
+    )
 
 
 def ir_discovery_json_schema() -> dict[str, Any]:

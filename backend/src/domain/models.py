@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
+from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -34,6 +35,11 @@ class SourceType(str, Enum):
     company_page = "company_page"
     news_article = "news_article"
     source_policy = "source_policy"
+
+
+class DataSourceRequestStatus(str, Enum):
+    success = "success"
+    error = "error"
 
 
 class FeatureLabel(str, Enum):
@@ -97,6 +103,61 @@ class SourceDocument(StrictBaseModel):
     def require_reference_or_metadata(self) -> "SourceDocument":
         if not self.url and not self.filing_accession and not self.metadata:
             raise ValueError("SourceDocument requires url, filing_accession, or metadata")
+        return self
+
+
+class DataSourceRequest(StrictBaseModel):
+    """Provider request audit record captured whenever an external source is queried."""
+
+    request_id: str = Field(default_factory=lambda: str(uuid4()), min_length=1)
+    source_id: str = Field(min_length=1)
+    provider: str = Field(min_length=1)
+    operation: str = Field(min_length=1)
+    source_dimension: str | None = None
+    target_cik: str | None = None
+    target_ticker: str | None = None
+    method: str = Field(default="GET", min_length=1)
+    url: str | None = None
+    request_params: dict[str, Any] = Field(default_factory=dict)
+    request_headers: dict[str, Any] = Field(default_factory=dict)
+    request_body: Any | None = None
+    status: DataSourceRequestStatus
+    status_code: int | None = Field(default=None, ge=100, le=599)
+    error_message: str | None = None
+    requested_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    completed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    duration_ms: int | None = Field(default=None, ge=0)
+
+    @field_validator("method")
+    @classmethod
+    def normalize_method(cls, value: str) -> str:
+        return value.strip().upper()
+
+
+class DataSourceRawRecord(StrictBaseModel):
+    """Provider-neutral raw record retained before downstream source-specific processing."""
+
+    request_id: str = Field(min_length=1)
+    source_id: str = Field(min_length=1)
+    provider: str = Field(min_length=1)
+    source_type: SourceType
+    source_dimension: str | None = None
+    target_cik: str | None = None
+    target_ticker: str | None = None
+    record_id: str | None = None
+    url: str | None = None
+    filing_accession: str | None = None
+    title: str | None = None
+    published_at: str | None = None
+    raw_payload: dict[str, Any] = Field(default_factory=dict)
+    raw_text: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    retrieved_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @model_validator(mode="after")
+    def require_payload_or_text(self) -> "DataSourceRawRecord":
+        if not self.raw_payload and not self.raw_text:
+            raise ValueError("DataSourceRawRecord requires raw_payload or raw_text")
         return self
 
 
