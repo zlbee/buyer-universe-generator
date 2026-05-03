@@ -70,6 +70,7 @@ class LLMTargetFeatureOutput(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     business_summary: str | None = None
+    company_strategy: str | None = None
     products: list[str] = Field(default_factory=list)
     customer_segments: list[str] = Field(default_factory=list)
     channels: list[str] = Field(default_factory=list)
@@ -132,6 +133,7 @@ def _coerce_string_list(value: Any) -> list[str]:
 
 _LLM_EXTRACTABLE_FIELDS = (
     "business_summary",
+    "company_strategy",
     "products",
     "customer_segments",
     "channels",
@@ -151,6 +153,7 @@ def target_feature_json_schema() -> dict[str, Any]:
         "required": [*_LLM_EXTRACTABLE_FIELDS, "field_support"],
         "properties": {
             "business_summary": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+            "company_strategy": {"anyOf": [{"type": "string"}, {"type": "null"}]},
             "products": string_array_schema,
             "customer_segments": string_array_schema,
             "channels": string_array_schema,
@@ -241,6 +244,7 @@ class TargetProfileExtractor:
         )
 
         source_documents = self._ensure_filing_text(ingestion, source_documents, warnings)
+        source_documents = self._ensure_strategy_filing_text(ingestion, source_documents, warnings)
         source_documents = self._ensure_company_page(ingestion, source_documents, warnings)
         source_documents = _filter_company_page_documents_for_profile(source_documents)
         logger.info(
@@ -309,7 +313,7 @@ class TargetProfileExtractor:
         return result
 
     def _effective_extractor_version(self) -> str:
-        return f"{self.settings.target_profile_extractor_version}:ir-v1:kt:{self.keyword_taxonomy.fingerprint[:12]}"
+        return f"{self.settings.target_profile_extractor_version}:ir-v1:cs-v1:kt:{self.keyword_taxonomy.fingerprint[:12]}"
 
     def _ensure_filing_text(
         self,
@@ -340,6 +344,60 @@ class TargetProfileExtractor:
 
         self.source_cache.save_document(document)
         return [*source_documents, document]
+
+    def _ensure_strategy_filing_text(
+        self,
+        ingestion: TargetIngestionResult,
+        source_documents: list[SourceDocument],
+        warnings: list[str],
+    ) -> list[SourceDocument]:
+        if any(document.raw_text and document.source_dimension == "seller_profile.company_strategy" for document in source_documents):
+            return source_documents
+
+        strategy_source = self.strategy.selected_source(
+            "seller_profile_company_strategy",
+            "edgar",
+            include_disabled=True,
+        )
+        if not strategy_source:
+            return source_documents
+        if not strategy_source.enabled:
+            warnings.append(f"edgar strategy text disabled: {strategy_source.disabled_reason}")
+            return source_documents
+
+        filings = _preferred_strategy_filings(ingestion.filings)
+        if not filings:
+            warnings.append(
+                "target profile extraction skipped SEC strategy text: "
+                "no 10-K, 8-K, S-1, or 10-Q filing metadata available"
+            )
+            return source_documents
+
+        documents = list(source_documents)
+        fetch_errors: list[str] = []
+        for filing in filings:
+            try:
+                document = self.edgar_client.fetch_filing_text_document(
+                    ingestion.target,
+                    filing,
+                    self.strategy.cache_ttl_hours("edgar"),
+                    source_strength=strategy_source.source_strength,
+                    source_dimension=strategy_source.dimension_id,
+                    text_scope="company_strategy",
+                )
+            except Exception as error:
+                fetch_errors.append(f"{filing.form} {filing.accession_number}: {error}")
+                continue
+
+            self.source_cache.save_document(document)
+            documents.append(document)
+
+        if len(documents) == len(source_documents):
+            warning = "target profile extraction skipped SEC strategy text"
+            if fetch_errors:
+                warning = f"{warning}: {'; '.join(fetch_errors[:3])}"
+            warnings.append(warning)
+        return documents
 
     def _ensure_company_page(
         self,
@@ -493,6 +551,7 @@ class TargetProfileExtractor:
 
         llm_field_values: dict[str, Any] = {
             "business_summary": llm_output.business_summary,
+            "company_strategy": llm_output.company_strategy,
             "products": llm_output.products,
             "customer_segments": llm_output.customer_segments,
             "channels": llm_output.channels,
@@ -507,6 +566,7 @@ class TargetProfileExtractor:
                 llm_output.field_support.get(field_name, []),
                 source_documents,
                 field_values=_field_values_for_evidence(field_name, value),
+                allowed_source_dimensions={"seller_profile.company_strategy"} if field_name == "company_strategy" else None,
             )
             if mapped_evidence:
                 feature_evidence[field_name] = mapped_evidence
@@ -527,8 +587,17 @@ class TargetProfileExtractor:
         if size_metrics:
             feature_labels["size_metrics"] = FeatureLabel.verified_fact
 
-        for field_name in ("business_summary", "products", "customer_segments", "channels", "geographies"):
+        for field_name in (
+            "business_summary",
+            "company_strategy",
+            "products",
+            "customer_segments",
+            "channels",
+            "geographies",
+        ):
             if not llm_field_values[field_name]:
+                continue
+            if field_name == "company_strategy" and not feature_evidence.get(field_name):
                 continue
             feature_labels[field_name] = FeatureLabel.verified_fact if feature_evidence.get(field_name) else FeatureLabel.llm_inference
         if keyword_result.values:
@@ -537,6 +606,8 @@ class TargetProfileExtractor:
             feature_labels["adjacent_categories"] = FeatureLabel.llm_inference
 
         evidence = _flatten_evidence(feature_evidence)
+        # Company strategy is intentionally traceable to SEC/EDGAR strategy filings only.
+        company_strategy = llm_output.company_strategy if feature_evidence.get("company_strategy") else None
         profile = TargetProfile(
             target_id=ingestion.target.cik,
             name=ingestion.target.canonical_name,
@@ -545,6 +616,7 @@ class TargetProfileExtractor:
             exchange=ingestion.target.exchange,
             sic=ingestion.target.sic,
             business_summary=llm_output.business_summary,
+            company_strategy=company_strategy,
             products=_dedupe_strings(llm_output.products),
             customer_segments=_dedupe_strings(llm_output.customer_segments),
             channels=_dedupe_strings(llm_output.channels),
@@ -601,6 +673,18 @@ def _preferred_text_filing(filings: list[FilingMetadata]) -> FilingMetadata | No
         (filing for filing in filings if filing.form == "10-Q"),
         None,
     )
+
+
+def _preferred_strategy_filings(filings: list[FilingMetadata]) -> list[FilingMetadata]:
+    selected: list[FilingMetadata] = []
+    seen_accessions: set[str] = set()
+    for preferred_form in ("10-K", "8-K", "S-1", "S-1/A", "10-Q"):
+        filing = next((candidate for candidate in filings if candidate.form.upper() == preferred_form), None)
+        if not filing or filing.accession_number in seen_accessions:
+            continue
+        selected.append(filing)
+        seen_accessions.add(filing.accession_number)
+    return selected
 
 
 def _homepage_url_from_polygon(source_documents: list[SourceDocument]) -> str | None:
@@ -670,6 +754,7 @@ Target identity:
 
 Return valid JSON with exactly these top-level keys, and do not omit any key:
 business_summary: string or null
+company_strategy: string or null, extracted only from SEC/EDGAR strategy evidence such as 10-K MD&A, 8-K material events, or S-1 strategy disclosures
 products: string[]
 customer_segments: string[]
 channels: string[]
@@ -683,6 +768,7 @@ Rules:
 - Keep values concise and useful for retrieval.
 - field_support snippets must be copied from the source text when possible.
 - Use [] in field_support when a field is empty or has no exact supporting snippet.
+- For company_strategy, use only sources with source_dimension=seller_profile.company_strategy.
 - Treat keywords as supplemental source-grounded terms; deterministic post-processing derives canonical keywords from verified fields and SIC taxonomy.
 - adjacent_categories may be inference, but keep them grounded in source text.
 
@@ -765,12 +851,18 @@ def _evidence_from_support(
     snippets: list[str],
     source_documents: list[SourceDocument],
     field_values: list[str] | None = None,
+    allowed_source_dimensions: set[str] | None = None,
 ) -> list[Evidence]:
     evidence: list[Evidence] = []
+    candidate_documents = [
+        document
+        for document in source_documents
+        if not allowed_source_dimensions or document.source_dimension in allowed_source_dimensions
+    ]
     for snippet in snippets:
         if not _support_snippet_matches_field_values(snippet, field_values or []):
             continue
-        document = _document_containing_snippet(source_documents, snippet)
+        document = _document_containing_snippet(candidate_documents, snippet)
         if not document:
             continue
         if document.source_type == SourceType.company_page and _is_low_value_company_page_snippet(snippet):
@@ -792,7 +884,7 @@ def _evidence_from_support(
 
 
 def _field_values_for_evidence(field_name: str, value: Any) -> list[str]:
-    if field_name == "business_summary":
+    if field_name in {"business_summary", "company_strategy"}:
         return []
     if isinstance(value, str):
         return [value]
@@ -1015,6 +1107,7 @@ def _dedupe_strings(values: list[str]) -> list[str]:
 def _populated_llm_fields(output: LLMTargetFeatureOutput) -> list[str]:
     field_values: dict[str, Any] = {
         "business_summary": output.business_summary,
+        "company_strategy": output.company_strategy,
         "products": output.products,
         "customer_segments": output.customer_segments,
         "channels": output.channels,

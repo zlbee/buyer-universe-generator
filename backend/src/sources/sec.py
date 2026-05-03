@@ -75,7 +75,11 @@ class SecEdgarClient:
         ]
         return matches
 
-    def fetch_recent_filings(self, target: ResolvedTarget, forms: tuple[str, ...] = ("10-K", "10-Q", "8-K")) -> list[FilingMetadata]:
+    def fetch_recent_filings(
+        self,
+        target: ResolvedTarget,
+        forms: tuple[str, ...] = ("10-K", "10-Q", "8-K", "S-1", "S-1/A"),
+    ) -> list[FilingMetadata]:
         edgar_filings = self._fetch_recent_filings_with_edgartools(target, forms)
         if edgar_filings:
             return edgar_filings
@@ -251,14 +255,16 @@ class SecEdgarClient:
         ttl_hours: int,
         source_strength: SourceStrength = SourceStrength.B,
         source_dimension: str | None = None,
+        text_scope: str = "business_description",
     ) -> SourceDocument:
+        """Fetch filing text and cache the section most relevant to a profile dimension."""
+
         raw_text, retrieval_method = self._fetch_filing_text_with_edgartools(target, filing)
         if not raw_text and filing.url:
             raw_text, retrieval_method = self._fetch_filing_text_with_http(filing)
 
         cleaned_text = _clean_filing_text(raw_text)
-        business_section = _extract_business_section(cleaned_text)
-        selected_text = business_section or cleaned_text
+        selected_text, selected_scope = _select_filing_text(cleaned_text, filing, text_scope)
         if not selected_text:
             raise ValueError(f"Could not retrieve filing text for accession {filing.accession_number}")
 
@@ -275,7 +281,7 @@ class SecEdgarClient:
             metadata={
                 **filing.model_dump(mode="json"),
                 "text_retrieval_method": retrieval_method,
-                "text_scope": "item_1_business" if business_section else "full_filing_text",
+                "text_scope": selected_scope,
                 "raw_text_char_count": len(cleaned_text),
                 "cached_text_char_count": len(selected_text),
             },
@@ -390,6 +396,15 @@ def _clean_filing_text(value: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", "\n".join(line for line in lines if line)).strip()
 
 
+def _select_filing_text(text: str, filing: FilingMetadata, text_scope: str) -> tuple[str, str]:
+    if text_scope == "company_strategy":
+        strategy_section, strategy_scope = _extract_strategy_section(text, filing.form)
+        return strategy_section or text, strategy_scope if strategy_section else _full_text_scope_for_form(filing.form)
+
+    business_section = _extract_business_section(text)
+    return business_section or text, "item_1_business" if business_section else "full_filing_text"
+
+
 def _extract_business_section(text: str) -> str | None:
     start_match = re.search(r"\bitem\s+1[\.\s:-]+business\b", text, flags=re.IGNORECASE)
     if not start_match:
@@ -404,6 +419,50 @@ def _extract_business_section(text: str) -> str | None:
     if not end_match:
         return after_start.strip()
     return after_start[: end_match.start()].strip()
+
+
+def _extract_strategy_section(text: str, form: str) -> tuple[str | None, str]:
+    normalized_form = form.strip().upper()
+    if normalized_form.startswith("10-K"):
+        section = _extract_section_between(
+            text,
+            r"\bitem\s+7[\.\s:-]+management(?:['`\u2019]s|s)?\s+discussion\s+and\s+analysis\b",
+            r"\bitem\s+(7a[\.\s:-]+quantitative|8[\.\s:-]+financial)\b",
+        )
+        return section, "item_7_mdna"
+    if normalized_form.startswith("10-Q"):
+        section = _extract_section_between(
+            text,
+            r"\bitem\s+2[\.\s:-]+management(?:['`\u2019]s|s)?\s+discussion\s+and\s+analysis\b",
+            r"\bitem\s+(3[\.\s:-]+quantitative|4[\.\s:-]+controls)\b",
+        )
+        return section, "item_2_mdna"
+    if normalized_form.startswith("8-K"):
+        return text, "full_8k_current_report"
+    if normalized_form.startswith("S-1"):
+        return text, "full_s1_registration_statement"
+    return None, "full_filing_text"
+
+
+def _extract_section_between(text: str, start_pattern: str, end_pattern: str) -> str | None:
+    start_match = re.search(start_pattern, text, flags=re.IGNORECASE)
+    if not start_match:
+        return None
+
+    after_start = text[start_match.start() :]
+    end_match = re.search(end_pattern, after_start, flags=re.IGNORECASE)
+    if not end_match:
+        return after_start.strip()
+    return after_start[: end_match.start()].strip()
+
+
+def _full_text_scope_for_form(form: str) -> str:
+    normalized_form = form.strip().upper()
+    if normalized_form.startswith("8-K"):
+        return "full_8k_current_report"
+    if normalized_form.startswith("S-1"):
+        return "full_s1_registration_statement"
+    return "full_filing_text"
 
 
 def _rows_from_search_results(search_results: Any) -> list[dict[str, Any]]:

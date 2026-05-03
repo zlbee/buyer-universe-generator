@@ -206,6 +206,7 @@ class TargetProfile(StrictBaseModel):
     exchange: str | None = None
     sic: str | None = None
     business_summary: str | None = None
+    company_strategy: str | None = None
     products: list[str] = Field(default_factory=list)
     customer_segments: list[str] = Field(default_factory=list)
     channels: list[str] = Field(default_factory=list)

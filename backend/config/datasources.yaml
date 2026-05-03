@@ -39,6 +39,16 @@ sources:
           - geographic_disclosures
         rationale: SEC filings are reliable but require extraction from unstructured filing text.
 
+      seller_profile.company_strategy:
+        source_strength: B
+        field_coverage:
+          - mdna_strategy_discussion
+          - strategic_priorities
+          - material_transactions
+          - acquisitions
+          - ipo_strategy
+        rationale: SEC 10-K MD&A, 8-K material event filings, and S-1 registration statements can provide traceable strategy evidence from primary disclosures.
+
       buyer_long_list_recall.public_company_peer_discovery:
         source_strength: B
         field_coverage:
@@ -200,6 +210,10 @@ use_cases:
       dimension: seller_profile.business_description
     - source_id: polygon
       dimension: seller_profile.business_description
+
+  seller_profile_company_strategy:
+    - source_id: edgar
+      dimension: seller_profile.company_strategy
 
   seller_profile_recent_news:
     - source_id: newsapi

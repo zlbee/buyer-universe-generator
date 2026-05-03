@@ -81,6 +81,32 @@ def test_sec_filing_text_document_falls_back_to_markdown(tmp_path: Path) -> None
     assert document.metadata["text_retrieval_method"] == "edgartools:Filing.markdown"
 
 
+def test_sec_filing_text_document_extracts_strategy_mdna_scope(tmp_path: Path) -> None:
+    fake_edgar = FakeEdgarTextModule(
+        text=(
+            "ITEM 1. Business e.l.f. Beauty sells cosmetics.\n"
+            "ITEM 7. Management's Discussion and Analysis We intend to invest in digital commerce "
+            "and pursue strategic acquisitions.\n"
+            "ITEM 7A. Quantitative and Qualitative Disclosures About Market Risk"
+        )
+    )
+    client = SecEdgarClient(settings_for_tests(tmp_path), edgar_module=fake_edgar)
+
+    document = client.fetch_filing_text_document(
+        sample_target(),
+        sample_filing("10-K"),
+        ttl_hours=24,
+        source_strength=SourceStrength.B,
+        source_dimension="seller_profile.company_strategy",
+        text_scope="company_strategy",
+    )
+
+    assert "invest in digital commerce and pursue strategic acquisitions" in document.raw_text
+    assert "ITEM 7A" not in document.raw_text
+    assert document.source_dimension == "seller_profile.company_strategy"
+    assert document.metadata["text_scope"] == "item_7_mdna"
+
+
 def test_source_ingestion_restores_filing_text_metadata() -> None:
     filing = sample_filing("10-K")
     document = SourceDocument(
@@ -382,6 +408,7 @@ def test_target_profile_extractor_assembles_profile_and_reuses_cache(tmp_path: P
     fake_llm = FakeLLMClient(
         {
             "business_summary": "e.l.f. Beauty sells cosmetics through retail and e-commerce.",
+            "company_strategy": "e.l.f. Beauty intends to invest in digital commerce and pursue strategic acquisitions.",
             "products": ["cosmetics"],
             "customer_segments": ["retail consumers"],
             "channels": ["retail", "e-commerce"],
@@ -390,6 +417,7 @@ def test_target_profile_extractor_assembles_profile_and_reuses_cache(tmp_path: P
             "adjacent_categories": ["personal care"],
             "field_support": {
                 "business_summary": ["sells cosmetics through retail and e-commerce"],
+                "company_strategy": ["invest in digital commerce and pursue strategic acquisitions"],
                 "products": ["sells cosmetics"],
                 "customer_segments": ["retail consumers"],
                 "channels": ["retail and e-commerce"],
@@ -405,6 +433,7 @@ def test_target_profile_extractor_assembles_profile_and_reuses_cache(tmp_path: P
 
     profile = first_result.target_profile
     assert profile.ticker == "ELF"
+    assert profile.company_strategy == "e.l.f. Beauty intends to invest in digital commerce and pursue strategic acquisitions."
     assert profile.products == ["cosmetics"]
     assert profile.keywords == [
         "cosmetics",
@@ -425,9 +454,11 @@ def test_target_profile_extractor_assembles_profile_and_reuses_cache(tmp_path: P
     }
     assert "unsupported trend" not in profile.keywords
     assert profile.feature_labels["business_summary"] == "verified_fact"
+    assert profile.feature_labels["company_strategy"] == "verified_fact"
     assert profile.feature_labels["keywords"] == "derived_keyword"
     assert profile.feature_labels["adjacent_categories"] == "llm_inference"
     assert profile.feature_evidence["business_summary"][0].source_dimension == "seller_profile.business_description"
+    assert profile.feature_evidence["company_strategy"][0].source_dimension == "seller_profile.company_strategy"
     assert profile.feature_evidence["keywords"][0].claim == "Keyword 'cosmetics' is derived from verified products."
     assert first_result.extraction_metadata["keyword_derivation_counts"] == {
         "verified_products": 1,
@@ -444,9 +475,12 @@ def test_target_profile_extractor_assembles_profile_and_reuses_cache(tmp_path: P
     assert fake_llm.source_business_types == ["target_profile_extraction"]
     assert fake_llm.system_prompts[0].startswith("You are extracting a target company profile")
     assert fake_llm.json_schemas[0]["additionalProperties"] is False
+    assert "company_strategy" in fake_llm.json_schemas[0]["required"]
     assert "field_support" in fake_llm.json_schemas[0]["required"]
     assert fake_llm.json_schemas[0]["properties"]["business_summary"]["anyOf"][0]["type"] == "string"
+    assert fake_llm.json_schemas[0]["properties"]["company_strategy"]["anyOf"][0]["type"] == "string"
     assert fake_llm.json_schemas[0]["properties"]["field_support"]["additionalProperties"] is False
+    assert "source_dimension=seller_profile.company_strategy" in fake_llm.prompts[0]
 
 
 def test_target_profile_extractor_normalizes_repairable_llm_shape(tmp_path: Path) -> None:
@@ -1050,7 +1084,32 @@ class FakeFailedIRPageDiscovery:
 
 
 class FakeProfileSecClient:
-    def fetch_filing_text_document(self, *_args, **_kwargs):
+    def fetch_filing_text_document(self, *args, **kwargs):
+        if kwargs.get("text_scope") == "company_strategy":
+            target = args[0]
+            filing = args[1]
+            ttl_hours = args[2]
+            retrieved_at = datetime.now(UTC)
+            return SourceDocument(
+                source_id="edgar",
+                source_dimension=kwargs.get("source_dimension"),
+                source_type=SourceType.sec_filing,
+                source_strength=kwargs.get("source_strength", SourceStrength.B),
+                target_cik=target.cik,
+                target_ticker=target.ticker,
+                url=filing.url,
+                filing_accession=filing.accession_number,
+                raw_text=(
+                    "ITEM 7. Management's Discussion and Analysis We intend to invest in digital commerce "
+                    "and pursue strategic acquisitions."
+                ),
+                metadata={
+                    **filing.model_dump(mode="json"),
+                    "text_scope": "item_7_mdna",
+                },
+                retrieved_at=retrieved_at,
+                expires_at=retrieved_at + timedelta(hours=ttl_hours),
+            )
         raise AssertionError("text document should already be present in fixture")
 
 

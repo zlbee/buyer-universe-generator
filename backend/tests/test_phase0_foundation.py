@@ -43,6 +43,7 @@ def test_phase0_foundation_smoke(tmp_path: Path) -> None:
         exchange="Nasdaq",
         sic="1234",
         business_summary="Example business summary.",
+        company_strategy="Example SEC-backed strategy.",
         products=["example product"],
         customer_segments=["enterprise customers"],
         channels=["direct sales"],

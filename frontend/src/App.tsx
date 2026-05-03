@@ -58,6 +58,7 @@ type TargetProfile = {
   exchange: string | null;
   sic: string | null;
   business_summary: string | null;
+  company_strategy: string | null;
   products: string[];
   customer_segments: string[];
   channels: string[];
