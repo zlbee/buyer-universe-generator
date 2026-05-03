@@ -8,6 +8,7 @@ from typing import Any
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from src.api.main import create_app
 from src.cli import main as cli_main
@@ -26,6 +27,8 @@ from src.llm import LLMResponseError, OpenRouterProvider
 from src.pipelines.source_ingestion import SourceIngestionService
 from src.pipelines.target_profile_extraction import TargetProfileExtractionError, TargetProfileExtractor
 from src.repositories.database import create_session_factory, init_db
+from src.repositories.llm_interaction_log import LLMInteractionLog
+from src.repositories.models import LLMInteractionRecord
 from src.repositories.source_cache import SourceCache
 from src.repositories.target_profile_cache import TargetProfileCache
 from src.sources.company_pages import CompanyPageClient
@@ -213,6 +216,46 @@ def test_openrouter_provider_sends_web_search_server_tool_request(tmp_path: Path
     assert "provider" not in captured["payload"]
 
 
+def test_openrouter_provider_persists_raw_llm_interaction(tmp_path: Path) -> None:
+    raw_content = json.dumps({"business_summary": "A beauty company."})
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"choices": [{"message": {"content": raw_content}}]})
+
+    settings = settings_for_tests(tmp_path, openrouter_base_url="https://openrouter.test/api/v1")
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
+
+    with session_factory() as session:
+        provider = OpenRouterProvider(
+            settings,
+            http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+            interaction_recorder=LLMInteractionLog(session),
+        )
+
+        result = provider.generate_json(
+            "extract profile",
+            "TargetProfileFeatureExtraction",
+            {"type": "object"},
+            system_prompt="Return target JSON.",
+            source_business_type="target_profile_extraction",
+        )
+
+        record = session.execute(select(LLMInteractionRecord)).scalar_one()
+
+    assert result == {"business_summary": "A beauty company."}
+    assert record.source_business_type == "target_profile_extraction"
+    assert record.provider == "openrouter"
+    assert record.model == settings.llm_model
+    assert record.schema_name == "TargetProfileFeatureExtraction"
+    assert record.status == "success"
+    assert record.prompt == "extract profile"
+    assert record.system_prompt == "Return target JSON."
+    assert record.raw_output_content == raw_content
+    assert json.loads(record.parsed_output_json or "{}") == result
+    assert json.loads(record.request_payload_json)["messages"][1]["content"] == "extract profile"
+
+
 def test_ir_page_discovery_selects_elf_investor_page_and_rejects_storefront(tmp_path: Path) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         url = str(request.url).rstrip("/")
@@ -236,30 +279,31 @@ def test_ir_page_discovery_selects_elf_investor_page_and_rejects_storefront(tmp_
             )
         return httpx.Response(404)
 
+    fake_web_search = FakeWebSearchJSONClient(
+        {
+            "candidates": [
+                {
+                    "url": "https://www.elfcosmetics.com",
+                    "title": "e.l.f. Cosmetics",
+                    "snippet": "Official beauty shopping site.",
+                    "confidence": 0.55,
+                    "reason": "Known company website",
+                    "source": "web",
+                },
+                {
+                    "url": "https://investor.elfbeauty.com/",
+                    "title": "e.l.f. Beauty - Investor Relations",
+                    "snippet": "Investor Relations, SEC filings, financials and stock information.",
+                    "confidence": 0.95,
+                    "reason": "Official IR page",
+                    "source": "web",
+                },
+            ]
+        }
+    )
     discovery = InvestorRelationsPageDiscovery(
         settings_for_tests(tmp_path),
-        FakeWebSearchJSONClient(
-            {
-                "candidates": [
-                    {
-                        "url": "https://www.elfcosmetics.com",
-                        "title": "e.l.f. Cosmetics",
-                        "snippet": "Official beauty shopping site.",
-                        "confidence": 0.55,
-                        "reason": "Known company website",
-                        "source": "web",
-                    },
-                    {
-                        "url": "https://investor.elfbeauty.com/",
-                        "title": "e.l.f. Beauty - Investor Relations",
-                        "snippet": "Investor Relations, SEC filings, financials and stock information.",
-                        "confidence": 0.95,
-                        "reason": "Official IR page",
-                        "source": "web",
-                    },
-                ]
-            }
-        ),
+        fake_web_search,
         http_client=httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True),
     )
 
@@ -280,6 +324,7 @@ def test_ir_page_discovery_selects_elf_investor_page_and_rejects_storefront(tmp_
     assert "investor relations" in result.document.metadata["validated_signals"]
     assert result.rejection_reasons
     assert "missing investor-relations page signals" in result.rejection_reasons[0]
+    assert fake_web_search.source_business_types == ["investor_relations_page_discovery"]
 
 
 def test_openrouter_provider_recovers_wrapped_json_content(tmp_path: Path) -> None:
@@ -396,6 +441,7 @@ def test_target_profile_extractor_assembles_profile_and_reuses_cache(tmp_path: P
     assert second_result.extraction_metadata["cache_hit"] is True
     assert fake_llm.calls == 1
     assert fake_llm.schema_names == ["TargetProfileFeatureExtraction"]
+    assert fake_llm.source_business_types == ["target_profile_extraction"]
     assert fake_llm.system_prompts[0].startswith("You are extracting a target company profile")
     assert fake_llm.json_schemas[0]["additionalProperties"] is False
     assert "field_support" in fake_llm.json_schemas[0]["required"]
@@ -746,6 +792,7 @@ class FakeLLMClient:
         self.schema_names: list[str] = []
         self.json_schemas: list[dict[str, Any] | None] = []
         self.system_prompts: list[str | None] = []
+        self.source_business_types: list[str] = []
         self.prompts: list[str] = []
 
     def generate_json(
@@ -754,12 +801,14 @@ class FakeLLMClient:
         schema_name: str,
         json_schema: dict[str, Any] | None = None,
         system_prompt: str | None = None,
+        source_business_type: str = "unspecified",
     ) -> dict[str, Any]:
         self.calls += 1
         self.prompts.append(_prompt)
         self.schema_names.append(schema_name)
         self.json_schemas.append(json_schema)
         self.system_prompts.append(system_prompt)
+        self.source_business_types.append(source_business_type)
         return self.payload
 
 
@@ -767,6 +816,7 @@ class FakeWebSearchJSONClient:
     def __init__(self, payload: dict[str, Any]) -> None:
         self.payload = payload
         self.prompts: list[str] = []
+        self.source_business_types: list[str] = []
 
     def generate_json_with_web_search(
         self,
@@ -778,8 +828,10 @@ class FakeWebSearchJSONClient:
         max_total_results: int = 5,
         search_engine: str = "auto",
         search_context_size: str = "low",
+        source_business_type: str = "unspecified",
     ) -> dict[str, Any]:
         self.prompts.append(prompt)
+        self.source_business_types.append(source_business_type)
         return self.payload
 
 
@@ -793,6 +845,7 @@ class FailingLLMClient:
         _schema_name: str,
         json_schema: dict[str, Any] | None = None,
         system_prompt: str | None = None,
+        source_business_type: str = "unspecified",
     ) -> dict[str, Any]:
         self.calls += 1
         raise LLMResponseError("invalid json")

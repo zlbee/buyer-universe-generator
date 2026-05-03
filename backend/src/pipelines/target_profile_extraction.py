@@ -34,6 +34,8 @@ from src.sources.strategy import DataSourceStrategy
 
 logger = logging.getLogger(__name__)
 
+_TARGET_PROFILE_LLM_BUSINESS_TYPE = "target_profile_extraction"
+
 
 class TargetProfileExtractionError(RuntimeError):
     """Structured Phase 2 failure that API and CLI layers can serialize."""
@@ -418,6 +420,7 @@ class TargetProfileExtractor:
                     self.llm_schema_name,
                     target_feature_json_schema(),
                     system_prompt=target_profile_llm_system_prompt(self.llm_schema_name),
+                    source_business_type=_TARGET_PROFILE_LLM_BUSINESS_TYPE,
                 )
                 logger.info(
                     "TargetProfile LLM extraction attempt returned payload: ticker=%s attempt=%s/%s top_level_keys=%s",

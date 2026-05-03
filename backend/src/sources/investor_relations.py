@@ -20,6 +20,8 @@ from src.llm import LLMResponseError, MissingLLMConfigurationError, WebSearchJSO
 
 logger = logging.getLogger(__name__)
 
+_IR_DISCOVERY_LLM_BUSINESS_TYPE = "investor_relations_page_discovery"
+
 
 class IRPageCandidateOutput(BaseModel):
     """Candidate investor relations page returned by the LLM web-search step."""
@@ -101,6 +103,7 @@ class InvestorRelationsPageDiscovery:
                 max_total_results=self.settings.ir_discovery_max_candidates,
                 search_engine=self.settings.ir_discovery_search_engine,
                 search_context_size=self.settings.ir_discovery_search_context_size,
+                source_business_type=_IR_DISCOVERY_LLM_BUSINESS_TYPE,
             )
             discovery_output = IRPageDiscoveryOutput.model_validate(payload)
         except MissingLLMConfigurationError:

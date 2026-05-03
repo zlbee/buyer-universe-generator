@@ -79,3 +79,25 @@ class TargetProfileCacheRecord(Base):
     payload_json: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class LLMInteractionRecord(Base):
+    """Provider-level LLM request/response audit trail for prompt review and optimization."""
+
+    __tablename__ = "llm_interactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    source_business_type: Mapped[str] = mapped_column(String(128), index=True)
+    provider: Mapped[str] = mapped_column(String(64), index=True)
+    model: Mapped[str] = mapped_column(String(256), index=True)
+    schema_name: Mapped[str] = mapped_column(String(128), index=True)
+    response_format_type: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    prompt: Mapped[str] = mapped_column(Text)
+    system_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    request_payload_json: Mapped[str] = mapped_column(Text)
+    response_payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    raw_output_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parsed_output_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))

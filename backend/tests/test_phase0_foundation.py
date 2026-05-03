@@ -91,6 +91,7 @@ def test_phase0_foundation_smoke(tmp_path: Path) -> None:
     assert "pipeline_runs" in inspect(engine).get_table_names()
     assert "target_resolutions" in inspect(engine).get_table_names()
     assert "source_documents" in inspect(engine).get_table_names()
+    assert "llm_interactions" in inspect(engine).get_table_names()
 
     app = create_app(settings)
     with TestClient(app) as client:

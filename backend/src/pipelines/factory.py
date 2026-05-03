@@ -9,6 +9,7 @@ from src.llm import LLMClient, OpenRouterProvider
 from src.pipelines.source_ingestion import SourceIngestionService
 from src.pipelines.target_profile_extraction import TargetProfileExtractor
 from src.pipelines.target_resolution import TargetResolver
+from src.repositories.llm_interaction_log import LLMInteractionLog
 from src.repositories.source_cache import SourceCache
 from src.repositories.target_profile_cache import TargetProfileCache
 from src.sources.investor_relations import InvestorRelationsPageDiscovery
@@ -50,7 +51,7 @@ def build_target_profile_extractor(
         polygon_client=registry.polygon(),
         newsapi_client=registry.newsapi(),
     )
-    provider = llm_client or OpenRouterProvider(settings)
+    provider = llm_client or OpenRouterProvider(settings, interaction_recorder=LLMInteractionLog(session))
     ir_page_discovery = (
         InvestorRelationsPageDiscovery(settings, provider)
         if settings.enable_ir_page_discovery and hasattr(provider, "generate_json_with_web_search")
