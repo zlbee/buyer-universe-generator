@@ -110,6 +110,7 @@ class SourceIngestionService:
             self.strategy.cache_ttl_hours("newsapi"),
             source_strength=news_source.source_strength,
             source_dimension=news_source.dimension_id,
+            domains=news_source.config.retrieval.domains,
         )
         self.cache.save_documents(news_documents)
         return news_documents

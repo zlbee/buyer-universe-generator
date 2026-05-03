@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -53,6 +54,7 @@ def test_data_source_policy_disables_optional_sources_without_keys(tmp_path: Pat
     assert news_source.source_strength == SourceStrength.B
     assert news_source.enabled is False
     assert news_source.disabled_reason == "missing BUG_NEWS_API_KEY"
+    assert {"bloomberg.com", "reuters.com", "wsj.com"} <= set(news_source.config.retrieval.domains)
 
 
 def test_data_source_policy_scopes_strength_by_dimension(tmp_path: Path) -> None:
@@ -159,9 +161,12 @@ def test_polygon_client_returns_supporting_profile_document(tmp_path: Path) -> N
     assert document.metadata["market_cap"] == 1_000_000
 
 
-def test_newsapi_client_returns_article_documents(tmp_path: Path) -> None:
+def test_newsapi_client_returns_article_documents(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    domains = ["bloomberg.com", "reuters.com", "wsj.com"]
+
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.params["apiKey"] == "news-test-key"
+        assert request.url.params["domains"] == ",".join(domains)
         return httpx.Response(
             200,
             json={
@@ -177,12 +182,47 @@ def test_newsapi_client_returns_article_documents(tmp_path: Path) -> None:
 
     settings = settings_for_tests(tmp_path, news_api_key="news-test-key")
     client = NewsApiClient(settings, http_client=httpx.Client(transport=httpx.MockTransport(handler)))
-    documents = client.fetch_target_articles(sample_target(), ttl_hours=12)
+    with caplog.at_level(logging.INFO):
+        documents = client.fetch_target_articles(sample_target(), ttl_hours=12, domains=domains)
 
     assert len(documents) == 1
     assert documents[0].source_id == "newsapi"
     assert documents[0].source_type == SourceType.news_article
     assert documents[0].source_strength == SourceStrength.B
+    newsapi_log_text = "\n".join(
+        record.message for record in caplog.records if record.name in {"src.sources.newsapi", "uvicorn.error"}
+    )
+    assert "NewsAPI request" in newsapi_log_text
+    assert ",".join(domains) in newsapi_log_text
+    assert "news-test-key" not in newsapi_log_text
+    assert "<redacted>" in newsapi_log_text
+    assert any(record.name == "uvicorn.error" and "NewsAPI request" in record.message for record in caplog.records)
+
+
+def test_source_ingestion_applies_newsapi_domains_from_policy(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path, news_api_key="news-test-key")
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
+    fake_sec = FakeSecClient()
+    fake_news = FakeNewsApiClient()
+
+    with session_factory() as session:
+        strategy = DataSourceStrategy.from_settings(settings)
+        cache = SourceCache(session)
+        resolver = TargetResolver(strategy=strategy, edgar_client=fake_sec, source_cache=cache)
+        service = SourceIngestionService(
+            strategy=strategy,
+            resolver=resolver,
+            cache=cache,
+            edgar_client=fake_sec,
+            newsapi_client=fake_news,
+        )
+
+        result = service.ingest("AAPL")
+
+    assert fake_news.domains is not None
+    assert {"bloomberg.com", "reuters.com", "wsj.com"} <= set(fake_news.domains)
+    assert any(document.source_id == "newsapi" for document in result.source_documents)
 
 
 def test_target_resolver_handles_ticker_exact_name_invalid_and_ambiguous(tmp_path: Path) -> None:
@@ -310,6 +350,36 @@ class FakeSecClient:
             retrieved_at=datetime.now(UTC),
             expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours),
         )
+
+
+class FakeNewsApiClient:
+    def __init__(self) -> None:
+        self.domains: list[str] | None = None
+
+    def fetch_target_articles(
+        self,
+        target: ResolvedTarget,
+        ttl_hours: int,
+        page_size: int = 5,
+        source_strength: SourceStrength = SourceStrength.B,
+        source_dimension: str | None = None,
+        domains: list[str] | None = None,
+    ) -> list[SourceDocument]:
+        self.domains = domains
+        return [
+            SourceDocument(
+                source_id="newsapi",
+                source_dimension=source_dimension,
+                source_type=SourceType.news_article,
+                source_strength=source_strength,
+                target_cik=target.cik,
+                target_ticker=target.ticker,
+                url="https://reuters.com/apple-news",
+                metadata={"domains": domains, "page_size": page_size},
+                retrieved_at=datetime.now(UTC),
+                expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours),
+            )
+        ]
 
 
 class FakeEdgarModule:

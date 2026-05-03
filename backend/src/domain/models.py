@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class StrictBaseModel(BaseModel):
@@ -117,6 +117,17 @@ class DataSourceDimensionConfig(StrictBaseModel):
     rationale: str | None = None
 
 
+class DataSourceRetrievalConfig(StrictBaseModel):
+    """Source-level controls applied when querying raw provider APIs."""
+
+    domains: list[str] = Field(default_factory=list)
+
+    @field_validator("domains")
+    @classmethod
+    def normalize_domains(cls, value: list[str]) -> list[str]:
+        return [domain.strip().lower() for domain in value if domain.strip()]
+
+
 class DataSourceConfig(StrictBaseModel):
     """Provider-level data-source policy that avoids dimension-specific scoring."""
 
@@ -125,6 +136,7 @@ class DataSourceConfig(StrictBaseModel):
     required: bool = False
     api_key_env: str | None = None
     cache_ttl_hours: int = Field(default=24, ge=0)
+    retrieval: DataSourceRetrievalConfig = Field(default_factory=DataSourceRetrievalConfig)
     dimensions: dict[str, DataSourceDimensionConfig] = Field(default_factory=dict)
 
     @model_validator(mode="after")

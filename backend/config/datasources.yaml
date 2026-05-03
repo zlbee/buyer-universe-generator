@@ -127,6 +127,23 @@ sources:
     required: false
     api_key_env: BUG_NEWS_API_KEY
     cache_ttl_hours: 12
+    retrieval:
+      domains:
+        - bloomberg.com
+        - reuters.com
+        - wsj.com
+        - ft.com
+        - cnbc.com
+        - barrons.com
+        - marketwatch.com
+        - seekingalpha.com
+        - benzinga.com
+        - thedeal.com
+        - businessinsider.com
+        - techcrunch.com
+        - thestreet.com
+        - nasdaq.com
+        - yahoo.com
     dimensions:
       seller_profile.recent_news_context:
         source_strength: B
