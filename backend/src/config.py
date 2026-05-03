@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     llm_provider: str = "openrouter"
     llm_model: str = "openrouter/auto"
     llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
-    llm_max_input_chars: int = Field(default=24_000, ge=1_000)
+    llm_max_input_chars: int = Field(default=120_000, ge=1_000)
     target_profile_extractor_version: str = "target-profile-v1"
     target_profile_cache_ttl_hours: int = Field(default=24, ge=0)
     enable_ir_page_discovery: bool = True
