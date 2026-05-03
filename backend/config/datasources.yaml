@@ -106,20 +106,20 @@ sources:
         rationale: Descriptions and SIC codes can seed adjacency, but they are too coarse for final fit claims.
 
   company_pages:
-    provider: official_company_pages
+    provider: official_investor_relations_pages
     enabled: true
     required: false
     cache_ttl_hours: 24
     dimensions:
       seller_profile.business_description:
-        source_strength: A
+        source_strength: B
         field_coverage:
-          - official_homepage
+          - official_investor_relations_page
           - product_lines
           - customer_segments
           - channels
           - geographies
-        rationale: Official company pages can support product, channel, and geography extraction when discoverable.
+        rationale: Official investor relations pages can support product, channel, and geography extraction when discoverable and validated.
 
   newsapi:
     provider: newsapi.org

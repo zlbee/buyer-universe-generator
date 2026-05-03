@@ -46,27 +46,74 @@ class OpenRouterProvider:
             # OpenRouter may otherwise route to providers that silently ignore response_format.
             provider_preferences = {"require_parameters": True}
 
-        try:
-            payload: dict[str, Any] = {
-                "model": self.settings.llm_model,
-                "response_format": response_format,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": system_prompt or _default_json_system_prompt(schema_name),
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-            }
-            if provider_preferences:
-                payload["provider"] = provider_preferences
+        payload: dict[str, Any] = {
+            "model": self.settings.llm_model,
+            "response_format": response_format,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": system_prompt or _default_json_system_prompt(schema_name),
+                },
+                {"role": "user", "content": prompt},
+            ],
+        }
+        if provider_preferences:
+            payload["provider"] = provider_preferences
 
+        return self._send_structured_request(payload, schema_name, prompt, response_format["type"])
+
+    def generate_json_with_web_search(
+        self,
+        prompt: str,
+        schema_name: str,
+        json_schema: dict[str, Any] | None = None,
+        system_prompt: str | None = None,
+        max_results: int = 5,
+        max_total_results: int = 5,
+        search_engine: str = "auto",
+        search_context_size: str = "low",
+    ) -> dict[str, Any]:
+        """Generate structured JSON while letting OpenRouter run its web-search server tool."""
+        if not self.settings.openrouter_api_key:
+            raise MissingLLMConfigurationError("BUG_OPENROUTER_API_KEY is required for structured LLM extraction")
+
+        tool_parameters: dict[str, Any] = {
+            "engine": search_engine,
+            "max_results": max_results,
+            "max_total_results": max_total_results,
+            "search_context_size": search_context_size,
+        }
+        payload: dict[str, Any] = {
+            "model": self.settings.llm_model,
+            # Web-search discovery uses JSON object mode to avoid provider-routing failures on models
+            # that do not support strict JSON Schema response_format parameters.
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {
+                    "role": "system",
+                    "content": system_prompt or _default_json_system_prompt(schema_name),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "tools": [{"type": "openrouter:web_search", "parameters": tool_parameters}],
+        }
+
+        return self._send_structured_request(payload, schema_name, prompt, "json_object:web_search")
+
+    def _send_structured_request(
+        self,
+        payload: dict[str, Any],
+        schema_name: str,
+        prompt: str,
+        response_format_type: str,
+    ) -> dict[str, Any]:
+        try:
             logger.info(
                 "OpenRouter structured request started: schema=%s model=%s prompt_chars=%s response_format=%s",
                 schema_name,
                 self.settings.llm_model,
                 len(prompt),
-                response_format["type"],
+                response_format_type,
             )
             response = self.http_client.post(
                 f"{self.settings.openrouter_base_url.rstrip('/')}/chat/completions",

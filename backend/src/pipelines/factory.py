@@ -11,6 +11,7 @@ from src.pipelines.target_profile_extraction import TargetProfileExtractor
 from src.pipelines.target_resolution import TargetResolver
 from src.repositories.source_cache import SourceCache
 from src.repositories.target_profile_cache import TargetProfileCache
+from src.sources.investor_relations import InvestorRelationsPageDiscovery
 from src.sources.registry import SourceRegistry
 from src.sources.strategy import DataSourceStrategy
 
@@ -49,6 +50,12 @@ def build_target_profile_extractor(
         polygon_client=registry.polygon(),
         newsapi_client=registry.newsapi(),
     )
+    provider = llm_client or OpenRouterProvider(settings)
+    ir_page_discovery = (
+        InvestorRelationsPageDiscovery(settings, provider)
+        if settings.enable_ir_page_discovery and hasattr(provider, "generate_json_with_web_search")
+        else None
+    )
     return TargetProfileExtractor(
         settings=settings,
         strategy=strategy,
@@ -56,6 +63,6 @@ def build_target_profile_extractor(
         source_cache=cache,
         profile_cache=TargetProfileCache(session),
         edgar_client=edgar_client,
-        llm_client=llm_client or OpenRouterProvider(settings),
-        company_page_client=registry.company_pages(),
+        llm_client=provider,
+        ir_page_discovery=ir_page_discovery,
     )

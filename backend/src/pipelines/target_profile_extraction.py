@@ -28,7 +28,7 @@ from src.llm import LLMClient, LLMResponseError, MissingLLMConfigurationError
 from src.pipelines.source_ingestion import SourceIngestionService
 from src.repositories.source_cache import SourceCache
 from src.repositories.target_profile_cache import TargetProfileCache
-from src.sources.company_pages import CompanyPageClient
+from src.sources.investor_relations import InvestorRelationsPageDiscovery
 from src.sources.sec import SecEdgarClient
 from src.sources.strategy import DataSourceStrategy
 
@@ -212,7 +212,7 @@ class TargetProfileExtractor:
         profile_cache: TargetProfileCache,
         edgar_client: SecEdgarClient,
         llm_client: LLMClient,
-        company_page_client: CompanyPageClient | None = None,
+        ir_page_discovery: InvestorRelationsPageDiscovery | None = None,
     ) -> None:
         self.settings = settings
         self.strategy = strategy
@@ -221,7 +221,7 @@ class TargetProfileExtractor:
         self.profile_cache = profile_cache
         self.edgar_client = edgar_client
         self.llm_client = llm_client
-        self.company_page_client = company_page_client
+        self.ir_page_discovery = ir_page_discovery
         self.keyword_taxonomy = load_keyword_taxonomy(settings.keyword_taxonomy_path)
 
     def build_profile(self, query: str) -> TargetProfileExtractionResult:
@@ -240,6 +240,7 @@ class TargetProfileExtractor:
 
         source_documents = self._ensure_filing_text(ingestion, source_documents, warnings)
         source_documents = self._ensure_company_page(ingestion, source_documents, warnings)
+        source_documents = _filter_company_page_documents_for_profile(source_documents)
         logger.info(
             "TargetProfile sources prepared: ticker=%s source_documents=%s text_documents=%s raw_text_chars=%s warnings=%s",
             ingestion.target.ticker,
@@ -306,7 +307,7 @@ class TargetProfileExtractor:
         return result
 
     def _effective_extractor_version(self) -> str:
-        return f"{self.settings.target_profile_extractor_version}:keyword-taxonomy:{self.keyword_taxonomy.fingerprint[:12]}"
+        return f"{self.settings.target_profile_extractor_version}:ir-v1:kt:{self.keyword_taxonomy.fingerprint[:12]}"
 
     def _ensure_filing_text(
         self,
@@ -344,11 +345,8 @@ class TargetProfileExtractor:
         source_documents: list[SourceDocument],
         warnings: list[str],
     ) -> list[SourceDocument]:
-        if any(document.source_id == "company_pages" for document in source_documents):
-            return source_documents
-
-        homepage_url = _homepage_url_from_polygon(source_documents)
-        if not homepage_url:
+        existing_company_pages = [document for document in source_documents if document.source_id == "company_pages"]
+        if any(_is_high_value_company_page(document) for document in existing_company_pages):
             return source_documents
 
         company_page_source = self.strategy.selected_source(
@@ -361,12 +359,16 @@ class TargetProfileExtractor:
         if not company_page_source.enabled:
             warnings.append(f"company_pages disabled: {company_page_source.disabled_reason}")
             return source_documents
-        if not self.company_page_client:
-            warnings.append("company_pages disabled: adapter unavailable")
+        if not self.settings.enable_ir_page_discovery:
+            warnings.append("company_pages IR discovery disabled: setting disabled")
+            return source_documents
+        if not self.ir_page_discovery:
+            warnings.append("company_pages IR discovery disabled: adapter unavailable")
             return source_documents
 
+        homepage_url = _homepage_url_from_polygon(source_documents)
         try:
-            document = self.company_page_client.fetch_official_page(
+            discovery_result = self.ir_page_discovery.discover(
                 ingestion.target,
                 homepage_url,
                 self.strategy.cache_ttl_hours("company_pages"),
@@ -374,13 +376,19 @@ class TargetProfileExtractor:
                 source_dimension=company_page_source.dimension_id,
             )
         except Exception as error:
-            warnings.append(f"company_pages fetch failed: {error}")
+            warnings.append(f"company_pages IR discovery failed: {error}")
             return source_documents
 
-        if not document:
+        if not discovery_result.document:
+            rejection_preview = "; ".join((discovery_result.rejection_reasons or [])[:3])
+            warning = f"company_pages IR discovery failed: status={discovery_result.status}"
+            if rejection_preview:
+                warning = f"{warning} rejection_reasons={rejection_preview}"
+            warnings.append(warning)
             return source_documents
-        self.source_cache.save_document(document)
-        return [*source_documents, document]
+
+        self.source_cache.save_document(discovery_result.document)
+        return [*source_documents, discovery_result.document]
 
     def _extract_with_llm(
         self,
@@ -491,7 +499,12 @@ class TargetProfileExtractor:
         for field_name, value in llm_field_values.items():
             if not value:
                 continue
-            mapped_evidence = _evidence_from_support(field_name, llm_output.field_support.get(field_name, []), source_documents)
+            mapped_evidence = _evidence_from_support(
+                field_name,
+                llm_output.field_support.get(field_name, []),
+                source_documents,
+                field_values=_field_values_for_evidence(field_name, value),
+            )
             if mapped_evidence:
                 feature_evidence[field_name] = mapped_evidence
 
@@ -596,6 +609,19 @@ def _homepage_url_from_polygon(source_documents: list[SourceDocument]) -> str | 
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
+
+
+def _is_high_value_company_page(document: SourceDocument) -> bool:
+    return document.metadata.get("page_role") == "investor_relations"
+
+
+def _filter_company_page_documents_for_profile(source_documents: list[SourceDocument]) -> list[SourceDocument]:
+    """Keep stale homepage/company-about cache entries out of the LLM evidence set."""
+    return [
+        document
+        for document in source_documents
+        if document.source_id != "company_pages" or _is_high_value_company_page(document)
+    ]
 
 
 def _build_extraction_prompt(
@@ -735,11 +761,16 @@ def _evidence_from_support(
     field_name: str,
     snippets: list[str],
     source_documents: list[SourceDocument],
+    field_values: list[str] | None = None,
 ) -> list[Evidence]:
     evidence: list[Evidence] = []
     for snippet in snippets:
+        if not _support_snippet_matches_field_values(snippet, field_values or []):
+            continue
         document = _document_containing_snippet(source_documents, snippet)
         if not document:
+            continue
+        if document.source_type == SourceType.company_page and _is_low_value_company_page_snippet(snippet):
             continue
         evidence.append(
             Evidence(
@@ -755,6 +786,45 @@ def _evidence_from_support(
             )
         )
     return evidence
+
+
+def _field_values_for_evidence(field_name: str, value: Any) -> list[str]:
+    if field_name == "business_summary":
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [str(item) for item in value if isinstance(item, (str, int, float))]
+    return []
+
+
+def _support_snippet_matches_field_values(snippet: str, field_values: list[str]) -> bool:
+    if not field_values:
+        return True
+    normalized_snippet = _normalize_evidence_text(snippet)
+    return any(_normalize_evidence_text(value) in normalized_snippet for value in field_values if _normalize_evidence_text(value))
+
+
+def _is_low_value_company_page_snippet(snippet: str) -> bool:
+    normalized = _normalize_evidence_text(snippet)
+    low_value_phrases = (
+        "afterpay",
+        "pay in 4",
+        "interest free payments",
+        "shop now",
+        "free shipping",
+        "add to cart",
+        "checkout",
+        "promo code",
+        "newsletter",
+        "sign up",
+        "cookie",
+    )
+    return any(phrase in normalized for phrase in low_value_phrases)
+
+
+def _normalize_evidence_text(value: str) -> str:
+    return " ".join(value.replace("-", " ").split()).casefold()
 
 
 def _build_canonical_keywords(

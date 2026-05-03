@@ -18,6 +18,23 @@ class LLMClient(Protocol):
         ...
 
 
+class WebSearchJSONClient(Protocol):
+    """Produces structured JSON outputs with provider-managed web search enabled."""
+
+    def generate_json_with_web_search(
+        self,
+        prompt: str,
+        schema_name: str,
+        json_schema: dict[str, Any] | None = None,
+        system_prompt: str | None = None,
+        max_results: int = 5,
+        max_total_results: int = 5,
+        search_engine: str = "auto",
+        search_context_size: str = "low",
+    ) -> dict[str, Any]:
+        ...
+
+
 class MissingLLMConfigurationError(RuntimeError):
     """Raised when a required LLM provider setting is unavailable."""
 
