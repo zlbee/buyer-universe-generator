@@ -25,10 +25,13 @@ class SourceRegistry:
         self.request_recorder = request_recorder
 
     def edgar(self) -> SecEdgarClient:
+        retrieval = self._retrieval("edgar")
         return SecEdgarClient(
             self.settings,
             request_recorder=self.request_recorder,
             provider=self._provider("edgar", "edgartools"),
+            markdown_item_parser_enabled=retrieval.markdown_item_parser_enabled,
+            markdown_item_parser_min_chars=retrieval.markdown_item_parser_min_chars,
         )
 
     def polygon(self) -> PolygonClient:
@@ -58,3 +61,10 @@ class SourceRegistry:
         if not self.strategy:
             return fallback
         return self.strategy.source(source_id).provider
+
+    def _retrieval(self, source_id: str):
+        if not self.strategy:
+            from src.domain import DataSourceRetrievalConfig
+
+            return DataSourceRetrievalConfig()
+        return self.strategy.source(source_id).retrieval

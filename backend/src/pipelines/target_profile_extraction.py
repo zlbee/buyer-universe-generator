@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 import hashlib
 import json
 import logging
@@ -376,6 +377,20 @@ class TargetProfileExtractor:
         documents = list(source_documents)
         fetch_errors: list[str] = []
         for filing in filings:
+            cached_document = _source_document_from_cached_structured_sections(
+                ingestion.target,
+                documents,
+                filing,
+                self.strategy.cache_ttl_hours("edgar"),
+                source_strength=strategy_source.source_strength,
+                source_dimension=strategy_source.dimension_id,
+                text_scope="company_strategy",
+            )
+            if cached_document:
+                self.source_cache.save_document(cached_document)
+                documents.append(cached_document)
+                continue
+
             try:
                 document = self.edgar_client.fetch_filing_text_document(
                     ingestion.target,
@@ -709,6 +724,72 @@ def _filter_company_page_documents_for_profile(source_documents: list[SourceDocu
         for document in source_documents
         if document.source_id != "company_pages" or _is_high_value_company_page(document)
     ]
+
+
+def _source_document_from_cached_structured_sections(
+    target,
+    source_documents: list[SourceDocument],
+    filing: FilingMetadata,
+    ttl_hours: int,
+    source_strength: SourceStrength,
+    source_dimension: str | None,
+    text_scope: str,
+) -> SourceDocument | None:
+    if text_scope != "company_strategy":
+        return None
+
+    for document in source_documents:
+        if document.source_id != "edgar" or document.filing_accession != filing.accession_number:
+            continue
+        sections = document.metadata.get("structured_sections")
+        if not isinstance(sections, dict):
+            continue
+        selected_text, selected_scope = _cached_structured_strategy_section(sections, filing)
+        if not selected_text:
+            continue
+
+        retrieved_at = datetime.now(UTC)
+        # Reuse the already-parsed edgartools object sections so one filing can feed multiple dimensions.
+        metadata = {
+            **filing.model_dump(mode="json"),
+            "text_retrieval_method": "cache:structured_sections",
+            "text_scope": selected_scope,
+            "raw_text_char_count": len(selected_text),
+            "cached_text_char_count": len(selected_text),
+            "structured_sections": sections,
+            "structured_section_char_counts": {
+                section_name: len(str(section_text)) for section_name, section_text in sections.items()
+            },
+            "derived_from_source_dimension": document.source_dimension,
+        }
+        return SourceDocument(
+            source_id="edgar",
+            source_dimension=source_dimension,
+            source_type=SourceType.sec_filing,
+            source_strength=source_strength,
+            target_cik=target.cik,
+            target_ticker=target.ticker,
+            url=filing.url,
+            filing_accession=filing.accession_number,
+            raw_text=selected_text,
+            metadata=metadata,
+            retrieved_at=retrieved_at,
+            expires_at=retrieved_at + timedelta(hours=ttl_hours) if ttl_hours else None,
+        )
+    return None
+
+
+def _cached_structured_strategy_section(sections: dict[str, Any], filing: FilingMetadata) -> tuple[str | None, str]:
+    normalized_form = filing.form.strip().upper()
+    value = sections.get("management_discussion")
+    if isinstance(value, str) and value.strip():
+        if normalized_form.startswith("10-Q"):
+            return value, "item_2_mdna"
+        return value, "item_7_mdna"
+    value = sections.get("current_report")
+    if normalized_form.startswith("8-K") and isinstance(value, str) and value.strip():
+        return value, "full_8k_current_report"
+    return None, "full_filing_text"
 
 
 def _build_extraction_prompt(

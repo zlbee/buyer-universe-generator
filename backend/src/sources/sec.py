@@ -3,14 +3,64 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
 
 from src.config import Settings
-from src.domain import DataSourceRawRecord, FilingMetadata, ResolvedTarget, SourceDocument, SourceStrength, SourceType
+from src.domain import (
+    DataSourceRawRecord,
+    DataSourceRequestStatus,
+    FilingMetadata,
+    ResolvedTarget,
+    SourceDocument,
+    SourceStrength,
+    SourceType,
+)
 from src.sources.base import DataSourceRequestContext, DataSourceRequestRecorder, ExternalDataSourceClient
+
+
+@dataclass(frozen=True)
+class FilingTextExtraction:
+    """Selected SEC filing text plus provenance about how it was extracted."""
+
+    selected_text: str
+    retrieval_method: str
+    text_scope: str
+    raw_text_char_count: int
+    cached_text_char_count: int
+    structured_sections: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class MarkdownItemSection:
+    """A deterministic SEC Item section extracted from edgartools markdown."""
+
+    text: str
+    section_name: str
+    selected_scope: str
+    start_item: str
+    end_item: str
+
+
+@dataclass(frozen=True)
+class MarkdownItemHeading:
+    """Line-level SEC Item heading found in markdown output."""
+
+    item_code: str
+    start: int
+    end: int
+
+
+_ITEM_HEADING_RE = re.compile(
+    r"^[ \t>#*_\-]*(?:part\s+[ivxlcdm]+\s+)?item\s+"
+    r"(?P<item>\d{1,2}\s*[A-Z]?)\s*"
+    r"(?:[.\-:)\u2013\u2014]\s*)?"
+    r"(?P<title>[^\n]{0,160})$",
+    re.IGNORECASE | re.MULTILINE,
+)
 
 
 class SecEdgarClient(ExternalDataSourceClient):
@@ -27,6 +77,8 @@ class SecEdgarClient(ExternalDataSourceClient):
         use_edgartools: bool = True,
         request_recorder: DataSourceRequestRecorder | None = None,
         provider: str = "edgartools",
+        markdown_item_parser_enabled: bool = False,
+        markdown_item_parser_min_chars: int = 500,
     ) -> None:
         super().__init__(
             settings,
@@ -37,6 +89,8 @@ class SecEdgarClient(ExternalDataSourceClient):
         )
         self._edgar_module = edgar_module
         self._use_edgartools = use_edgartools
+        self.markdown_item_parser_enabled = markdown_item_parser_enabled
+        self.markdown_item_parser_min_chars = markdown_item_parser_min_chars
         self._company_mapping: list[dict[str, Any]] | None = None
         self._configure_edgartools_identity()
 
@@ -300,16 +354,24 @@ class SecEdgarClient(ExternalDataSourceClient):
         source_dimension: str | None = None,
         text_scope: str = "business_description",
     ) -> SourceDocument:
-        """Fetch filing text and cache the section most relevant to a profile dimension."""
+        """Fetch structured filing sections and cache the one relevant to a profile dimension."""
 
-        raw_text, retrieval_method = self._fetch_filing_text_with_edgartools(target, filing)
-        if not raw_text and filing.url:
-            raw_text, retrieval_method = self._fetch_filing_text_with_http(target, filing)
+        extraction = self._fetch_filing_text_with_edgartools(target, filing, text_scope, source_dimension)
+        if not extraction:
+            raise ValueError(f"Could not retrieve structured filing section for accession {filing.accession_number}")
 
-        cleaned_text = _clean_filing_text(raw_text)
-        selected_text, selected_scope = _select_filing_text(cleaned_text, filing, text_scope)
-        if not selected_text:
-            raise ValueError(f"Could not retrieve filing text for accession {filing.accession_number}")
+        metadata = {
+            **filing.model_dump(mode="json"),
+            "text_retrieval_method": extraction.retrieval_method,
+            "text_scope": extraction.text_scope,
+            "raw_text_char_count": extraction.raw_text_char_count,
+            "cached_text_char_count": extraction.cached_text_char_count,
+        }
+        if extraction.structured_sections:
+            metadata["structured_sections"] = extraction.structured_sections
+            metadata["structured_section_char_counts"] = {
+                section_name: len(section_text) for section_name, section_text in extraction.structured_sections.items()
+            }
 
         return SourceDocument(
             source_id="edgar",
@@ -320,14 +382,8 @@ class SecEdgarClient(ExternalDataSourceClient):
             target_ticker=target.ticker,
             url=filing.url,
             filing_accession=filing.accession_number,
-            raw_text=selected_text,
-            metadata={
-                **filing.model_dump(mode="json"),
-                "text_retrieval_method": retrieval_method,
-                "text_scope": selected_scope,
-                "raw_text_char_count": len(cleaned_text),
-                "cached_text_char_count": len(selected_text),
-            },
+            raw_text=extraction.selected_text,
+            metadata=metadata,
             retrieved_at=datetime.now(UTC),
             expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours) if ttl_hours else None,
         )
@@ -352,13 +408,42 @@ class SecEdgarClient(ExternalDataSourceClient):
             expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours) if ttl_hours else None,
         )
 
-    def _fetch_filing_text_with_edgartools(self, target: ResolvedTarget, filing: FilingMetadata) -> tuple[str, str]:
+    def _fetch_filing_text_with_edgartools(
+        self,
+        target: ResolvedTarget,
+        filing: FilingMetadata,
+        text_scope: str,
+        source_dimension: str | None,
+    ) -> FilingTextExtraction | None:
         edgar = self._edgar()
         if not edgar or not hasattr(edgar, "Filing"):
-            return "", ""
+            return None
 
+        filing_object = self._edgartools_filing_object(edgar, target, filing)
+        if not filing_object:
+            return None
+
+        return self._fetch_structured_filing_section(
+            target,
+            filing,
+            filing_object,
+            text_scope,
+            source_dimension,
+        )
+
+    def _edgartools_filing_object(self, edgar: Any, target: ResolvedTarget, filing: FilingMetadata) -> Any | None:
+        get_by_accession_number = getattr(edgar, "get_by_accession_number", None)
+        if callable(get_by_accession_number):
+            try:
+                return get_by_accession_number(filing.accession_number, show_progress=False)
+            except Exception:
+                return None
+
+        filing_class = getattr(edgar, "Filing", None)
+        if not callable(filing_class):
+            return None
         try:
-            filing_object = edgar.Filing(
+            return filing_class(
                 cik=int(target.cik),
                 company=target.canonical_name,
                 form=filing.form,
@@ -366,44 +451,118 @@ class SecEdgarClient(ExternalDataSourceClient):
                 accession_no=filing.accession_number,
             )
         except Exception:
-            return "", ""
+            return None
 
-        for method_name in ("text", "markdown", "full_text_submission"):
-            method = getattr(filing_object, method_name, None)
-            if not callable(method):
-                continue
-            context = self._start_provider_request(
-                operation="edgartools_filing_text",
-                target=target,
-                request_params={"accession_number": filing.accession_number, "method": method_name},
-            )
-            try:
-                text = method()
-            except Exception as error:
-                self._record_provider_error(context, error)
-                continue
-            if isinstance(text, str) and text.strip():
-                self._record_provider_success(
-                    context,
-                    [_filing_text_raw_record(filing, context, datetime.now(UTC), text, f"edgartools:Filing.{method_name}")],
-                )
-                return text, f"edgartools:Filing.{method_name}"
-            self._record_provider_success(context, [])
-        return "", ""
+    def _fetch_structured_filing_section(
+        self,
+        target: ResolvedTarget,
+        filing: FilingMetadata,
+        filing_object: Any,
+        text_scope: str,
+        source_dimension: str | None,
+    ) -> FilingTextExtraction | None:
+        obj_method = getattr(filing_object, "obj", None) or getattr(filing_object, "data_object", None)
+        if not callable(obj_method):
+            return None
 
-    def _fetch_filing_text_with_http(self, target: ResolvedTarget, filing: FilingMetadata) -> tuple[str, str]:
-        if not filing.url:
-            return "", ""
-        text, _raw_records = self._get_text(
-            operation="sec_filing_text_http_fallback",
-            url=filing.url,
-            headers={"User-Agent": self.settings.sec_user_agent},
+        context = self._start_provider_request(
+            operation="edgartools_filing_structured_object",
             target=target,
-            raw_records_from_text=lambda value, context, retrieved_at, _response: [
-                _filing_text_raw_record(filing, context, retrieved_at, value, "http:fallback")
-            ],
+            source_dimension=source_dimension,
+            request_params={"accession_number": filing.accession_number, "form": filing.form, "text_scope": text_scope},
         )
-        return text, "http:fallback"
+        try:
+            report_object = obj_method()
+        except Exception as error:
+            self._record_provider_error(context, error)
+            return None
+
+        if not report_object:
+            self._record_request(
+                context,
+                DataSourceRequestStatus.error,
+                None,
+                [],
+                error_message=f"edgartools:Filing.obj returned no report object for accession {filing.accession_number}",
+            )
+            return None
+
+        sections = _structured_sections_from_report_object(report_object, filing)
+        selected_text, selected_scope = _select_structured_section(sections, filing, text_scope)
+        payload = _structured_report_payload(report_object, filing, sections, selected_scope)
+        audit_text, audit_text_representation = _structured_raw_text_for_audit(
+            filing_object,
+            selected_text,
+            report_object,
+            payload,
+        )
+        retrieval_method = "edgartools:Filing.obj"
+
+        if not selected_text and self.markdown_item_parser_enabled:
+            parsed_section = _parse_markdown_item_section(
+                audit_text or "",
+                filing,
+                text_scope,
+                self.markdown_item_parser_min_chars,
+            )
+            if parsed_section:
+                selected_text = parsed_section.text
+                selected_scope = parsed_section.selected_scope
+                sections = {**sections, parsed_section.section_name: parsed_section.text}
+                payload = _structured_report_payload(report_object, filing, sections, selected_scope)
+                payload["markdown_item_parser"] = {
+                    "enabled": True,
+                    "result": "matched",
+                    "start_item": parsed_section.start_item,
+                    "end_item": parsed_section.end_item,
+                    "min_chars": self.markdown_item_parser_min_chars,
+                    "selected_char_count": len(parsed_section.text),
+                }
+                retrieval_method = "edgartools:Filing.markdown:item_parser"
+            else:
+                payload["markdown_item_parser"] = {
+                    "enabled": True,
+                    "result": "no_confident_item_boundary",
+                    "min_chars": self.markdown_item_parser_min_chars,
+                }
+
+        payload["text_retrieval_method"] = retrieval_method
+        raw_record = _filing_structured_raw_record(
+            filing,
+            context,
+            datetime.now(UTC),
+            report_object,
+            payload,
+            audit_text,
+            selected_scope,
+            audit_text_representation,
+            retrieval_method,
+        )
+        if not selected_text:
+            self._record_request(
+                context,
+                DataSourceRequestStatus.error,
+                None,
+                [raw_record],
+                error_message=(
+                    "edgartools:Filing.obj did not return the required structured section "
+                    f"for form={filing.form} text_scope={text_scope}"
+                ),
+            )
+            return None
+
+        self._record_provider_success(context, [raw_record])
+
+        return FilingTextExtraction(
+            selected_text=selected_text,
+            retrieval_method=retrieval_method,
+            text_scope=selected_scope,
+            raw_text_char_count=len(audit_text or "") if retrieval_method != "edgartools:Filing.obj" else sum(
+                len(section_text) for section_text in sections.values()
+            ),
+            cached_text_char_count=len(selected_text),
+            structured_sections=sections,
+        )
 
     def _load_company_mapping(self) -> list[dict[str, Any]]:
         if self._company_mapping is not None:
@@ -465,7 +624,7 @@ def _edgartools_company_raw_record(
         target_ticker=str(ticker) if ticker else context.target_ticker,
         record_id=str(raw_payload["cik"]) if raw_payload.get("cik") else context.url,
         raw_payload=raw_payload,
-        metadata={"provider_method": context.operation},
+        metadata={"provider_method": context.operation, "record_role": "company_mapping"},
         retrieved_at=retrieved_at,
     )
 
@@ -486,7 +645,7 @@ def _edgartools_search_raw_record(
         target_ticker=str(row.get("ticker")) if row.get("ticker") else context.target_ticker,
         record_id=str(row.get("cik") or row.get("ticker") or index),
         raw_payload=row,
-        metadata={"provider_method": context.operation, "record_index": index},
+        metadata={"provider_method": context.operation, "record_role": "company_mapping", "record_index": index},
         retrieved_at=retrieved_at,
     )
 
@@ -521,7 +680,7 @@ def _company_mapping_raw_records_from_payload(
                 record_id=str(raw_payload.get("cik") or raw_payload.get("ticker") or index),
                 url=context.url,
                 raw_payload=raw_payload,
-                metadata={"record_index": index},
+                metadata={"record_role": "company_mapping", "record_index": index},
                 retrieved_at=retrieved_at,
             )
         )
@@ -562,7 +721,7 @@ def _submission_filing_raw_records_from_payload(
                 title=str(raw_payload.get("form")) if raw_payload.get("form") else None,
                 published_at=str(raw_payload.get("filingDate")) if raw_payload.get("filingDate") else None,
                 raw_payload=raw_payload,
-                metadata={"record_index": index + 1},
+                metadata={"record_role": "filing_metadata", "record_index": index + 1},
                 retrieved_at=retrieved_at,
             )
         )
@@ -589,17 +748,21 @@ def _filing_raw_record(
         title=filing.form,
         published_at=filing.filing_date,
         raw_payload=filing.model_dump(mode="json"),
-        metadata={"provider_method": provider_method},
+        metadata={"provider_method": provider_method, "record_role": "filing_metadata"},
         retrieved_at=retrieved_at,
     )
 
 
-def _filing_text_raw_record(
+def _filing_structured_raw_record(
     filing: FilingMetadata,
     context: DataSourceRequestContext,
     retrieved_at: datetime,
-    text: str,
-    provider_method: str,
+    report_object: Any,
+    payload: dict[str, Any],
+    raw_text: str | None,
+    selected_scope: str,
+    raw_text_representation: str | None,
+    text_retrieval_method: str,
 ) -> DataSourceRawRecord:
     return DataSourceRawRecord(
         request_id=context.request_id,
@@ -609,14 +772,22 @@ def _filing_text_raw_record(
         source_type=SourceType.sec_filing,
         target_cik=context.target_cik,
         target_ticker=context.target_ticker,
-        record_id=f"{filing.accession_number}:{provider_method}",
+        record_id=f"{filing.accession_number}:{text_retrieval_method}",
         url=filing.url,
         filing_accession=filing.accession_number,
         title=filing.form,
         published_at=filing.filing_date,
-        raw_payload={**filing.model_dump(mode="json"), "provider_method": provider_method},
-        raw_text=text,
-        metadata={"provider_method": provider_method, "raw_text_char_count": len(text)},
+        raw_payload=payload,
+        raw_text=raw_text,
+        metadata={
+            "provider_method": "edgartools:Filing.obj",
+            "text_retrieval_method": text_retrieval_method,
+            "record_role": "filing_structured_object",
+            "obj_type": type(report_object).__name__,
+            "selected_scope": selected_scope,
+            "raw_text_char_count": len(raw_text or ""),
+            "raw_text_representation": raw_text_representation,
+        },
         retrieved_at=retrieved_at,
     )
 
@@ -628,6 +799,245 @@ def _filing_index_url(cik: str | None, accession: Any) -> str | None:
     cik_no_padding = str(int(cik)) if str(cik).isdigit() else str(cik)
     accession_no_dashes = accession_text.replace("-", "")
     return f"https://www.sec.gov/Archives/edgar/data/{cik_no_padding}/{accession_no_dashes}/{accession_text}-index.html"
+
+
+def _structured_raw_text_for_audit(
+    filing_object: Any,
+    selected_text: str | None,
+    report_object: Any,
+    payload: dict[str, Any],
+) -> tuple[str | None, str | None]:
+    markdown_method = getattr(filing_object, "markdown", None)
+    if callable(markdown_method):
+        try:
+            markdown = markdown_method()
+        except Exception:
+            markdown = None
+        if isinstance(markdown, str) and markdown.strip():
+            return markdown, "edgartools:Filing.markdown:audit"
+
+    if selected_text:
+        return selected_text, "structured_selected_section"
+
+    section_markdown = _sections_to_markdown(payload.get("sections", {}))
+    if section_markdown:
+        return section_markdown, "structured_sections_markdown"
+
+    object_text = _clean_filing_text(_coerce_report_text(report_object))
+    if object_text:
+        return object_text, "structured_object_text"
+
+    return None, None
+
+
+def _parse_markdown_item_section(
+    markdown: str,
+    filing: FilingMetadata,
+    text_scope: str,
+    min_chars: int,
+) -> MarkdownItemSection | None:
+    spec = _markdown_item_parser_spec(filing, text_scope)
+    if not spec or not markdown.strip():
+        return None
+
+    section_name, selected_scope, start_items, end_items = spec
+    normalized_markdown = markdown.replace("\r", "\n")
+    headings = _markdown_item_headings(normalized_markdown)
+    candidates: list[tuple[int, MarkdownItemSection]] = []
+    for index, heading in enumerate(headings):
+        if heading.item_code not in start_items:
+            continue
+
+        end_heading = next(
+            (candidate for candidate in headings[index + 1 :] if candidate.item_code in end_items),
+            None,
+        )
+        if not end_heading:
+            continue
+
+        # Include the Item heading itself so downstream audit text keeps SEC section provenance.
+        text = _clean_filing_text(normalized_markdown[heading.start : end_heading.start])
+        if len(text) < min_chars:
+            continue
+
+        candidates.append(
+            (
+                heading.start,
+                MarkdownItemSection(
+                    text=text,
+                    section_name=section_name,
+                    selected_scope=selected_scope,
+                    start_item=heading.item_code,
+                    end_item=end_heading.item_code,
+                ),
+            )
+        )
+
+    if not candidates:
+        return None
+
+    # Later Item headings are preferred because table-of-contents entries usually appear first.
+    return max(candidates, key=lambda candidate: candidate[0])[1]
+
+
+def _markdown_item_parser_spec(
+    filing: FilingMetadata,
+    text_scope: str,
+) -> tuple[str, str, set[str], set[str]] | None:
+    normalized_form = filing.form.strip().upper()
+    if text_scope == "company_strategy":
+        if normalized_form.startswith("10-K"):
+            return "management_discussion", "item_7_mdna", {"7"}, {"7A", "8"}
+        if normalized_form.startswith("10-Q"):
+            return "management_discussion", "item_2_mdna", {"2"}, {"3", "4"}
+        return None
+
+    if normalized_form.startswith("10-K"):
+        return "business", "item_1_business", {"1"}, {"1A", "2"}
+    return None
+
+
+def _markdown_item_headings(markdown: str) -> list[MarkdownItemHeading]:
+    headings: list[MarkdownItemHeading] = []
+    for match in _ITEM_HEADING_RE.finditer(markdown):
+        item_code = re.sub(r"\s+", "", match.group("item").upper())
+        headings.append(MarkdownItemHeading(item_code=item_code, start=match.start(), end=match.end()))
+    return headings
+
+
+def _sections_to_markdown(value: Any) -> str | None:
+    if not isinstance(value, dict):
+        return None
+
+    parts: list[str] = []
+    for section_name, section_text in value.items():
+        text = _clean_filing_text(str(section_text)) if section_text else ""
+        if not text:
+            continue
+        parts.append(f"## {section_name}\n\n{text}")
+    return "\n\n".join(parts) or None
+
+
+def _structured_sections_from_report_object(report_object: Any, filing: FilingMetadata) -> dict[str, str]:
+    sections: dict[str, str] = {}
+
+    def add_section(name: str, value: Any) -> None:
+        text = _clean_filing_text(_coerce_report_text(value))
+        if text:
+            sections[name] = text
+
+    normalized_form = filing.form.strip().upper()
+    add_section("business", _report_attribute(report_object, "business"))
+    add_section("risk_factors", _report_attribute(report_object, "risk_factors"))
+    add_section("management_discussion", _report_attribute(report_object, "management_discussion"))
+
+    if "business" not in sections:
+        add_section("business", _report_item(report_object, "Item 1"))
+    if "risk_factors" not in sections:
+        add_section("risk_factors", _report_item(report_object, "Item 1A"))
+    if "management_discussion" not in sections:
+        if normalized_form.startswith("10-K"):
+            add_section("management_discussion", _report_item(report_object, "Item 7"))
+        elif normalized_form.startswith("10-Q"):
+            # Ten-Q has no convenience property in edgartools 3.15.1, but Item 2 is MD&A.
+            add_section("management_discussion", _report_item(report_object, "Item 2"))
+
+    if normalized_form.startswith("8-K"):
+        add_section("current_report", _report_attribute(report_object, "text"))
+
+    return sections
+
+
+def _select_structured_section(
+    sections: dict[str, str],
+    filing: FilingMetadata,
+    text_scope: str,
+) -> tuple[str | None, str]:
+    normalized_form = filing.form.strip().upper()
+    if text_scope == "company_strategy":
+        if normalized_form.startswith("10-K") and sections.get("management_discussion"):
+            return sections["management_discussion"], "item_7_mdna"
+        if normalized_form.startswith("10-Q") and sections.get("management_discussion"):
+            return sections["management_discussion"], "item_2_mdna"
+        if normalized_form.startswith("8-K") and sections.get("current_report"):
+            return sections["current_report"], "full_8k_current_report"
+        if normalized_form.startswith("S-1") and sections.get("registration_statement"):
+            return sections["registration_statement"], "full_s1_registration_statement"
+        return None, _full_text_scope_for_form(filing.form)
+
+    if sections.get("business"):
+        return sections["business"], "item_1_business"
+    return None, "full_filing_text"
+
+
+def _structured_report_payload(
+    report_object: Any,
+    filing: FilingMetadata,
+    sections: dict[str, str],
+    selected_scope: str,
+) -> dict[str, Any]:
+    items = _json_safe_list(_report_attribute(report_object, "items"))
+    available_properties = [
+        property_name
+        for property_name in (
+            "business",
+            "risk_factors",
+            "management_discussion",
+            "financials",
+            "income_statement",
+            "balance_sheet",
+            "cash_flow_statement",
+            "reports",
+            "press_releases",
+        )
+        if property_name in dir(report_object)
+    ]
+    return {
+        **filing.model_dump(mode="json"),
+        "provider_method": "edgartools:Filing.obj",
+        "record_role": "filing_structured_object",
+        "obj_type": type(report_object).__name__,
+        "items": items,
+        "available_properties": available_properties,
+        "selected_scope": selected_scope,
+        "section_char_counts": {section_name: len(section_text) for section_name, section_text in sections.items()},
+        "sections": sections,
+    }
+
+
+def _report_attribute(report_object: Any, name: str) -> Any:
+    try:
+        return getattr(report_object, name, None)
+    except Exception:
+        return None
+
+
+def _report_item(report_object: Any, item_name: str) -> Any:
+    try:
+        return report_object[item_name]
+    except Exception:
+        return None
+
+
+def _coerce_report_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if callable(value):
+        try:
+            value = value()
+        except Exception:
+            return ""
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
+def _json_safe_list(value: Any) -> list[Any]:
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    if isinstance(value, tuple):
+        return [str(item) for item in value]
+    return []
 
 
 def _normalize_name(value: str) -> str:
@@ -645,66 +1055,6 @@ def _first_or_none(values: list[Any]) -> Any | None:
 def _clean_filing_text(value: str) -> str:
     lines = [" ".join(line.split()) for line in value.replace("\r", "\n").split("\n")]
     return re.sub(r"\n{3,}", "\n\n", "\n".join(line for line in lines if line)).strip()
-
-
-def _select_filing_text(text: str, filing: FilingMetadata, text_scope: str) -> tuple[str, str]:
-    if text_scope == "company_strategy":
-        strategy_section, strategy_scope = _extract_strategy_section(text, filing.form)
-        return strategy_section or text, strategy_scope if strategy_section else _full_text_scope_for_form(filing.form)
-
-    business_section = _extract_business_section(text)
-    return business_section or text, "item_1_business" if business_section else "full_filing_text"
-
-
-def _extract_business_section(text: str) -> str | None:
-    start_match = re.search(r"\bitem\s+1[\.\s:-]+business\b", text, flags=re.IGNORECASE)
-    if not start_match:
-        return None
-
-    after_start = text[start_match.start() :]
-    end_match = re.search(
-        r"\bitem\s+(1a[\.\s:-]+risk\s+factors|2[\.\s:-]+properties)\b",
-        after_start,
-        flags=re.IGNORECASE,
-    )
-    if not end_match:
-        return after_start.strip()
-    return after_start[: end_match.start()].strip()
-
-
-def _extract_strategy_section(text: str, form: str) -> tuple[str | None, str]:
-    normalized_form = form.strip().upper()
-    if normalized_form.startswith("10-K"):
-        section = _extract_section_between(
-            text,
-            r"\bitem\s+7[\.\s:-]+management(?:['`\u2019]s|s)?\s+discussion\s+and\s+analysis\b",
-            r"\bitem\s+(7a[\.\s:-]+quantitative|8[\.\s:-]+financial)\b",
-        )
-        return section, "item_7_mdna"
-    if normalized_form.startswith("10-Q"):
-        section = _extract_section_between(
-            text,
-            r"\bitem\s+2[\.\s:-]+management(?:['`\u2019]s|s)?\s+discussion\s+and\s+analysis\b",
-            r"\bitem\s+(3[\.\s:-]+quantitative|4[\.\s:-]+controls)\b",
-        )
-        return section, "item_2_mdna"
-    if normalized_form.startswith("8-K"):
-        return text, "full_8k_current_report"
-    if normalized_form.startswith("S-1"):
-        return text, "full_s1_registration_statement"
-    return None, "full_filing_text"
-
-
-def _extract_section_between(text: str, start_pattern: str, end_pattern: str) -> str | None:
-    start_match = re.search(start_pattern, text, flags=re.IGNORECASE)
-    if not start_match:
-        return None
-
-    after_start = text[start_match.start() :]
-    end_match = re.search(end_pattern, after_start, flags=re.IGNORECASE)
-    if not end_match:
-        return after_start.strip()
-    return after_start[: end_match.start()].strip()
 
 
 def _full_text_scope_for_form(form: str) -> str:

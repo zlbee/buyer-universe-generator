@@ -20,6 +20,7 @@ from src.repositories.models import DataSourceRawRecordRecord, DataSourceRequest
 from src.repositories.source_cache import SourceCache
 from src.sources.newsapi import NewsApiClient
 from src.sources.polygon import PolygonClient
+from src.sources.registry import SourceRegistry
 from src.sources.sec import SecEdgarClient
 from src.sources.strategy import DataSourceStrategy
 
@@ -59,6 +60,18 @@ def test_data_source_policy_disables_optional_sources_without_keys(tmp_path: Pat
     assert news_source.enabled is False
     assert news_source.disabled_reason == "missing BUG_NEWS_API_KEY"
     assert {"bloomberg.com", "reuters.com", "wsj.com"} <= set(news_source.config.retrieval.domains)
+    edgar_config = strategy.source("edgar").retrieval
+    assert edgar_config.markdown_item_parser_enabled is True
+    assert edgar_config.markdown_item_parser_min_chars == 500
+
+
+def test_source_registry_applies_edgar_retrieval_config(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path)
+    strategy = DataSourceStrategy.from_settings(settings)
+    client = SourceRegistry(settings, strategy=strategy).edgar()
+
+    assert client.markdown_item_parser_enabled is True
+    assert client.markdown_item_parser_min_chars == 500
 
 
 def test_data_source_policy_scopes_strength_by_dimension(tmp_path: Path) -> None:

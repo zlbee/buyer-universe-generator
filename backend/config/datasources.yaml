@@ -8,6 +8,9 @@ sources:
     enabled: true
     required: true
     cache_ttl_hours: 24
+    retrieval:
+      markdown_item_parser_enabled: true
+      markdown_item_parser_min_chars: 500
     dimensions:
       seller_profile.identity_resolution:
         source_strength: A

@@ -182,6 +182,8 @@ class DataSourceRetrievalConfig(StrictBaseModel):
     """Source-level controls applied when querying raw provider APIs."""
 
     domains: list[str] = Field(default_factory=list)
+    markdown_item_parser_enabled: bool = False
+    markdown_item_parser_min_chars: int = Field(default=500, ge=1)
 
     @field_validator("domains")
     @classmethod

@@ -26,9 +26,10 @@ from src.domain import (
 from src.llm import LLMResponseError, OpenRouterProvider
 from src.pipelines.source_ingestion import SourceIngestionService
 from src.pipelines.target_profile_extraction import TargetProfileExtractionError, TargetProfileExtractor
+from src.repositories.data_source_audit_log import DataSourceAuditLog
 from src.repositories.database import create_session_factory, init_db
 from src.repositories.llm_interaction_log import LLMInteractionLog
-from src.repositories.models import LLMInteractionRecord
+from src.repositories.models import DataSourceRawRecordRecord, DataSourceRequestRecord, LLMInteractionRecord
 from src.repositories.source_cache import SourceCache
 from src.repositories.target_profile_cache import TargetProfileCache
 from src.sources.company_pages import CompanyPageClient
@@ -53,8 +54,30 @@ def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:
     return Settings(**values)
 
 
-def test_sec_filing_text_document_uses_edgartools_text(tmp_path: Path) -> None:
-    fake_edgar = FakeEdgarTextModule(text="ITEM 1. Business e.l.f. Beauty sells cosmetics. ITEM 1A. Risk Factors")
+def test_sec_filing_text_document_requires_edgartools_structured_object(tmp_path: Path) -> None:
+    fake_edgar = FakeEdgarTextModule(text="ITEM 1. Business fallback text.")
+    client = SecEdgarClient(settings_for_tests(tmp_path), edgar_module=fake_edgar)
+
+    with pytest.raises(ValueError, match="Could not retrieve structured filing section"):
+        client.fetch_filing_text_document(
+            sample_target(),
+            sample_filing("10-K"),
+            ttl_hours=24,
+            source_strength=SourceStrength.B,
+            source_dimension="seller_profile.business_description",
+        )
+
+    assert fake_edgar.filing_calls == ["0000923796-25-000001"]
+
+
+def test_sec_filing_text_document_prefers_edgartools_structured_object(tmp_path: Path) -> None:
+    fake_edgar = FakeEdgarTextModule(
+        text="ITEM 1. Business fallback text.",
+        report_object=FakeTenKReport(
+            business="Structured Item 1. Business e.l.f. Beauty sells cosmetics.",
+            management_discussion="Structured Item 7. Management discusses digital commerce.",
+        ),
+    )
     client = SecEdgarClient(settings_for_tests(tmp_path), edgar_module=fake_edgar)
 
     document = client.fetch_filing_text_document(
@@ -65,29 +88,92 @@ def test_sec_filing_text_document_uses_edgartools_text(tmp_path: Path) -> None:
         source_dimension="seller_profile.business_description",
     )
 
-    assert document.raw_text == "ITEM 1. Business e.l.f. Beauty sells cosmetics."
-    assert document.source_dimension == "seller_profile.business_description"
-    assert document.metadata["text_retrieval_method"] == "edgartools:Filing.text"
-    assert fake_edgar.filing_calls == ["0000923796-25-000001"]
+    assert document.raw_text == "Structured Item 1. Business e.l.f. Beauty sells cosmetics."
+    assert document.metadata["text_retrieval_method"] == "edgartools:Filing.obj"
+    assert document.metadata["text_scope"] == "item_1_business"
+    assert document.metadata["structured_sections"]["management_discussion"] == "Structured Item 7. Management discusses digital commerce."
+    assert fake_edgar.obj_calls == 1
 
 
-def test_sec_filing_text_document_falls_back_to_markdown(tmp_path: Path) -> None:
-    fake_edgar = FakeEdgarTextModule(text_error=RuntimeError("text unavailable"), markdown="ITEM 1. Business cosmetics brand")
-    client = SecEdgarClient(settings_for_tests(tmp_path), edgar_module=fake_edgar)
+def test_sec_filing_text_document_errors_when_structured_section_missing(tmp_path: Path) -> None:
+    fake_edgar = FakeEdgarTextModule(markdown="# 10-K\n\nITEM 1. Business markdown audit text.", report_object=FakeTenKReport())
+    settings = settings_for_tests(tmp_path)
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
 
-    document = client.fetch_filing_text_document(sample_target(), sample_filing("10-K"), ttl_hours=24)
+    with session_factory() as session:
+        client = SecEdgarClient(settings, edgar_module=fake_edgar, request_recorder=DataSourceAuditLog(session))
+        with pytest.raises(ValueError, match="Could not retrieve structured filing section"):
+            client.fetch_filing_text_document(sample_target(), sample_filing("10-K"), ttl_hours=24)
 
-    assert document.raw_text == "ITEM 1. Business cosmetics brand"
-    assert document.metadata["text_retrieval_method"] == "edgartools:Filing.markdown"
+        request_record = session.execute(select(DataSourceRequestRecord)).scalar_one()
+        raw_record = session.execute(select(DataSourceRawRecordRecord)).scalar_one()
+
+    assert request_record.operation == "edgartools_filing_structured_object"
+    assert request_record.status == "error"
+    assert "did not return the required structured section" in (request_record.error_message or "")
+    assert raw_record.raw_text == "# 10-K\n\nITEM 1. Business markdown audit text."
+    raw_metadata = json.loads(raw_record.metadata_json)
+    assert raw_metadata["record_role"] == "filing_structured_object"
+    assert raw_metadata["raw_text_representation"] == "edgartools:Filing.markdown:audit"
+
+
+def test_sec_filing_text_document_uses_configured_markdown_item_parser(tmp_path: Path) -> None:
+    business_sentence = (
+        "e.l.f. Beauty sells cosmetics through digital commerce, retail channels, international stores, "
+        "and brand-led innovation across color cosmetics and skin care. "
+    )
+    business_body = business_sentence * 6
+    markdown = (
+        "# Form 10-K\n\n"
+        "Item 1. Business 5\n"
+        "Item 1A. Risk Factors 18\n\n"
+        f"Item 1. Business\n\n{business_body}\n\n"
+        "Item 1A. Risk Factors\n\nRisk text."
+    )
+    fake_edgar = FakeEdgarTextModule(markdown=markdown, report_object=FakeTenKReport())
+    settings = settings_for_tests(tmp_path)
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
+
+    with session_factory() as session:
+        client = SecEdgarClient(
+            settings,
+            edgar_module=fake_edgar,
+            request_recorder=DataSourceAuditLog(session),
+            markdown_item_parser_enabled=True,
+        )
+        document = client.fetch_filing_text_document(
+            sample_target(),
+            sample_filing("10-K"),
+            ttl_hours=24,
+            source_dimension="seller_profile.business_description",
+        )
+
+        request_record = session.execute(select(DataSourceRequestRecord)).scalar_one()
+        raw_record = session.execute(select(DataSourceRawRecordRecord)).scalar_one()
+
+    assert document.raw_text.startswith("Item 1. Business")
+    assert "Risk Factors" not in document.raw_text
+    assert document.metadata["text_retrieval_method"] == "edgartools:Filing.markdown:item_parser"
+    assert document.metadata["text_scope"] == "item_1_business"
+    assert document.metadata["structured_sections"]["business"] == document.raw_text
+    assert request_record.status == "success"
+    assert raw_record.raw_text == markdown
+    raw_payload = json.loads(raw_record.raw_payload_json)
+    raw_metadata = json.loads(raw_record.metadata_json)
+    assert raw_payload["markdown_item_parser"]["result"] == "matched"
+    assert raw_metadata["text_retrieval_method"] == "edgartools:Filing.markdown:item_parser"
 
 
 def test_sec_filing_text_document_extracts_strategy_mdna_scope(tmp_path: Path) -> None:
     fake_edgar = FakeEdgarTextModule(
-        text=(
-            "ITEM 1. Business e.l.f. Beauty sells cosmetics.\n"
-            "ITEM 7. Management's Discussion and Analysis We intend to invest in digital commerce "
-            "and pursue strategic acquisitions.\n"
-            "ITEM 7A. Quantitative and Qualitative Disclosures About Market Risk"
+        report_object=FakeTenKReport(
+            business="Structured Item 1. Business e.l.f. Beauty sells cosmetics.",
+            management_discussion=(
+                "Structured Item 7. Management's Discussion and Analysis We intend to invest in digital commerce "
+                "and pursue strategic acquisitions."
+            ),
         )
     )
     client = SecEdgarClient(settings_for_tests(tmp_path), edgar_module=fake_edgar)
@@ -101,10 +187,45 @@ def test_sec_filing_text_document_extracts_strategy_mdna_scope(tmp_path: Path) -
         text_scope="company_strategy",
     )
 
+    assert document.raw_text.startswith("Structured Item 7")
     assert "invest in digital commerce and pursue strategic acquisitions" in document.raw_text
-    assert "ITEM 7A" not in document.raw_text
     assert document.source_dimension == "seller_profile.company_strategy"
     assert document.metadata["text_scope"] == "item_7_mdna"
+    assert document.metadata["text_retrieval_method"] == "edgartools:Filing.obj"
+
+
+def test_sec_filing_text_document_uses_markdown_item_parser_for_strategy(tmp_path: Path) -> None:
+    mdna_sentence = (
+        "Management discusses digital commerce, brand investment, international expansion, supply chain scale, "
+        "and selective acquisition opportunities as part of the company's strategy. "
+    )
+    mdna_body = mdna_sentence * 6
+    markdown = (
+        "# Form 10-K\n\n"
+        "Item 7. Management's Discussion and Analysis of Financial Condition and Results of Operations\n\n"
+        f"{mdna_body}\n\n"
+        "Item 7A. Quantitative and Qualitative Disclosures About Market Risk\n\nMarket risk text."
+    )
+    fake_edgar = FakeEdgarTextModule(markdown=markdown, report_object=FakeTenKReport())
+    client = SecEdgarClient(
+        settings_for_tests(tmp_path),
+        edgar_module=fake_edgar,
+        markdown_item_parser_enabled=True,
+    )
+
+    document = client.fetch_filing_text_document(
+        sample_target(),
+        sample_filing("10-K"),
+        ttl_hours=24,
+        source_strength=SourceStrength.B,
+        source_dimension="seller_profile.company_strategy",
+        text_scope="company_strategy",
+    )
+
+    assert document.raw_text.startswith("Item 7. Management's Discussion")
+    assert "Market Risk" not in document.raw_text
+    assert document.metadata["text_scope"] == "item_7_mdna"
+    assert document.metadata["text_retrieval_method"] == "edgartools:Filing.markdown:item_parser"
 
 
 def test_source_ingestion_restores_filing_text_metadata() -> None:
@@ -483,6 +604,30 @@ def test_target_profile_extractor_assembles_profile_and_reuses_cache(tmp_path: P
     assert "source_dimension=seller_profile.company_strategy" in fake_llm.prompts[0]
 
 
+def test_target_profile_extractor_reuses_structured_sections_for_strategy(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path)
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
+
+    with session_factory() as session:
+        extractor = build_test_extractor(
+            settings,
+            session,
+            FakeLLMClient({}),
+            edgar_client=FailingProfileSecClient(),
+        )
+        ingestion = FakeStructuredSectionsIngestionService().ingest("ELF")
+        warnings: list[str] = []
+
+        documents = extractor._ensure_strategy_filing_text(ingestion, list(ingestion.source_documents), warnings)
+
+    strategy_document = next(document for document in documents if document.source_dimension == "seller_profile.company_strategy")
+    assert warnings == []
+    assert "invest in digital commerce and pursue strategic acquisitions" in strategy_document.raw_text
+    assert strategy_document.metadata["text_retrieval_method"] == "cache:structured_sections"
+    assert strategy_document.metadata["derived_from_source_dimension"] == "seller_profile.business_description"
+
+
 def test_target_profile_extractor_normalizes_repairable_llm_shape(tmp_path: Path) -> None:
     settings = settings_for_tests(tmp_path)
     engine = init_db(settings)
@@ -723,6 +868,7 @@ def build_test_extractor(
     llm_client,
     ingestion_service=None,
     ir_page_discovery=None,
+    edgar_client=None,
 ) -> TargetProfileExtractor:
     strategy = DataSourceStrategy.from_settings(settings)
     cache = SourceCache(session)
@@ -732,7 +878,7 @@ def build_test_extractor(
         ingestion_service=ingestion_service or FakeIngestionService(),
         source_cache=cache,
         profile_cache=TargetProfileCache(session),
-        edgar_client=FakeProfileSecClient(),
+        edgar_client=edgar_client or FakeProfileSecClient(),
         llm_client=llm_client,
         ir_page_discovery=ir_page_discovery,
     )
@@ -787,25 +933,46 @@ def sample_profile_result() -> TargetProfileExtractionResult:
 
 
 class FakeEdgarTextModule:
-    def __init__(self, text: str = "", markdown: str = "", text_error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        text: str = "",
+        markdown: str = "",
+        text_error: Exception | None = None,
+        report_object: Any | None = None,
+    ) -> None:
         self.text = text
         self.markdown = markdown
         self.text_error = text_error
+        self.report_object = report_object
         self.filing_calls: list[str] = []
+        self.obj_calls = 0
 
     def set_identity(self, _identity: str) -> None:
         return None
 
     def Filing(self, **kwargs):
         self.filing_calls.append(kwargs["accession_no"])
-        return FakeEdgarTextFiling(self.text, self.markdown, self.text_error)
+        return FakeEdgarTextFiling(self, self.text, self.markdown, self.text_error, self.report_object)
 
 
 class FakeEdgarTextFiling:
-    def __init__(self, text: str, markdown: str, text_error: Exception | None) -> None:
+    def __init__(
+        self,
+        module: FakeEdgarTextModule,
+        text: str,
+        markdown: str,
+        text_error: Exception | None,
+        report_object: Any | None,
+    ) -> None:
+        self._module = module
         self._text = text
         self._markdown = markdown
         self._text_error = text_error
+        self._report_object = report_object
+
+    def obj(self):
+        self._module.obj_calls += 1
+        return self._report_object
 
     def text(self) -> str:
         if self._text_error:
@@ -817,6 +984,15 @@ class FakeEdgarTextFiling:
 
     def full_text_submission(self) -> str:
         return ""
+
+
+class FakeTenKReport:
+    items = ["Item 1", "Item 1A", "Item 7"]
+
+    def __init__(self, business: str = "", management_discussion: str = "", risk_factors: str = "") -> None:
+        self.business = business
+        self.management_discussion = management_discussion
+        self.risk_factors = risk_factors
 
 
 class FakeLLMClient:
@@ -918,6 +1094,45 @@ class FakeIngestionService:
                     filing_accession=filing.accession_number,
                     raw_text=text,
                     metadata=filing.model_dump(mode="json"),
+                    retrieved_at=retrieved_at,
+                    expires_at=retrieved_at + timedelta(hours=24),
+                ),
+            ],
+        )
+
+
+class FakeStructuredSectionsIngestionService:
+    def ingest(self, _query: str) -> TargetIngestionResult:
+        target = sample_target()
+        filing = sample_filing("10-K")
+        retrieved_at = datetime.now(UTC)
+        sections = {
+            "business": "ITEM 1. Business e.l.f. Beauty sells cosmetics through retail and e-commerce.",
+            "management_discussion": (
+                "ITEM 7. Management's Discussion and Analysis We intend to invest in digital commerce "
+                "and pursue strategic acquisitions."
+            ),
+        }
+        return TargetIngestionResult(
+            target=target,
+            filings=[filing],
+            source_documents=[
+                SourceDocument(
+                    source_id="edgar",
+                    source_dimension="seller_profile.business_description",
+                    source_type=SourceType.sec_filing,
+                    source_strength=SourceStrength.B,
+                    target_cik=target.cik,
+                    target_ticker=target.ticker,
+                    url=filing.url,
+                    filing_accession=filing.accession_number,
+                    raw_text=sections["business"],
+                    metadata={
+                        **filing.model_dump(mode="json"),
+                        "text_retrieval_method": "edgartools:Filing.obj",
+                        "text_scope": "item_1_business",
+                        "structured_sections": sections,
+                    },
                     retrieved_at=retrieved_at,
                     expires_at=retrieved_at + timedelta(hours=24),
                 ),
@@ -1111,6 +1326,11 @@ class FakeProfileSecClient:
                 expires_at=retrieved_at + timedelta(hours=ttl_hours),
             )
         raise AssertionError("text document should already be present in fixture")
+
+
+class FailingProfileSecClient:
+    def fetch_filing_text_document(self, *args, **kwargs):
+        raise AssertionError("structured sections should be reused without fetching SEC text again")
 
 
 class FakeProfileService:
