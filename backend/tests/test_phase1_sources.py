@@ -129,9 +129,14 @@ def test_data_source_policy_configures_strategic_retriever_strategy(tmp_path: Pa
     assert ma_policy.use_case == "buyer_recall_transaction_signals"
     assert ma_policy.source_roles["primary_filing_source"] == "edgar"
     assert ma_policy.source_roles["supplemental_news_source"] == "newsapi"
-    assert ma_policy.source_priority == ["edgar", "newsapi"]
+    assert ma_policy.source_roles["supplemental_rss_news_source"] == "google_news_rss"
+    assert ma_policy.source_priority == ["edgar", "newsapi", "google_news_rss"]
     assert ma_policy.lookback_years == 5
     assert ma_policy.edgar_form_type == "8-K"
+    assert ma_policy.rss_topic == "BUSINESS"
+    assert ma_policy.rss_require_identity_resolution is False
+    assert ma_policy.rss_use_llm_extraction is True
+    assert ma_policy.rss_require_llm_extraction is True
     assert ma_policy.eligible_sector_matches == ["same", "adjacent"]
 
 
@@ -337,6 +342,40 @@ def test_google_news_rss_client_returns_article_documents(tmp_path: Path, caplog
     assert document.raw_text and "Apple acquisition report" in document.raw_text
     google_log_text = "\n".join(record.message for record in caplog.records if record.name == "src.sources.google_news_rss")
     assert "Google News RSS request" in google_log_text
+
+
+def test_google_news_rss_client_returns_topic_article_documents(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url).startswith("https://news.google.com/rss/headlines/section/topic/BUSINESS")
+        assert request.url.params["hl"] == "en-US"
+        assert request.url.params["gl"] == "US"
+        assert request.url.params["ceid"] == "US:en"
+        return httpx.Response(
+            200,
+            text=(
+                "<?xml version='1.0' encoding='UTF-8'?>"
+                "<rss version='2.0'><channel>"
+                "<item>"
+                "<title>Business acquisition report</title>"
+                "<link>https://news.google.com/rss/articles/business-acquisition</link>"
+                "<pubDate>Mon, 04 May 2026 12:30:00 GMT</pubDate>"
+                "<description>Business acquisition report</description>"
+                "<source url='https://example.com'>Example News</source>"
+                "</item>"
+                "</channel></rss>"
+            ),
+        )
+
+    client = GoogleNewsRssClient(
+        settings_for_tests(tmp_path),
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    documents = client.fetch_topic_articles("BUSINESS", sample_target(), ttl_hours=6)
+
+    assert len(documents) == 1
+    assert documents[0].metadata["topic"] == "BUSINESS"
+    assert documents[0].metadata["provider_method"] == "google_news_rss_topic"
 
 
 def test_source_ingestion_applies_newsapi_domains_from_policy(tmp_path: Path) -> None:

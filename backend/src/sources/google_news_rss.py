@@ -25,6 +25,7 @@ class GoogleNewsRssClient(ExternalDataSourceClient):
 
     rss_url = "https://news.google.com/rss"
     search_url = "https://news.google.com/rss/search"
+    topic_url_template = "https://news.google.com/rss/headlines/section/topic/{topic}"
 
     def __init__(
         self,
@@ -109,6 +110,50 @@ class GoogleNewsRssClient(ExternalDataSourceClient):
             if raw_record.url
         ]
 
+    def fetch_topic_articles(
+        self,
+        topic: str,
+        target: ResolvedTarget,
+        ttl_hours: int,
+        page_size: int = 10,
+        source_strength: SourceStrength = SourceStrength.C,
+        source_dimension: str | None = None,
+        language: str | None = None,
+        country: str | None = None,
+        edition: str | None = None,
+    ) -> list[SourceDocument]:
+        """Fetch a Google News RSS topic feed such as BUSINESS."""
+
+        normalized_topic = re.sub(r"[^A-Z_]+", "", topic.strip().upper())
+        url = self.topic_url_template.format(topic=normalized_topic)
+        params = {
+            "hl": language or self.default_language,
+            "gl": country or self.default_country,
+            "ceid": edition or self.default_edition,
+        }
+        params = {key: value for key, value in params.items() if value}
+
+        logger.info("Google News RSS topic request: url=%s params=%s", url, params)
+        _text, raw_records = self._get_text(
+            operation="rss_topic_feed",
+            url=url,
+            params=params,
+            target=target,
+            source_dimension=source_dimension,
+            raw_records_from_text=_google_news_rss_raw_records_from_text,
+        )
+        logger.info("Google News RSS topic response parsed: topic=%s article_count=%s", normalized_topic, len(raw_records))
+
+        return [
+            source_document_from_raw_record(
+                raw_record,
+                source_strength=source_strength,
+                ttl_hours=ttl_hours,
+            )
+            for raw_record in raw_records[:page_size]
+            if raw_record.url
+        ]
+
 
 def _google_news_rss_raw_records_from_text(
     text: str,
@@ -137,7 +182,8 @@ def _google_news_rss_raw_records_from_text(
             "source": source,
             "guid": guid,
             "query": context.request_params.get("q"),
-            "provider_method": "google_news_rss_search",
+            "topic": _topic_from_url(context.url),
+            "provider_method": _provider_method_from_context(context),
         }
         raw_records.append(
             DataSourceRawRecord(
@@ -191,6 +237,19 @@ def _source_metadata(item: ET.Element) -> dict[str, str] | None:
 
 def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
+
+
+def _topic_from_url(url: str | None) -> str | None:
+    if not url:
+        return None
+    match = re.search(r"/topic/(?P<topic>[A-Z_]+)$", url)
+    return match.group("topic") if match else None
+
+
+def _provider_method_from_context(context: DataSourceRequestContext) -> str:
+    if context.operation == "rss_topic_feed":
+        return "google_news_rss_topic"
+    return "google_news_rss_search"
 
 
 def _rss_datetime(value: str | None) -> str | None:

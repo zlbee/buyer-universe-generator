@@ -242,6 +242,10 @@ class DataSourceRetrieverConfig(StrictBaseModel):
     require_edgar_primary_item: bool = False
     fetch_edgar_filing_text: bool = False
     edgar_text_scope: str | None = None
+    rss_topic: str | None = None
+    rss_require_identity_resolution: bool = True
+    rss_use_llm_extraction: bool = False
+    rss_require_llm_extraction: bool = False
     eligible_sector_matches: list[str] = Field(default_factory=list)
     transaction_terms: list[str] = Field(default_factory=list)
 

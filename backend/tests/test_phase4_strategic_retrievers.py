@@ -372,6 +372,148 @@ def test_ma_history_retriever_uses_sec_filer_identity_for_item_201_hits(tmp_path
     assert hit.retrieval_metadata["deal_events"][0]["target_acquired"] == "Luxury Labs"
 
 
+def test_ma_history_retriever_recalls_google_rss_resolved_and_pending_buyers(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path, news_api_key=None)
+    strategy = DataSourceStrategy.from_settings(settings)
+    google_source = FakeGoogleRssSource(
+        search_documents=[
+            rss_document(
+                "Clean Cosmetics Lab sold to Ulta Beauty, expanding cosmetics brands.",
+                "2026-04-20T10:00:00+00:00",
+                "https://news.google.com/rss/articles/ulta-cosmetics",
+            ),
+            rss_document(
+                "Private Buyer acquired Indie Beauty Co, a cosmetics company.",
+                "2026-04-22T10:00:00+00:00",
+                "https://news.google.com/rss/articles/private-buyer",
+            ),
+            rss_document(
+                "Cosmetics customer acquisition costs rose during the holiday quarter.",
+                "2026-04-23T10:00:00+00:00",
+                "https://news.google.com/rss/articles/customer-acquisition-costs",
+            ),
+        ],
+        topic_documents=[
+            rss_document(
+                "L'Oreal acquired Skin Care Co in cosmetics expansion.",
+                "2026-04-21T10:00:00+00:00",
+                "https://news.google.com/rss/articles/loreal-cosmetics",
+            ),
+            rss_document(
+                "Mega Corp acquired Mining Labs for equipment services.",
+                "2026-04-21T10:00:00+00:00",
+                "https://news.google.com/rss/articles/mining",
+            ),
+        ],
+    )
+    identity_resolver = FakeBuyerIdentityResolver(
+        {
+            "Ulta Beauty": [resolved_target("Ulta Beauty, Inc.", "ULTA", "0001403568")],
+            "L'Oreal": [resolved_target("L'Oreal S.A.", "LRLCY", "0000007777")],
+        }
+    )
+    llm_client = FakeMnaLlmClient(
+        {
+            "ulta-cosmetics": {
+                "is_mna": True,
+                "buyer_name": "Ulta Beauty",
+                "acquired_target": "Clean Cosmetics Lab",
+                "deal_type": "acquisition",
+                "confidence": 0.93,
+                "rationale": "The title says Clean Cosmetics Lab sold to Ulta Beauty.",
+            },
+            "private-buyer": {
+                "is_mna": True,
+                "buyer_name": "Private Buyer",
+                "acquired_target": "Indie Beauty Co",
+                "deal_type": "acquisition",
+                "confidence": 0.91,
+                "rationale": "The title says Private Buyer acquired Indie Beauty Co.",
+            },
+            "loreal-cosmetics": {
+                "is_mna": True,
+                "buyer_name": "L'Oreal",
+                "acquired_target": "Skin Care Co",
+                "deal_type": "acquisition",
+                "confidence": 0.95,
+                "rationale": "The title says L'Oreal acquired Skin Care Co.",
+            },
+            "customer-acquisition-costs": {
+                "is_mna": False,
+                "buyer_name": None,
+                "acquired_target": None,
+                "deal_type": None,
+                "confidence": 0.98,
+                "rationale": "Customer acquisition costs are not M&A.",
+            },
+        }
+    )
+    retriever = MAHistoryRetriever(
+        strategy,
+        edgar_client=FakeEdgarTransactionSource([]),
+        google_news_rss_client=google_source,
+        buyer_identity_resolver=identity_resolver,
+        llm_client=llm_client,
+        as_of_date=date(2026, 5, 4),
+    )
+
+    result = retriever.retrieve_with_context(sample_profile())
+
+    by_name = {hit.candidate_name: hit for hit in result.hits}
+    assert set(by_name) == {"L'Oreal S.A.", "Private Buyer", "Ulta Beauty, Inc."}
+    assert google_source.topic_calls == ["BUSINESS"]
+    assert len(google_source.search_queries) == 5
+    assert google_source.search_queries[0].startswith('"Perfumes, cosmetics, and other toilet preparations"')
+    assert "acquisition OR acquired" in google_source.search_queries[0]
+    assert by_name["Ulta Beauty, Inc."].candidate_ticker == "ULTA"
+    assert by_name["Ulta Beauty, Inc."].candidate_cik == "0001403568"
+    assert by_name["L'Oreal S.A."].candidate_ticker == "LRLCY"
+    assert by_name["Private Buyer"].candidate_ticker is None
+    assert by_name["Private Buyer"].candidate_cik is None
+    assert by_name["Private Buyer"].pending_verification is True
+    assert by_name["Private Buyer"].confidence == 0.52
+    assert by_name["Private Buyer"].retrieval_metadata["identity_resolution"][0]["status"] == "unresolved"
+    assert by_name["Ulta Beauty, Inc."].retrieval_metadata["deal_events"][0]["target_acquired"] == "Clean Cosmetics Lab"
+    assert result.metadata["rss_topic"] == "BUSINESS"
+    assert result.metadata["rss_search_documents_checked"] == 15
+    assert result.metadata["rss_topic_documents_checked"] == 1
+    assert result.metadata["rss_topic_documents_filtered"] == 1
+    assert result.metadata["rss_llm_mna_count"] == 3
+    assert result.metadata["rss_llm_non_mna_count"] == 1
+    assert result.metadata["rss_identity_resolved"] == 2
+    assert result.metadata["rss_identity_unresolved"] == 1
+    assert all("acquisition, acquired, acquires" in prompt for prompt in llm_client.prompts)
+    assert "customer acquisition costs" not in by_name
+
+
+def test_ma_history_retriever_skips_google_rss_when_required_llm_unavailable(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path, news_api_key=None)
+    strategy = DataSourceStrategy.from_settings(settings)
+    google_source = FakeGoogleRssSource(
+        search_documents=[
+            rss_document(
+                "Ulta Beauty acquired Clean Cosmetics Lab, a cosmetics brand.",
+                "2026-04-20T10:00:00+00:00",
+                "https://news.google.com/rss/articles/ulta-cosmetics",
+            )
+        ],
+        topic_documents=[],
+    )
+    retriever = MAHistoryRetriever(
+        strategy,
+        edgar_client=FakeEdgarTransactionSource([]),
+        google_news_rss_client=google_source,
+        as_of_date=date(2026, 5, 4),
+    )
+
+    result = retriever.retrieve_with_context(sample_profile())
+
+    assert result.hits == []
+    assert result.metadata["rss_llm_error_count"] == 1
+    assert result.metadata["rss_llm_skipped_count"] == 1
+    assert any("LLM extraction unavailable" in warning for warning in result.warnings)
+
+
 def test_ma_history_retriever_handles_disabled_newsapi_without_throwing(tmp_path: Path) -> None:
     settings = settings_for_tests(tmp_path, news_api_key=None)
     strategy = DataSourceStrategy.from_settings(settings)
@@ -644,6 +786,39 @@ def news_document(title: str, published_at: str, url: str) -> SourceDocument:
     )
 
 
+def rss_document(title: str, published_at: str, url: str) -> SourceDocument:
+    return SourceDocument(
+        source_id="google_news_rss",
+        source_dimension="buyer_long_list_recall.transaction_news",
+        source_type=SourceType.news_article,
+        source_strength=SourceStrength.C,
+        target_cik="0001600033",
+        target_ticker="ELF",
+        url=url,
+        metadata={
+            "title": title,
+            "description": title,
+            "publishedAt": published_at,
+            "source": {"name": "Example News"},
+        },
+        raw_text=title,
+        retrieved_at=datetime(2026, 5, 4, tzinfo=UTC),
+    )
+
+
+def resolved_target(name: str, ticker: str, cik: str) -> Any:
+    from src.domain import ResolvedTarget
+
+    return ResolvedTarget(
+        canonical_name=name,
+        ticker=ticker,
+        cik=cik,
+        resolution_confidence=0.95,
+        matched_input=name,
+        source_provenance=["test"],
+    )
+
+
 class FakeSicSource:
     def __init__(self, documents: list[SourceDocument]) -> None:
         self.documents = documents
@@ -662,6 +837,63 @@ class FakeNewsSource:
         self.queries.append(query)
         self.calls.append({"query": query, "kwargs": _kwargs})
         return self.documents
+
+
+class FakeGoogleRssSource:
+    def __init__(self, search_documents: list[SourceDocument], topic_documents: list[SourceDocument]) -> None:
+        self.search_documents = search_documents
+        self.topic_documents = topic_documents
+        self.search_queries: list[str] = []
+        self.topic_calls: list[str] = []
+
+    def fetch_articles_for_query(self, query: str, *_args, **_kwargs) -> list[SourceDocument]:
+        self.search_queries.append(query)
+        return self.search_documents
+
+    def fetch_topic_articles(self, topic: str, *_args, **_kwargs) -> list[SourceDocument]:
+        self.topic_calls.append(topic)
+        return self.topic_documents
+
+
+class FakeMnaLlmClient:
+    def __init__(self, outputs_by_url_fragment: dict[str, dict[str, Any]]) -> None:
+        self.outputs_by_url_fragment = outputs_by_url_fragment
+        self.prompts: list[str] = []
+        self.schema_names: list[str] = []
+        self.source_business_types: list[str] = []
+
+    def generate_json(
+        self,
+        prompt: str,
+        schema_name: str,
+        json_schema: dict[str, Any] | None = None,
+        system_prompt: str | None = None,
+        source_business_type: str = "unspecified",
+    ) -> dict[str, Any]:
+        self.prompts.append(prompt)
+        self.schema_names.append(schema_name)
+        self.source_business_types.append(source_business_type)
+        for url_fragment, payload in self.outputs_by_url_fragment.items():
+            if url_fragment in prompt:
+                return payload
+        return {
+            "is_mna": False,
+            "buyer_name": None,
+            "acquired_target": None,
+            "deal_type": None,
+            "confidence": 0.0,
+            "rationale": "No fixture matched.",
+        }
+
+
+class FakeBuyerIdentityResolver:
+    def __init__(self, matches_by_query: dict[str, list[Any]]) -> None:
+        self.matches_by_query = matches_by_query
+        self.queries: list[str] = []
+
+    def resolve_by_company_name(self, company_name: str) -> list[Any]:
+        self.queries.append(company_name)
+        return self.matches_by_query.get(company_name, [])
 
 
 class FakeEdgarTransactionSource:

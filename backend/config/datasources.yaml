@@ -241,9 +241,11 @@ retrievers:
     source_roles:
       primary_filing_source: edgar
       supplemental_news_source: newsapi
+      supplemental_rss_news_source: google_news_rss
     source_priority:
       - edgar
       - newsapi
+      - google_news_rss
     lookback_years: 5
     max_companies: 150
     max_documents: 50
@@ -258,6 +260,10 @@ retrievers:
     require_edgar_primary_item: true
     fetch_edgar_filing_text: true
     edgar_text_scope: primary_item_section
+    rss_topic: BUSINESS
+    rss_require_identity_resolution: false
+    rss_use_llm_extraction: true
+    rss_require_llm_extraction: true
     eligible_sector_matches:
       - same
       - adjacent

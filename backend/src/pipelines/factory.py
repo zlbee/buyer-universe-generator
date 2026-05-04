@@ -89,6 +89,7 @@ def build_strategic_buyer_candidate_retriever(settings: Settings, session: Sessi
     request_recorder = DataSourceAuditLog(session)
     registry = SourceRegistry(settings, strategy=strategy, request_recorder=request_recorder)
     edgar_client = registry.edgar()
+    llm_provider = OpenRouterProvider(settings, interaction_recorder=LLMInteractionLog(session))
     return BuyerCandidateRetriever(
         [
             SameSicRetriever(strategy, edgar_client),
@@ -99,7 +100,10 @@ def build_strategic_buyer_candidate_retriever(settings: Settings, session: Sessi
             MAHistoryRetriever(
                 strategy,
                 newsapi_client=registry.newsapi(),
+                google_news_rss_client=registry.google_news_rss(),
                 edgar_client=edgar_client,
+                buyer_identity_resolver=edgar_client,
+                llm_client=llm_provider,
             ),
             SupplyChainRetriever(strategy),
         ]
