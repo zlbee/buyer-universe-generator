@@ -61,6 +61,15 @@ sources:
           - industry_context
         rationale: EDGAR can support public-company peer recall, but it is not optimized as a screening database.
 
+      buyer_long_list_recall.acquirer_capacity:
+        source_strength: A
+        field_coverage:
+          - public_company_universe
+          - revenue
+          - cash
+          - xbrl_companyfacts
+        rationale: SEC company mapping and XBRL companyfacts are the primary free public source for listed-company revenue and cash capacity metrics.
+
       buyer_long_list_recall.transaction_signal:
         source_strength: C
         field_coverage:
@@ -109,6 +118,15 @@ sources:
           - exchange
           - sic
         rationale: Polygon can help screen listed strategic buyers by liquidity, size, and public-market metadata.
+
+      buyer_long_list_recall.acquirer_capacity_screening:
+        source_strength: B
+        field_coverage:
+          - active_status
+          - market_cap
+          - exchange
+          - shares_outstanding
+        rationale: Polygon can optionally hydrate market capitalization and active-listing status for public-company capacity screens.
 
       buyer_long_list_recall.strategic_adjacency:
         source_strength: C
@@ -231,6 +249,12 @@ use_cases:
       dimension: buyer_long_list_recall.public_company_peer_discovery
     - source_id: polygon
       dimension: buyer_long_list_recall.public_company_screening
+
+  buyer_recall_acquirer_capacity:
+    - source_id: edgar
+      dimension: buyer_long_list_recall.acquirer_capacity
+    - source_id: polygon
+      dimension: buyer_long_list_recall.acquirer_capacity_screening
 
   buyer_recall_strategic_signals:
     - source_id: polygon

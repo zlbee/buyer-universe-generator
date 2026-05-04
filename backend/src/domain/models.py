@@ -31,6 +31,7 @@ class SourceStrength(str, Enum):
 class SourceType(str, Enum):
     sec_filing = "sec_filing"
     sec_company_mapping = "sec_company_mapping"
+    sec_companyfacts = "sec_companyfacts"
     exchange_profile = "exchange_profile"
     company_page = "company_page"
     news_article = "news_article"
@@ -53,6 +54,12 @@ class PipelineRunStatus(str, Enum):
     running = "running"
     completed = "completed"
     failed = "failed"
+
+
+class AcquirerCapacityRuleStatus(str, Enum):
+    passed = "pass"
+    failed = "fail"
+    unknown = "unknown"
 
 
 class ResolvedTarget(StrictBaseModel):
@@ -294,6 +301,73 @@ class TargetProfileExtractionResult(StrictBaseModel):
     source_documents: list[SourceDocument] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     extraction_metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class CompanyFinancialMetrics(StrictBaseModel):
+    """Comparable financial metrics used by the acquirer-capability screen."""
+
+    canonical_name: str = Field(min_length=1)
+    ticker: str = Field(min_length=1)
+    cik: str = Field(min_length=1)
+    exchange: str | None = None
+    sic: str | None = None
+    market_cap_usd: float | None = Field(default=None, ge=0)
+    revenue_usd: float | None = Field(default=None, ge=0)
+    cash_and_equivalents_usd: float | None = Field(default=None, ge=0)
+    revenue_period_end: str | None = None
+    revenue_period_type: str | None = None
+    revenue_fiscal_year: int | None = None
+    cash_period_end: str | None = None
+    cash_fiscal_year: int | None = None
+    currency: str = "USD"
+    metric_sources: dict[str, str] = Field(default_factory=dict)
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
+class AcquirerCapacityRuleResult(StrictBaseModel):
+    """One deterministic capacity rule evaluation for a candidate."""
+
+    rule_id: str = Field(min_length=1)
+    status: AcquirerCapacityRuleStatus
+    observed_value_usd: float | None = Field(default=None, ge=0)
+    threshold_usd: float | None = Field(default=None, ge=0)
+    ratio: float | None = Field(default=None, ge=0)
+    missing_fields: list[str] = Field(default_factory=list)
+    warning: str | None = None
+
+
+class AcquirerCapabilityCandidate(StrictBaseModel):
+    """A public-company strategic buyer candidate that passed at least one capacity rule."""
+
+    canonical_name: str = Field(min_length=1)
+    ticker: str = Field(min_length=1)
+    cik: str = Field(min_length=1)
+    exchange: str | None = None
+    sic: str | None = None
+    metrics: CompanyFinancialMetrics
+    rule_results: list[AcquirerCapacityRuleResult] = Field(default_factory=list)
+    passed_rules: list[str] = Field(default_factory=list)
+    risk_flags: list[str] = Field(default_factory=list)
+    evidence: list[Evidence] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def require_passed_rule(self) -> "AcquirerCapabilityCandidate":
+        if not self.passed_rules:
+            raise ValueError("AcquirerCapabilityCandidate requires at least one passed rule")
+        return self
+
+
+class AcquirerCapabilityUniverseResult(StrictBaseModel):
+    """Result envelope for the Acquirer-Capable Universe v1 screen."""
+
+    target: ResolvedTarget
+    target_metrics: CompanyFinancialMetrics
+    thresholds: dict[str, float | None] = Field(default_factory=dict)
+    candidates: list[AcquirerCapabilityCandidate] = Field(default_factory=list)
+    excluded_counts: dict[str, int] = Field(default_factory=dict)
+    source_coverage: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class CandidateHit(StrictBaseModel):

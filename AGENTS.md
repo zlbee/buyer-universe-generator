@@ -10,7 +10,7 @@
 - EdgarTools filings guide: https://edgartools.readthedocs.io/en/latest/guides/working-with-filing/
 - EdgarTools Filing API: https://edgartools.readthedocs.io/en/latest/api/filing/
 - EdgarTools data objects: https://edgartools.readthedocs.io/en/latest/data-objects/
-- Polygon.io ticker overview: https://polygon.io/docs/rest/stocks/tickers/ticker-overview
+- Polygon.io documentation: https://polygon.io/docs
 - NewsAPI Everything endpoint: https://newsapi.org/docs/endpoints/everything
 - OpenRouter chat completion API: https://openrouter.ai/docs/api-reference/chat-completion
 - OpenRouter web search server tool: https://openrouter.ai/docs/guides/features/server-tools/web-search

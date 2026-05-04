@@ -135,6 +135,20 @@ class TargetProfileCacheRecord(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class CompanyFinancialMetricsCacheRecord(Base):
+    """Cached normalized public-company metrics keyed by source fingerprint."""
+
+    __tablename__ = "company_financial_metrics_cache"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    cik: Mapped[str] = mapped_column(String(32), index=True)
+    ticker: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    source_fingerprint: Mapped[str] = mapped_column(String(128), index=True)
+    payload_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class LLMInteractionRecord(Base):
     """Provider-level LLM request/response audit trail for prompt review and optimization."""
 

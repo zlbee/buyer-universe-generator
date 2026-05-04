@@ -66,6 +66,32 @@ class SourceCache:
         records = self.session.execute(statement).scalars().all()
         return [self._document_from_record(record) for record in records if not record.expires_at or _as_utc(record.expires_at) > now]
 
+    def get_valid_documents_by_cik(
+        self,
+        target_ciks: list[str],
+        source_id: str | None = None,
+    ) -> dict[str, list[SourceDocument]]:
+        """Batch-read source documents to avoid one SQLite query per candidate."""
+
+        if not target_ciks:
+            return {}
+
+        now = datetime.now(UTC)
+        normalized_ciks = list(dict.fromkeys(target_ciks))
+        statement = select(SourceDocumentRecord).where(SourceDocumentRecord.target_cik.in_(normalized_ciks))
+        if source_id:
+            statement = statement.where(SourceDocumentRecord.source_id == source_id)
+
+        documents_by_cik: dict[str, list[SourceDocument]] = {}
+        records = self.session.execute(statement).scalars().all()
+        for record in records:
+            if record.expires_at and _as_utc(record.expires_at) <= now:
+                continue
+            if not record.target_cik:
+                continue
+            documents_by_cik.setdefault(record.target_cik, []).append(self._document_from_record(record))
+        return documents_by_cik
+
     def save_document(self, document: SourceDocument) -> None:
         self.session.add(
             SourceDocumentRecord(

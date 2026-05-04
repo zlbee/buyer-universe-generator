@@ -65,6 +65,10 @@ class Settings(BaseSettings):
 
     max_strategic_candidates: int = Field(default=150, ge=1)
     max_financial_candidates: int = Field(default=100, ge=1)
+    acquirer_cache_only_mode: bool = False
+    acquirer_market_cap_multiple: float = Field(default=3.0, gt=0)
+    acquirer_cash_to_target_market_cap_multiple: float = Field(default=0.3, gt=0)
+    acquirer_revenue_multiple: float = Field(default=2.0, gt=0)
     request_timeout_seconds: float = Field(default=30.0, gt=0)
     cache_ttl_hours: int = Field(default=24, ge=0)
     cors_origins: list[str] = Field(

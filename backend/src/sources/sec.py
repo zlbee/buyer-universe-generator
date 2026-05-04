@@ -2,24 +2,28 @@
 
 from __future__ import annotations
 
+import json
 import re
+import zipfile
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Sequence
 
 import httpx
 
 from src.config import Settings
 from src.domain import (
+    CompanyFinancialMetrics,
     DataSourceRawRecord,
     DataSourceRequestStatus,
+    Evidence,
     FilingMetadata,
     ResolvedTarget,
     SourceDocument,
     SourceStrength,
     SourceType,
 )
-from src.sources.base import DataSourceRequestContext, DataSourceRequestRecorder, ExternalDataSourceClient
+from src.sources.base import DataSourceRequestContext, DataSourceRequestRecorder, ExternalDataSourceClient, _status_code_from_error
 
 
 @dataclass(frozen=True)
@@ -54,6 +58,24 @@ class MarkdownItemHeading:
     end: int
 
 
+@dataclass(frozen=True)
+class XbrlCompanyFact:
+    """One normalized SEC companyfacts numeric fact used for capacity metrics."""
+
+    taxonomy: str
+    concept: str
+    unit: str
+    value: float
+    start: str | None
+    end: str | None
+    filed: str | None
+    form: str | None
+    fiscal_year: int | None
+    fiscal_period: str | None
+    frame: str | None
+    accession_number: str | None
+
+
 _ITEM_HEADING_RE = re.compile(
     r"^[ \t>#*_\-]*(?:part\s+[ivxlcdm]+\s+)?item\s+"
     r"(?P<item>\d{1,2}\s*[A-Z]?)\s*"
@@ -68,6 +90,8 @@ class SecEdgarClient(ExternalDataSourceClient):
 
     company_tickers_exchange_url = "https://www.sec.gov/files/company_tickers_exchange.json"
     submissions_url_template = "https://data.sec.gov/submissions/CIK{cik}.json"
+    companyfacts_url_template = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
+    companyfacts_bulk_url = "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip"
 
     def __init__(
         self,
@@ -170,6 +194,108 @@ class SecEdgarClient(ExternalDataSourceClient):
             )
 
         return list(latest_by_form.values())
+
+    def fetch_public_company_universe(self) -> list[ResolvedTarget]:
+        """Return main-exchange operating companies from SEC's ticker/exchange mapping."""
+
+        targets: list[ResolvedTarget] = []
+        for row in self._load_company_mapping():
+            if not _is_main_us_operating_company_row(row):
+                continue
+            targets.append(self._target_from_mapping(row, matched_input=str(row["ticker"]), confidence=1.0))
+        return targets
+
+    def fetch_company_financial_metrics(
+        self,
+        target: ResolvedTarget,
+        source_strength: SourceStrength = SourceStrength.A,
+        source_dimension: str | None = None,
+    ) -> CompanyFinancialMetrics:
+        cik_padded = target.cik.zfill(10)
+        url = self.companyfacts_url_template.format(cik=cik_padded)
+        payload, _raw_records = self._get_json(
+            operation="companyfacts",
+            url=url,
+            headers={"User-Agent": self.settings.sec_user_agent},
+            target=target,
+            source_dimension=source_dimension,
+            raw_records_from_payload=_companyfacts_raw_records_from_payload,
+        )
+        return financial_metrics_from_companyfacts(
+            target,
+            payload,
+            source_strength=source_strength,
+            source_dimension=source_dimension,
+            url=url,
+        )
+
+    def fetch_company_financial_metrics_bulk(
+        self,
+        targets: Sequence[ResolvedTarget],
+        source_strength: SourceStrength = SourceStrength.A,
+        source_dimension: str | None = None,
+    ) -> dict[str, CompanyFinancialMetrics]:
+        """Load normalized metrics for many companies from SEC's nightly companyfacts ZIP."""
+
+        target_by_cik = {target.cik.zfill(10): target for target in targets}
+        if not target_by_cik:
+            return {}
+
+        bulk_path = self.settings.cache_dir / "sec" / "companyfacts.zip"
+        if not bulk_path.exists():
+            bulk_path.parent.mkdir(parents=True, exist_ok=True)
+            context = self._start_request(
+                operation="companyfacts_bulk_zip",
+                method="GET",
+                url=self.companyfacts_bulk_url,
+                params=None,
+                headers={"User-Agent": self.settings.sec_user_agent},
+                target=None,
+                source_dimension=source_dimension,
+            )
+            status_code: int | None = None
+            try:
+                response = self.http_client.get(self.companyfacts_bulk_url, headers={"User-Agent": self.settings.sec_user_agent})
+                status_code = response.status_code
+                response.raise_for_status()
+                bulk_path.write_bytes(response.content)
+                self._record_request(
+                    context,
+                    DataSourceRequestStatus.success,
+                    response.status_code,
+                    [_companyfacts_bulk_raw_record(context, datetime.now(UTC), len(response.content), len(target_by_cik))],
+                )
+            except Exception as error:
+                self._record_request(
+                    context,
+                    DataSourceRequestStatus.error,
+                    status_code or _status_code_from_error(error),
+                    [],
+                    error_message=f"{type(error).__name__}: {error}",
+                )
+                raise
+
+        metrics_by_cik: dict[str, CompanyFinancialMetrics] = {}
+        with zipfile.ZipFile(bulk_path) as companyfacts_zip:
+            wanted_ciks = set(target_by_cik)
+            for member_name in companyfacts_zip.namelist():
+                cik = _cik_from_companyfacts_member_name(member_name)
+                if cik not in wanted_ciks:
+                    continue
+                with companyfacts_zip.open(member_name) as member:
+                    payload = json.loads(member.read().decode("utf-8"))
+                target = target_by_cik[cik]
+                metrics_by_cik[target.cik] = financial_metrics_from_companyfacts(
+                    target,
+                    payload,
+                    source_strength=source_strength,
+                    source_dimension=source_dimension,
+                    url=f"{self.companyfacts_bulk_url}#{member_name}",
+                )
+                wanted_ciks.remove(cik)
+                if not wanted_ciks:
+                    break
+        return metrics_by_cik
 
     def _edgar(self) -> Any | None:
         if not self._use_edgartools:
@@ -687,6 +813,67 @@ def _company_mapping_raw_records_from_payload(
     return raw_records
 
 
+def _companyfacts_raw_records_from_payload(
+    payload: Any,
+    context: DataSourceRequestContext,
+    retrieved_at: datetime,
+) -> list[DataSourceRawRecord]:
+    facts = payload.get("facts", {}) if isinstance(payload, dict) else {}
+    concept_count = 0
+    if isinstance(facts, dict):
+        concept_count = sum(len(taxonomy_facts) for taxonomy_facts in facts.values() if isinstance(taxonomy_facts, dict))
+
+    # Companyfacts payloads can be very large; the audit record keeps a compact
+    # inventory while the normalized metrics cache stores the decision-driving facts.
+    raw_payload = {
+        "cik": payload.get("cik") if isinstance(payload, dict) else context.target_cik,
+        "entityName": payload.get("entityName") if isinstance(payload, dict) else None,
+        "taxonomy_names": list(facts.keys()) if isinstance(facts, dict) else [],
+        "concept_count": concept_count,
+    }
+    return [
+        DataSourceRawRecord(
+            request_id=context.request_id,
+            source_id=context.source_id,
+            provider=context.provider,
+            source_dimension=context.source_dimension,
+            source_type=SourceType.sec_companyfacts,
+            target_cik=context.target_cik,
+            target_ticker=context.target_ticker,
+            record_id=str(context.target_cik or raw_payload.get("cik") or context.url),
+            url=context.url,
+            raw_payload=raw_payload,
+            metadata={"record_role": "companyfacts_summary"},
+            retrieved_at=retrieved_at,
+        )
+    ]
+
+
+def _companyfacts_bulk_raw_record(
+    context: DataSourceRequestContext,
+    retrieved_at: datetime,
+    zip_bytes: int,
+    requested_target_count: int,
+) -> DataSourceRawRecord:
+    return DataSourceRawRecord(
+        request_id=context.request_id,
+        source_id=context.source_id,
+        provider=context.provider,
+        source_dimension=context.source_dimension,
+        source_type=SourceType.sec_companyfacts,
+        record_id="companyfacts.zip",
+        url=context.url,
+        raw_payload={"zip_bytes": zip_bytes, "requested_target_count": requested_target_count},
+        metadata={"record_role": "companyfacts_bulk_zip"},
+        retrieved_at=retrieved_at,
+    )
+
+
+def _cik_from_companyfacts_member_name(member_name: str) -> str | None:
+    match = re.search(r"(?:CIK)?(?P<cik>\d{10})\.json$", member_name)
+    return match.group("cik") if match else None
+
+
 def _submission_filing_raw_records_from_payload(
     payload: Any,
     context: DataSourceRequestContext,
@@ -726,6 +913,311 @@ def _submission_filing_raw_records_from_payload(
             )
         )
     return raw_records
+
+
+_MAIN_US_EXCHANGES = {"NYSE", "Nasdaq", "NYSE American"}
+_NON_OPERATING_NAME_PATTERNS = (
+    " ETF",
+    " ETN",
+    " FUND",
+    " TRUST",
+    " INDEX",
+    " SPDR ",
+    " ISHARES ",
+    " INVESCO QQQ",
+    " PROSHARES ",
+    " DIREXION ",
+    " WISDOMTREE ",
+    " VANECK ",
+    " ACQUISITION CORP",
+    " ACQUISITION CO",
+    " ACQUISITION LTD",
+    " ACQUISITION INC",
+    " SPAC",
+    " BLANK CHECK",
+)
+
+
+def is_main_us_operating_company_name(name: str) -> bool:
+    """Heuristic exclusion for securities that are not operating-company buyers."""
+
+    normalized = f" {re.sub(r'[^A-Z0-9]+', ' ', name.upper()).strip()} "
+    return not any(pattern in normalized for pattern in _NON_OPERATING_NAME_PATTERNS)
+
+
+def _is_main_us_operating_company_row(row: dict[str, Any]) -> bool:
+    exchange = str(row.get("exchange", "")).strip()
+    if exchange not in _MAIN_US_EXCHANGES:
+        return False
+    return is_main_us_operating_company_name(str(row.get("name", "")))
+
+
+_REVENUE_CONCEPTS = (
+    ("us-gaap", "RevenueFromContractWithCustomerExcludingAssessedTax"),
+    ("us-gaap", "Revenues"),
+    ("us-gaap", "SalesRevenueNet"),
+    ("us-gaap", "SalesRevenueGoodsNet"),
+    ("us-gaap", "SalesRevenueServicesNet"),
+    ("ifrs-full", "Revenue"),
+)
+_CASH_CONCEPTS = (
+    ("us-gaap", "CashAndCashEquivalentsAtCarryingValue"),
+    ("us-gaap", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"),
+    ("us-gaap", "Cash"),
+    ("us-gaap", "CashAndDueFromBanks"),
+    ("ifrs-full", "CashAndCashEquivalents"),
+)
+_ANNUAL_FORMS = {"10-K", "10-K/A", "20-F", "20-F/A", "40-F", "40-F/A"}
+_FINANCIAL_FORMS = _ANNUAL_FORMS | {"10-Q", "10-Q/A"}
+_QUARTERLY_PERIODS = {"Q1", "Q2", "Q3", "Q4"}
+
+
+def financial_metrics_from_companyfacts(
+    target: ResolvedTarget,
+    payload: dict[str, Any],
+    *,
+    source_strength: SourceStrength,
+    source_dimension: str | None,
+    url: str,
+) -> CompanyFinancialMetrics:
+    """Extract v1 comparable revenue and cash metrics from SEC companyfacts JSON."""
+
+    revenue_fact, revenue_period_type, revenue_component_facts = _select_revenue_fact(payload)
+    cash_fact = _select_cash_fact(payload)
+    evidence: list[Evidence] = []
+    metric_sources: dict[str, str] = {}
+    revenue_value = None
+    cash_value = None
+
+    if revenue_fact and revenue_period_type != "TTM":
+        revenue_value = revenue_fact.value
+        metric_sources["revenue_usd"] = f"sec_companyfacts:{revenue_fact.taxonomy}:{revenue_fact.concept}:{revenue_period_type}"
+        evidence.append(
+            _companyfact_evidence(
+                target,
+                "revenue",
+                revenue_fact.value,
+                source_strength,
+                source_dimension,
+                url,
+                revenue_fact,
+            )
+        )
+    elif revenue_fact and revenue_period_type == "TTM":
+        revenue_value = revenue_fact.value
+        metric_sources["revenue_usd"] = "sec_companyfacts:ttm_quarterly_revenue"
+        evidence.append(
+            _ttm_revenue_evidence(
+                target,
+                revenue_fact.value,
+                revenue_component_facts,
+                source_strength,
+                source_dimension,
+                url,
+            )
+        )
+
+    if cash_fact:
+        cash_value = cash_fact.value
+        metric_sources["cash_and_equivalents_usd"] = f"sec_companyfacts:{cash_fact.taxonomy}:{cash_fact.concept}"
+        evidence.append(
+            _companyfact_evidence(
+                target,
+                "cash and cash equivalents",
+                cash_fact.value,
+                source_strength,
+                source_dimension,
+                url,
+                cash_fact,
+            )
+        )
+
+    return CompanyFinancialMetrics(
+        canonical_name=target.canonical_name,
+        ticker=target.ticker,
+        cik=target.cik,
+        exchange=target.exchange,
+        sic=target.sic,
+        revenue_usd=revenue_value,
+        cash_and_equivalents_usd=cash_value,
+        revenue_period_end=revenue_fact.end if revenue_fact else None,
+        revenue_period_type=revenue_period_type,
+        revenue_fiscal_year=revenue_fact.fiscal_year if revenue_fact else None,
+        cash_period_end=cash_fact.end if cash_fact else None,
+        cash_fiscal_year=cash_fact.fiscal_year if cash_fact else None,
+        metric_sources=metric_sources,
+        evidence=evidence,
+    )
+
+
+def _select_revenue_fact(payload: dict[str, Any]) -> tuple[XbrlCompanyFact | None, str | None, list[XbrlCompanyFact]]:
+    facts = _facts_for_concepts(payload, _REVENUE_CONCEPTS)
+    annual_facts = [
+        fact
+        for fact in facts
+        if _normalized_form(fact.form) in _ANNUAL_FORMS and (fact.fiscal_period or "").upper() == "FY"
+    ]
+    if annual_facts:
+        return max(annual_facts, key=_fact_recency_key), "FY", []
+
+    quarterly_facts = [fact for fact in facts if _is_discrete_quarter_fact(fact)]
+    latest_by_period: dict[str, XbrlCompanyFact] = {}
+    for fact in quarterly_facts:
+        period_key = fact.frame or f"{fact.end}:{fact.fiscal_period}"
+        existing = latest_by_period.get(period_key)
+        if not existing or _fact_recency_key(fact) > _fact_recency_key(existing):
+            latest_by_period[period_key] = fact
+    latest_four = sorted(latest_by_period.values(), key=_fact_recency_key, reverse=True)[:4]
+    if len(latest_four) < 4:
+        return None, None, []
+
+    # SEC companyfacts can include YTD 10-Q values. Restricting fallback to
+    # discrete-duration quarters avoids summing overlapping YTD periods.
+    ttm_value = sum(fact.value for fact in latest_four)
+    latest = max(latest_four, key=_fact_recency_key)
+    return (
+        XbrlCompanyFact(
+            taxonomy=latest.taxonomy,
+            concept="TTMRevenueFromDiscreteQuarters",
+            unit="USD",
+            value=ttm_value,
+            start=None,
+            end=latest.end,
+            filed=latest.filed,
+            form=latest.form,
+            fiscal_year=latest.fiscal_year,
+            fiscal_period="TTM",
+            frame=None,
+            accession_number=latest.accession_number,
+        ),
+        "TTM",
+        latest_four,
+    )
+
+
+def _select_cash_fact(payload: dict[str, Any]) -> XbrlCompanyFact | None:
+    facts = [
+        fact
+        for fact in _facts_for_concepts(payload, _CASH_CONCEPTS)
+        if _normalized_form(fact.form) in _FINANCIAL_FORMS and fact.end
+    ]
+    if not facts:
+        return None
+    return max(facts, key=_fact_recency_key)
+
+
+def _facts_for_concepts(payload: dict[str, Any], concepts: tuple[tuple[str, str], ...]) -> list[XbrlCompanyFact]:
+    facts_root = payload.get("facts", {})
+    if not isinstance(facts_root, dict):
+        return []
+
+    facts: list[XbrlCompanyFact] = []
+    for taxonomy, concept in concepts:
+        concept_payload = facts_root.get(taxonomy, {}).get(concept, {})
+        if not isinstance(concept_payload, dict):
+            continue
+        units = concept_payload.get("units", {})
+        usd_facts = units.get("USD", []) if isinstance(units, dict) else []
+        if not isinstance(usd_facts, list):
+            continue
+        for raw_fact in usd_facts:
+            fact = _xbrl_fact_from_raw(taxonomy, concept, "USD", raw_fact)
+            if fact:
+                facts.append(fact)
+    return facts
+
+
+def _xbrl_fact_from_raw(taxonomy: str, concept: str, unit: str, raw_fact: Any) -> XbrlCompanyFact | None:
+    if not isinstance(raw_fact, dict):
+        return None
+    value = raw_fact.get("val")
+    if not isinstance(value, (int, float)) or value < 0:
+        return None
+    return XbrlCompanyFact(
+        taxonomy=taxonomy,
+        concept=concept,
+        unit=unit,
+        value=float(value),
+        start=str(raw_fact["start"]) if raw_fact.get("start") else None,
+        end=str(raw_fact["end"]) if raw_fact.get("end") else None,
+        filed=str(raw_fact["filed"]) if raw_fact.get("filed") else None,
+        form=str(raw_fact["form"]) if raw_fact.get("form") else None,
+        fiscal_year=int(raw_fact["fy"]) if isinstance(raw_fact.get("fy"), int) else None,
+        fiscal_period=str(raw_fact["fp"]).upper() if raw_fact.get("fp") else None,
+        frame=str(raw_fact["frame"]) if raw_fact.get("frame") else None,
+        accession_number=str(raw_fact["accn"]) if raw_fact.get("accn") else None,
+    )
+
+
+def _is_discrete_quarter_fact(fact: XbrlCompanyFact) -> bool:
+    if (fact.fiscal_period or "").upper() not in _QUARTERLY_PERIODS:
+        return False
+    if fact.frame and re.fullmatch(r"CY\d{4}Q[1-4]", fact.frame):
+        return True
+    if not fact.start or not fact.end:
+        return False
+    duration_days = _date_ordinal(fact.end) - _date_ordinal(fact.start)
+    return 60 <= duration_days <= 120
+
+
+def _fact_recency_key(fact: XbrlCompanyFact) -> tuple[str, str, float]:
+    return (fact.end or "", fact.filed or "", fact.value)
+
+
+def _companyfact_evidence(
+    target: ResolvedTarget,
+    metric_name: str,
+    value: float,
+    source_strength: SourceStrength,
+    source_dimension: str | None,
+    url: str,
+    fact: XbrlCompanyFact,
+) -> Evidence:
+    return Evidence(
+        claim=f"{target.canonical_name} reported {metric_name} of {value:.0f} USD for period ending {fact.end}.",
+        source_type=SourceType.sec_companyfacts.value,
+        source_dimension=source_dimension,
+        source_strength=source_strength,
+        url=url,
+        quote_or_snippet=(
+            f"{fact.taxonomy}:{fact.concept} form={fact.form} fp={fact.fiscal_period} "
+            f"end={fact.end} value={value:.0f}"
+        ),
+        verified_fact=True,
+    )
+
+
+def _ttm_revenue_evidence(
+    target: ResolvedTarget,
+    value: float,
+    component_facts: list[XbrlCompanyFact],
+    source_strength: SourceStrength,
+    source_dimension: str | None,
+    url: str,
+) -> Evidence:
+    periods = ", ".join(f"{fact.end}:{fact.value:.0f}" for fact in sorted(component_facts, key=_fact_recency_key))
+    return Evidence(
+        claim=f"{target.canonical_name} has derived TTM revenue of {value:.0f} USD from four SEC companyfacts quarters.",
+        source_type=SourceType.sec_companyfacts.value,
+        source_dimension=source_dimension,
+        source_strength=source_strength,
+        url=url,
+        quote_or_snippet=f"TTM components {periods}",
+        verified_fact=True,
+    )
+
+
+def _normalized_form(value: str | None) -> str:
+    return (value or "").strip().upper()
+
+
+def _date_ordinal(value: str | None) -> int:
+    if not value:
+        return 0
+    try:
+        return datetime.fromisoformat(value).toordinal()
+    except ValueError:
+        return 0
 
 
 def _filing_raw_record(

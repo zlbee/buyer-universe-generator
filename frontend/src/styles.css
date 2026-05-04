@@ -198,6 +198,96 @@ h2 {
   margin-top: 18px;
 }
 
+.stage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.page-card {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid #cfd6de;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.page-card__header,
+.page-card__actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.page-card__header h2 {
+  margin-bottom: 0;
+}
+
+.page-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.page-card__metrics div {
+  min-height: 70px;
+  padding: 10px;
+  border: 1px solid #dce3ea;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.page-card__metrics dt {
+  margin-bottom: 8px;
+  color: #5d6b7a;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.page-card__metrics dd {
+  margin: 0;
+  color: #17202a;
+  font-size: 1rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.page-card__actions {
+  align-items: center;
+}
+
+.page-card__actions button {
+  min-width: 132px;
+  height: 42px;
+  border: 0;
+  border-radius: 6px;
+  color: #ffffff;
+  background: #2867a8;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.page-card__actions button:disabled {
+  color: #667382;
+  background: #d7dde4;
+  cursor: not-allowed;
+}
+
+.page-card__actions a {
+  color: #2867a8;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.page-card__actions a:hover {
+  text-decoration: underline;
+}
+
 .status-tile {
   display: grid;
   min-height: 92px;
@@ -375,6 +465,10 @@ h2 {
   background: #f8fafc;
 }
 
+.debug-field-list--wide {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .debug-field-list strong {
   color: #344252;
 }
@@ -457,8 +551,19 @@ h2 {
 
   .input-row,
   .status-grid,
+  .stage-grid,
   .debug-metrics,
-  .debug-json-grid {
+  .debug-json-grid,
+  .debug-field-list--wide {
+    grid-template-columns: 1fr;
+  }
+
+  .page-card__header,
+  .page-card__actions {
+    display: grid;
+  }
+
+  .page-card__metrics {
     grid-template-columns: 1fr;
   }
 }

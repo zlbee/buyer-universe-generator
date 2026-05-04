@@ -6,10 +6,12 @@ from sqlalchemy.orm import Session
 
 from src.config import Settings
 from src.llm import LLMClient, OpenRouterProvider
+from src.pipelines.acquirer_capability import AcquirerCapabilityUniverseBuilder
 from src.pipelines.source_ingestion import SourceIngestionService
 from src.pipelines.target_profile_extraction import TargetProfileExtractor
 from src.pipelines.target_resolution import TargetResolver
 from src.repositories.data_source_audit_log import DataSourceAuditLog
+from src.repositories.financial_metrics_cache import CompanyFinancialMetricsCache
 from src.repositories.llm_interaction_log import LLMInteractionLog
 from src.repositories.source_cache import SourceCache
 from src.repositories.target_profile_cache import TargetProfileCache
@@ -69,4 +71,25 @@ def build_target_profile_extractor(
         edgar_client=edgar_client,
         llm_client=provider,
         ir_page_discovery=ir_page_discovery,
+    )
+
+
+def build_acquirer_capability_universe_builder(
+    settings: Settings,
+    session: Session,
+) -> AcquirerCapabilityUniverseBuilder:
+    strategy = DataSourceStrategy.from_settings(settings)
+    request_recorder = DataSourceAuditLog(session)
+    registry = SourceRegistry(settings, strategy=strategy, request_recorder=request_recorder)
+    source_cache = SourceCache(session)
+    edgar_client = registry.edgar()
+    resolver = TargetResolver(strategy=strategy, edgar_client=edgar_client, source_cache=source_cache)
+    return AcquirerCapabilityUniverseBuilder(
+        settings=settings,
+        strategy=strategy,
+        resolver=resolver,
+        source_cache=source_cache,
+        metrics_cache=CompanyFinancialMetricsCache(session),
+        edgar_client=edgar_client,
+        polygon_client=registry.polygon(),
     )
