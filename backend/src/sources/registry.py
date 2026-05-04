@@ -5,6 +5,7 @@ from __future__ import annotations
 from src.config import Settings
 from src.sources.company_pages import CompanyPageClient
 from src.sources.base import DataSourceRequestRecorder
+from src.sources.google_news_rss import GoogleNewsRssClient
 from src.sources.newsapi import NewsApiClient
 from src.sources.polygon import PolygonClient
 from src.sources.sec import SecEdgarClient
@@ -55,6 +56,17 @@ class SourceRegistry:
             self.settings,
             request_recorder=self.request_recorder,
             provider=self._provider("newsapi", "newsapi.org"),
+        )
+
+    def google_news_rss(self) -> GoogleNewsRssClient:
+        retrieval = self._retrieval("google_news_rss")
+        return GoogleNewsRssClient(
+            self.settings,
+            request_recorder=self.request_recorder,
+            provider=self._provider("google_news_rss", "google_news_rss"),
+            default_language=retrieval.rss_language,
+            default_country=retrieval.rss_country,
+            default_edition=retrieval.rss_edition,
         )
 
     def _provider(self, source_id: str, fallback: str) -> str:

@@ -18,6 +18,7 @@ from src.repositories.data_source_audit_log import DataSourceAuditLog
 from src.repositories.database import create_session_factory, init_db
 from src.repositories.models import DataSourceRawRecordRecord, DataSourceRequestRecord
 from src.repositories.source_cache import SourceCache
+from src.sources.google_news_rss import GoogleNewsRssClient
 from src.sources.newsapi import NewsApiClient
 from src.sources.polygon import PolygonClient
 from src.sources.registry import SourceRegistry
@@ -54,13 +55,21 @@ def test_data_source_policy_disables_optional_sources_without_keys(tmp_path: Pat
     assert polygon_source.enabled is False
     assert polygon_source.disabled_reason == "missing BUG_POLYGON_API_KEY"
 
-    news_source = strategy.select("news_discovery", include_disabled=True)[0]
+    news_discovery_sources = strategy.select("news_discovery", include_disabled=True)
+    news_source = next(source for source in news_discovery_sources if source.source_id == "newsapi")
     assert news_source.dimension_id == "seller_profile.recent_news_context"
     assert news_source.source_strength == SourceStrength.B
     assert news_source.enabled is False
     assert news_source.disabled_reason == "missing BUG_NEWS_API_KEY"
     assert {"bloomberg.com", "reuters.com", "wsj.com"} <= set(news_source.config.retrieval.domains)
     assert news_source.config.retrieval.max_lookback_days == 30
+    google_news_source = next(source for source in news_discovery_sources if source.source_id == "google_news_rss")
+    assert google_news_source.dimension_id == "seller_profile.recent_news_context"
+    assert google_news_source.source_strength == SourceStrength.C
+    assert google_news_source.enabled is True
+    assert google_news_source.config.retrieval.rss_language == "en-US"
+    assert google_news_source.config.retrieval.rss_country == "US"
+    assert google_news_source.config.retrieval.rss_edition == "US:en"
     edgar_config = strategy.source("edgar").retrieval
     assert edgar_config.markdown_item_parser_enabled is True
     assert edgar_config.markdown_item_parser_min_chars == 500
@@ -75,21 +84,34 @@ def test_source_registry_applies_edgar_retrieval_config(tmp_path: Path) -> None:
     assert client.markdown_item_parser_min_chars == 500
 
 
+def test_source_registry_applies_google_news_rss_retrieval_config(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path)
+    strategy = DataSourceStrategy.from_settings(settings)
+    client = SourceRegistry(settings, strategy=strategy).google_news_rss()
+
+    assert client.default_language == "en-US"
+    assert client.default_country == "US"
+    assert client.default_edition == "US:en"
+
+
 def test_data_source_policy_scopes_strength_by_dimension(tmp_path: Path) -> None:
     strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path))
 
     identity_source = strategy.selected_source("target_resolution", "edgar", include_disabled=True)
     transaction_source = strategy.selected_source("buyer_recall_transaction_signals", "edgar", include_disabled=True)
     news_context_source = strategy.selected_source("news_discovery", "newsapi", include_disabled=True)
+    google_transaction_source = strategy.selected_source("buyer_recall_transaction_signals", "google_news_rss", include_disabled=True)
     sponsor_source = strategy.selected_source("buyer_recall_financial_sponsors", "newsapi", include_disabled=True)
 
     assert identity_source is not None
     assert transaction_source is not None
     assert news_context_source is not None
+    assert google_transaction_source is not None
     assert sponsor_source is not None
     assert identity_source.source_strength == SourceStrength.A
     assert transaction_source.source_strength == SourceStrength.C
     assert news_context_source.source_strength == SourceStrength.B
+    assert google_transaction_source.source_strength == SourceStrength.C
     assert sponsor_source.source_strength == SourceStrength.C
 
 
@@ -271,6 +293,50 @@ def test_newsapi_client_returns_article_documents(tmp_path: Path, caplog: pytest
     assert "NewsAPI request" in newsapi_log_text
     assert ",".join(domains) in newsapi_log_text
     assert "news-test-key" not in newsapi_log_text
+
+
+def test_google_news_rss_client_returns_article_documents(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url).startswith("https://news.google.com/rss/search")
+        assert request.url.params["q"] == '"Apple Inc." OR AAPL'
+        assert request.url.params["hl"] == "en-US"
+        assert request.url.params["gl"] == "US"
+        assert request.url.params["ceid"] == "US:en"
+        return httpx.Response(
+            200,
+            text=(
+                "<?xml version='1.0' encoding='UTF-8'?>"
+                "<rss version='2.0'><channel>"
+                "<item>"
+                "<title>Apple acquisition report</title>"
+                "<link>https://news.google.com/rss/articles/apple-acquisition</link>"
+                "<guid isPermaLink='false'>fixture-guid</guid>"
+                "<pubDate>Mon, 04 May 2026 12:30:00 GMT</pubDate>"
+                "<description><![CDATA[<a href='https://example.com/article'>Apple acquisition report</a>]]></description>"
+                "<source url='https://example.com'>Example News</source>"
+                "</item>"
+                "</channel></rss>"
+            ),
+        )
+
+    client = GoogleNewsRssClient(
+        settings_for_tests(tmp_path),
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    with caplog.at_level(logging.INFO):
+        documents = client.fetch_target_articles(sample_target(), ttl_hours=6)
+
+    assert len(documents) == 1
+    document = documents[0]
+    assert document.source_id == "google_news_rss"
+    assert document.source_type == SourceType.news_article
+    assert document.source_strength == SourceStrength.C
+    assert document.metadata["title"] == "Apple acquisition report"
+    assert document.metadata["publishedAt"] == "2026-05-04T12:30:00+00:00"
+    assert document.metadata["source"] == {"name": "Example News", "url": "https://example.com"}
+    assert document.raw_text and "Apple acquisition report" in document.raw_text
+    google_log_text = "\n".join(record.message for record in caplog.records if record.name == "src.sources.google_news_rss")
+    assert "Google News RSS request" in google_log_text
 
 
 def test_source_ingestion_applies_newsapi_domains_from_policy(tmp_path: Path) -> None:

@@ -12,6 +12,7 @@
 - EdgarTools data objects: https://edgartools.readthedocs.io/en/latest/data-objects/
 - Polygon.io ticker overview: https://polygon.io/docs/rest/stocks/tickers/ticker-overview
 - NewsAPI Everything endpoint: https://newsapi.org/docs/endpoints/everything
+- Google News RSS endpoint: https://news.google.com/rss
 - OpenRouter chat completion API: https://openrouter.ai/docs/api-reference/chat-completion
 - OpenRouter web search server tool: https://openrouter.ai/docs/guides/features/server-tools/web-search
 - Official company and investor-relations pages: no single provider API; use each target company's public website documentation or robots/policy pages when available.

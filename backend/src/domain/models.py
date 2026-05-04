@@ -187,6 +187,9 @@ class DataSourceRetrievalConfig(StrictBaseModel):
 
     domains: list[str] = Field(default_factory=list)
     max_lookback_days: int | None = Field(default=None, ge=1)
+    rss_language: str | None = None
+    rss_country: str | None = None
+    rss_edition: str | None = None
     markdown_item_parser_enabled: bool = False
     markdown_item_parser_min_chars: int = Field(default=500, ge=1)
 
