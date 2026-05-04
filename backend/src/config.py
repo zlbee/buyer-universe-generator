@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     sec_user_agent: str = "buyer-universe-generator/0.1 contact@example.com"
     polygon_api_key: str | None = None
     news_api_key: str | None = None
+    fmp_api_key: str | None = None
     openrouter_api_key: str | None = None
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     llm_provider: str = "openrouter"

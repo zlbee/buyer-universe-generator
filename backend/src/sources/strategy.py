@@ -91,6 +91,8 @@ class DataSourceStrategy:
             return False, "missing BUG_POLYGON_API_KEY"
         if source_id == "newsapi" and not self.settings.news_api_key:
             return False, "missing BUG_NEWS_API_KEY"
+        if source_id == "fmp" and not self.settings.fmp_api_key:
+            return False, "missing BUG_FMP_API_KEY"
 
         if config.api_key_env and not os.getenv(config.api_key_env) and not self._settings_key_present(config.api_key_env):
             return False, f"missing {config.api_key_env}"
@@ -102,6 +104,8 @@ class DataSourceStrategy:
             return bool(self.settings.polygon_api_key)
         if api_key_env == "BUG_NEWS_API_KEY":
             return bool(self.settings.news_api_key)
+        if api_key_env == "BUG_FMP_API_KEY":
+            return bool(self.settings.fmp_api_key)
         return False
 
 

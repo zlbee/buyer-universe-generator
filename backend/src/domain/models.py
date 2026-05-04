@@ -34,6 +34,7 @@ class SourceType(str, Enum):
     exchange_profile = "exchange_profile"
     company_page = "company_page"
     news_article = "news_article"
+    transaction_signal = "transaction_signal"
     source_policy = "source_policy"
 
 

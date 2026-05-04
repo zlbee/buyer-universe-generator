@@ -5,6 +5,7 @@ from __future__ import annotations
 from src.config import Settings
 from src.sources.company_pages import CompanyPageClient
 from src.sources.base import DataSourceRequestRecorder
+from src.sources.fmp import FinancialModelingPrepClient
 from src.sources.google_news_rss import GoogleNewsRssClient
 from src.sources.newsapi import NewsApiClient
 from src.sources.polygon import PolygonClient
@@ -40,6 +41,13 @@ class SourceRegistry:
             self.settings,
             request_recorder=self.request_recorder,
             provider=self._provider("polygon", "polygon.io"),
+        )
+
+    def fmp(self) -> FinancialModelingPrepClient:
+        return FinancialModelingPrepClient(
+            self.settings,
+            request_recorder=self.request_recorder,
+            provider=self._provider("fmp", "financialmodelingprep.com"),
         )
 
     def company_pages(self) -> CompanyPageClient | None:

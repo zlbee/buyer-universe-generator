@@ -11,6 +11,7 @@
 - EdgarTools Filing API: https://edgartools.readthedocs.io/en/latest/api/filing/
 - EdgarTools data objects: https://edgartools.readthedocs.io/en/latest/data-objects/
 - Polygon.io ticker overview: https://polygon.io/docs/rest/stocks/tickers/ticker-overview
+- Financial Modeling Prep API documentation: https://site.financialmodelingprep.com/developer/docs
 - NewsAPI Everything endpoint: https://newsapi.org/docs/endpoints/everything
 - Google News RSS endpoint: https://news.google.com/rss
 - OpenRouter chat completion API: https://openrouter.ai/docs/api-reference/chat-completion

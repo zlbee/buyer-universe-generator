@@ -18,6 +18,7 @@ from src.repositories.data_source_audit_log import DataSourceAuditLog
 from src.repositories.database import create_session_factory, init_db
 from src.repositories.models import DataSourceRawRecordRecord, DataSourceRequestRecord
 from src.repositories.source_cache import SourceCache
+from src.sources.fmp import FinancialModelingPrepClient
 from src.sources.google_news_rss import GoogleNewsRssClient
 from src.sources.newsapi import NewsApiClient
 from src.sources.polygon import PolygonClient
@@ -35,6 +36,7 @@ def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:
         "edgar_identity": "buyer-universe-generator/0.1 contact@example.com",
         "polygon_api_key": None,
         "news_api_key": None,
+        "fmp_api_key": None,
     }
     values.update(overrides)
     return Settings(**values)
@@ -54,6 +56,11 @@ def test_data_source_policy_disables_optional_sources_without_keys(tmp_path: Pat
     assert polygon_source.source_strength == SourceStrength.B
     assert polygon_source.enabled is False
     assert polygon_source.disabled_reason == "missing BUG_POLYGON_API_KEY"
+    fmp_source = next(source for source in target_sources if source.source_id == "fmp")
+    assert fmp_source.dimension_id == "seller_profile.identity_resolution"
+    assert fmp_source.source_strength == SourceStrength.B
+    assert fmp_source.enabled is False
+    assert fmp_source.disabled_reason == "missing BUG_FMP_API_KEY"
 
     news_discovery_sources = strategy.select("news_discovery", include_disabled=True)
     news_source = next(source for source in news_discovery_sources if source.source_id == "newsapi")
@@ -94,6 +101,15 @@ def test_source_registry_applies_google_news_rss_retrieval_config(tmp_path: Path
     assert client.default_edition == "US:en"
 
 
+def test_source_registry_constructs_fmp_client(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path, fmp_api_key="fmp-test-key")
+    strategy = DataSourceStrategy.from_settings(settings)
+    client = SourceRegistry(settings, strategy=strategy).fmp()
+
+    assert isinstance(client, FinancialModelingPrepClient)
+    assert client.provider == "financialmodelingprep.com"
+
+
 def test_data_source_policy_scopes_strength_by_dimension(tmp_path: Path) -> None:
     strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path))
 
@@ -101,17 +117,20 @@ def test_data_source_policy_scopes_strength_by_dimension(tmp_path: Path) -> None
     transaction_source = strategy.selected_source("buyer_recall_transaction_signals", "edgar", include_disabled=True)
     news_context_source = strategy.selected_source("news_discovery", "newsapi", include_disabled=True)
     google_transaction_source = strategy.selected_source("buyer_recall_transaction_signals", "google_news_rss", include_disabled=True)
+    fmp_transaction_source = strategy.selected_source("buyer_recall_transaction_signals", "fmp", include_disabled=True)
     sponsor_source = strategy.selected_source("buyer_recall_financial_sponsors", "newsapi", include_disabled=True)
 
     assert identity_source is not None
     assert transaction_source is not None
     assert news_context_source is not None
     assert google_transaction_source is not None
+    assert fmp_transaction_source is not None
     assert sponsor_source is not None
     assert identity_source.source_strength == SourceStrength.A
     assert transaction_source.source_strength == SourceStrength.C
     assert news_context_source.source_strength == SourceStrength.B
     assert google_transaction_source.source_strength == SourceStrength.C
+    assert fmp_transaction_source.source_strength == SourceStrength.B
     assert sponsor_source.source_strength == SourceStrength.C
 
 
@@ -263,6 +282,99 @@ def test_polygon_client_persists_audited_request_and_raw_record(tmp_path: Path) 
     assert raw_record.source_type == SourceType.exchange_profile.value
     assert raw_record.source_dimension == "seller_profile.exchange_profile"
     assert json.loads(raw_record.raw_payload_json)["market_cap"] == 1_000_000
+
+
+def test_fmp_client_returns_company_profile_document(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url).startswith("https://financialmodelingprep.com/stable/profile")
+        assert request.url.params["symbol"] == "AAPL"
+        assert request.url.params["apikey"] == "fmp-test-key"
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "symbol": "AAPL",
+                    "companyName": "Apple Inc.",
+                    "cik": "0000320193",
+                    "mktCap": 3_000_000,
+                    "description": "Apple designs consumer technology products.",
+                }
+            ],
+        )
+
+    settings = settings_for_tests(tmp_path, fmp_api_key="fmp-test-key")
+    client = FinancialModelingPrepClient(settings, http_client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+    document = client.fetch_company_profile(
+        sample_target(),
+        ttl_hours=24,
+        source_strength=SourceStrength.B,
+        source_dimension="seller_profile.exchange_profile",
+    )
+
+    assert document.source_id == "fmp"
+    assert document.source_type == SourceType.exchange_profile
+    assert document.source_strength == SourceStrength.B
+    assert document.source_dimension == "seller_profile.exchange_profile"
+    assert document.metadata["symbol"] == "AAPL"
+    assert document.metadata["mktCap"] == 3_000_000
+    assert "consumer technology" in (document.raw_text or "")
+
+
+def test_fmp_client_searches_mna_records_and_audits_redacted_key(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url).startswith("https://financialmodelingprep.com/stable/mergers-acquisitions-search")
+        assert request.url.params["name"] == "Apple"
+        assert request.url.params["limit"] == "5"
+        assert request.url.params["page"] == "0"
+        assert request.url.params["apikey"] == "fmp-test-key"
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "transactionId": "deal-1",
+                    "acquiringCompanyName": "Apple Inc.",
+                    "acquiredCompanyName": "Fixture Labs",
+                    "transactionDate": "2026-02-01",
+                    "filingUrl": "https://www.sec.gov/Archives/fixture",
+                }
+            ],
+        )
+
+    settings = settings_for_tests(tmp_path, fmp_api_key="fmp-test-key")
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
+
+    with session_factory() as session:
+        client = FinancialModelingPrepClient(
+            settings,
+            http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+            request_recorder=DataSourceAuditLog(session),
+        )
+        documents = client.search_mergers_acquisitions(
+            "Apple",
+            ttl_hours=24,
+            source_strength=SourceStrength.B,
+            source_dimension="buyer_long_list_recall.transaction_signal",
+            limit=5,
+        )
+
+        request_record = session.execute(select(DataSourceRequestRecord)).scalar_one()
+        raw_record = session.execute(select(DataSourceRawRecordRecord)).scalar_one()
+
+    assert len(documents) == 1
+    assert documents[0].source_id == "fmp"
+    assert documents[0].source_type == SourceType.transaction_signal
+    assert documents[0].source_dimension == "buyer_long_list_recall.transaction_signal"
+    assert documents[0].metadata["record_role"] == "mergers_acquisitions_result"
+    assert "Apple Inc. acquired Fixture Labs" in (documents[0].raw_text or "")
+    assert request_record.source_id == "fmp"
+    assert request_record.provider == "financialmodelingprep.com"
+    assert request_record.operation == "mergers_acquisitions_search"
+    assert json.loads(request_record.request_params_json)["apikey"] == "<redacted>"
+    assert raw_record.source_type == SourceType.transaction_signal.value
+    assert raw_record.source_dimension == "buyer_long_list_recall.transaction_signal"
+    assert json.loads(raw_record.raw_payload_json)["transactionId"] == "deal-1"
 
 
 def test_newsapi_client_returns_article_documents(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:

@@ -118,6 +118,69 @@ sources:
           - homepage_url
         rationale: Descriptions and SIC codes can seed adjacency, but they are too coarse for final fit claims.
 
+  fmp:
+    provider: financialmodelingprep.com
+    enabled: true
+    required: false
+    api_key_env: BUG_FMP_API_KEY
+    cache_ttl_hours: 24
+    dimensions:
+      seller_profile.identity_resolution:
+        source_strength: B
+        field_coverage:
+          - identity
+          - cik
+          - ticker
+          - exchange
+        rationale: FMP search endpoints can provide supplemental public-company identity matches, but SEC remains the canonical resolver.
+
+      seller_profile.exchange_profile:
+        source_strength: B
+        field_coverage:
+          - symbol
+          - exchange
+          - price
+          - beta
+          - industry
+          - sector
+        rationale: FMP company profile data is useful for public-market metadata enrichment and cross-checking.
+
+      seller_profile.size_metrics:
+        source_strength: B
+        field_coverage:
+          - market_cap
+          - price
+          - shares_outstanding
+        rationale: FMP profile and market-data endpoints can supplement downstream financial-capacity screening.
+
+      seller_profile.business_description:
+        source_strength: C
+        field_coverage:
+          - company_description
+          - industry
+          - sector
+          - website
+        rationale: Vendor company descriptions can seed extraction but should be cross-checked against primary disclosures.
+
+      buyer_long_list_recall.public_company_screening:
+        source_strength: B
+        field_coverage:
+          - public_company_universe
+          - market_cap
+          - sector
+          - industry
+          - exchange
+        rationale: FMP screens and company profiles can broaden listed-buyer recall when SEC or Polygon coverage is thin.
+
+      buyer_long_list_recall.transaction_signal:
+        source_strength: B
+        field_coverage:
+          - acquiring_company
+          - target_company
+          - transaction_date
+          - filing_links
+        rationale: FMP structured M&A endpoints can supplement EDGAR and news transaction discovery, with final evidence validation deferred.
+
   company_pages:
     provider: official_investor_relations_pages
     enabled: true
@@ -282,6 +345,8 @@ use_cases:
       dimension: seller_profile.identity_resolution
     - source_id: polygon
       dimension: seller_profile.exchange_profile
+    - source_id: fmp
+      dimension: seller_profile.identity_resolution
 
   sec_filings:
     - source_id: edgar
@@ -290,6 +355,8 @@ use_cases:
   exchange_profile:
     - source_id: polygon
       dimension: seller_profile.exchange_profile
+    - source_id: fmp
+      dimension: seller_profile.exchange_profile
 
   seller_profile_business_description:
     - source_id: edgar
@@ -297,6 +364,8 @@ use_cases:
     - source_id: company_pages
       dimension: seller_profile.business_description
     - source_id: polygon
+      dimension: seller_profile.business_description
+    - source_id: fmp
       dimension: seller_profile.business_description
 
   seller_profile_company_strategy:
@@ -320,6 +389,8 @@ use_cases:
       dimension: buyer_long_list_recall.public_company_peer_discovery
     - source_id: polygon
       dimension: buyer_long_list_recall.public_company_screening
+    - source_id: fmp
+      dimension: buyer_long_list_recall.public_company_screening
 
   buyer_recall_strategic_signals:
     - source_id: polygon
@@ -331,6 +402,8 @@ use_cases:
 
   buyer_recall_transaction_signals:
     - source_id: edgar
+      dimension: buyer_long_list_recall.transaction_signal
+    - source_id: fmp
       dimension: buyer_long_list_recall.transaction_signal
     - source_id: newsapi
       dimension: buyer_long_list_recall.transaction_news
