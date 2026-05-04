@@ -220,12 +220,39 @@ class DataSourceUseCaseConfig(StrictBaseModel):
     dimension: str = Field(min_length=1)
 
 
+class DataSourceRetrieverConfig(StrictBaseModel):
+    """Retriever-level strategy that binds a recall path to configured source policies."""
+
+    use_case: str = Field(min_length=1)
+    source_roles: dict[str, str] = Field(default_factory=dict)
+    source_priority: list[str] = Field(default_factory=list)
+    max_candidates: int | None = Field(default=None, ge=1)
+    max_documents: int | None = Field(default=None, ge=1)
+    lookback_years: int | None = Field(default=None, ge=1)
+    max_queries: int | None = Field(default=None, ge=1)
+    page_size: int | None = Field(default=None, ge=1)
+    edgar_form_type: str | None = None
+    eligible_sector_matches: list[str] = Field(default_factory=list)
+    transaction_terms: list[str] = Field(default_factory=list)
+
+    @field_validator("source_roles")
+    @classmethod
+    def normalize_source_roles(cls, value: dict[str, str]) -> dict[str, str]:
+        return {role.strip(): source_id.strip() for role, source_id in value.items() if role.strip() and source_id.strip()}
+
+    @field_validator("source_priority", "eligible_sector_matches", "transaction_terms")
+    @classmethod
+    def normalize_text_list(cls, value: list[str]) -> list[str]:
+        return [item.strip() for item in value if item.strip()]
+
+
 class DataSourcePolicy(StrictBaseModel):
     """Validated data-source selection policy loaded from YAML."""
 
     version: int = 1
     sources: dict[str, DataSourceConfig]
     use_cases: dict[str, list[DataSourceUseCaseConfig]]
+    retrievers: dict[str, DataSourceRetrieverConfig] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_use_case_references(self) -> "DataSourcePolicy":
@@ -238,6 +265,19 @@ class DataSourcePolicy(StrictBaseModel):
                     raise ValueError(
                         f"use case {use_case} references unknown dimension "
                         f"{selection.source_id}.{selection.dimension}"
+                    )
+        for retriever_name, retriever in self.retrievers.items():
+            selections = self.use_cases.get(retriever.use_case)
+            if selections is None:
+                raise ValueError(f"retriever {retriever_name} references unknown use case {retriever.use_case}")
+            use_case_source_ids = {selection.source_id for selection in selections}
+            configured_source_ids = [*retriever.source_roles.values(), *retriever.source_priority]
+            for source_id in configured_source_ids:
+                if source_id not in self.sources:
+                    raise ValueError(f"retriever {retriever_name} references unknown source {source_id}")
+                if source_id not in use_case_source_ids:
+                    raise ValueError(
+                        f"retriever {retriever_name} source {source_id} is not selected by use case {retriever.use_case}"
                     )
         return self
 
@@ -300,6 +340,9 @@ class CandidateHit(StrictBaseModel):
     """Raw buyer candidate emitted by one retriever before dedupe and filtering."""
 
     candidate_name: str = Field(min_length=1)
+    candidate_ticker: str | None = None
+    candidate_cik: str | None = None
+    candidate_domain: str | None = None
     buyer_type: BuyerType
     retriever_name: str = Field(min_length=1)
     source_path: list[str] = Field(default_factory=list)
@@ -307,6 +350,7 @@ class CandidateHit(StrictBaseModel):
     evidence: list[Evidence] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     pending_verification: bool = False
+    retrieval_metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def require_evidence_or_pending_status(self) -> "CandidateHit":
@@ -314,6 +358,35 @@ class CandidateHit(StrictBaseModel):
         if not self.evidence and not self.pending_verification:
             raise ValueError("CandidateHit requires evidence or pending_verification=True")
         return self
+
+
+class DealEvent(StrictBaseModel):
+    """Structured transaction signal used by M&A-history retrieval."""
+
+    buyer: str = Field(min_length=1)
+    target_acquired: str | None = None
+    deal_date: str | None = None
+    deal_type: str | None = None
+    sector_match: str = Field(pattern="^(same|adjacent|unrelated)$")
+    source_type: str = Field(min_length=1)
+    url: str | None = None
+    filing_accession: str | None = None
+    quote_or_snippet: str | None = None
+
+    @model_validator(mode="after")
+    def require_traceable_source(self) -> "DealEvent":
+        # Transaction events must point back to the public article or filing that created the signal.
+        if not self.url and not self.filing_accession:
+            raise ValueError("DealEvent requires either url or filing_accession")
+        return self
+
+
+class StrategicRetrievalResult(StrictBaseModel):
+    """Raw Phase 4 strategic retrieval output before normalization and hard filters."""
+
+    hits: list[CandidateHit] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class LongListCandidate(StrictBaseModel):

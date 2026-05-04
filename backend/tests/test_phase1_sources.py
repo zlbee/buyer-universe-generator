@@ -92,6 +92,26 @@ def test_data_source_policy_scopes_strength_by_dimension(tmp_path: Path) -> None
     assert sponsor_source.source_strength == SourceStrength.C
 
 
+def test_data_source_policy_configures_strategic_retriever_strategy(tmp_path: Path) -> None:
+    strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path))
+
+    same_sic_policy = strategy.retriever_config("SameSicRetriever")
+    ma_policy = strategy.retriever_config("MAHistoryRetriever")
+
+    assert same_sic_policy is not None
+    assert ma_policy is not None
+    assert same_sic_policy.use_case == "buyer_recall_strategic_public_companies"
+    assert same_sic_policy.source_roles["public_company_metadata"] == "edgar"
+    assert same_sic_policy.max_candidates == 150
+    assert ma_policy.use_case == "buyer_recall_transaction_signals"
+    assert ma_policy.source_roles["primary_filing_source"] == "edgar"
+    assert ma_policy.source_roles["supplemental_news_source"] == "newsapi"
+    assert ma_policy.source_priority == ["edgar", "newsapi"]
+    assert ma_policy.lookback_years == 5
+    assert ma_policy.edgar_form_type == "8-K"
+    assert ma_policy.eligible_sector_matches == ["same", "adjacent"]
+
+
 def test_sec_client_resolves_mapping_and_recent_filings(tmp_path: Path) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if str(request.url).endswith("company_tickers_exchange.json"):

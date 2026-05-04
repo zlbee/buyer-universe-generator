@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import re
+import logging
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -19,7 +21,10 @@ from src.domain import (
     SourceStrength,
     SourceType,
 )
-from src.sources.base import DataSourceRequestContext, DataSourceRequestRecorder, ExternalDataSourceClient
+from src.sources.base import DataSourceRequestContext, DataSourceRequestRecorder, ExternalDataSourceClient, source_document_from_raw_record
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -67,6 +72,7 @@ class SecEdgarClient(ExternalDataSourceClient):
     """Reads SEC company mapping and submissions metadata for US-listed targets."""
 
     company_tickers_exchange_url = "https://www.sec.gov/files/company_tickers_exchange.json"
+    browse_edgar_url = "https://www.sec.gov/cgi-bin/browse-edgar"
     submissions_url_template = "https://data.sec.gov/submissions/CIK{cik}.json"
 
     def __init__(
@@ -408,6 +414,276 @@ class SecEdgarClient(ExternalDataSourceClient):
             expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours) if ttl_hours else None,
         )
 
+    def list_public_company_profiles_by_sic(
+        self,
+        sic: str,
+        limit: int,
+        ttl_hours: int,
+        source_strength: SourceStrength = SourceStrength.B,
+        source_dimension: str | None = None,
+    ) -> list[SourceDocument]:
+        """Return public-company metadata rows whose SEC SIC matches the requested code.
+
+        SEC's lightweight ticker exchange mapping does not always include SIC.
+        When a configured provider or fixture supplies SIC in the mapping payload,
+        this method exposes those rows as traceable source documents for Phase 4.
+        """
+
+        normalized_sic = _normalize_sic(sic)
+        if not normalized_sic:
+            logger.info("SEC same-SIC public-company lookup skipped: empty SIC input value=%s", sic)
+            return []
+
+        logger.info(
+            "SEC same-SIC public-company lookup started: sic=%s limit=%s dimension=%s",
+            normalized_sic,
+            limit,
+            source_dimension,
+        )
+        mapping_rows = self._load_company_mapping()
+        mapping_by_cik = _company_mapping_by_cik(mapping_rows)
+        documents: list[SourceDocument] = []
+        for row in mapping_rows:
+            candidate_sic = _normalize_sic(row.get("sic") or row.get("sic_code") or row.get("SIC"))
+            if candidate_sic != normalized_sic:
+                continue
+            metadata = {
+                "canonical_name": row.get("name") or row.get("company"),
+                "ticker": row.get("ticker"),
+                "cik": str(row.get("cik")).zfill(10) if row.get("cik") else None,
+                "exchange": row.get("exchange"),
+                "sic": candidate_sic,
+                "provider_method": "sec_company_mapping_by_sic",
+            }
+            documents.append(
+                SourceDocument(
+                    source_id="edgar",
+                    source_dimension=source_dimension,
+                    source_type=SourceType.sec_company_mapping,
+                    source_strength=source_strength,
+                    target_cik=metadata["cik"],
+                    target_ticker=str(metadata["ticker"]) if metadata.get("ticker") else None,
+                    url=self.company_tickers_exchange_url,
+                    metadata={key: value for key, value in metadata.items() if value is not None},
+                    retrieved_at=datetime.now(UTC),
+                    expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours) if ttl_hours else None,
+                )
+            )
+            if len(documents) >= limit:
+                break
+
+        mapping_document_count = len(documents)
+        logger.info(
+            "SEC same-SIC mapping scan completed: sic=%s matched_documents=%s limit=%s",
+            normalized_sic,
+            mapping_document_count,
+            limit,
+        )
+        if len(documents) < limit:
+            browse_documents = self._fetch_browse_edgar_companies_by_sic(
+                normalized_sic,
+                limit=limit - len(documents),
+                ttl_hours=ttl_hours,
+                source_strength=source_strength,
+                source_dimension=source_dimension,
+            )
+            browse_documents = _enrich_company_profile_documents_from_mapping(browse_documents, mapping_by_cik)
+            browse_documents = self._enrich_company_profile_documents_from_submissions(browse_documents, source_dimension)
+            documents.extend(browse_documents)
+            logger.info(
+                "SEC same-SIC browse-edgar fallback completed: sic=%s browse_documents=%s total_documents=%s",
+                normalized_sic,
+                len(browse_documents),
+                len(documents),
+            )
+
+        logger.info(
+            "SEC same-SIC public-company lookup completed: sic=%s total_documents=%s mapping_documents=%s",
+            normalized_sic,
+            len(documents),
+            mapping_document_count,
+        )
+        return documents
+
+    def fetch_transaction_signal_documents(
+        self,
+        target_profile: Any,
+        since: date,
+        ttl_hours: int,
+        form_type: str,
+        limit: int,
+        source_strength: SourceStrength = SourceStrength.C,
+        source_dimension: str | None = None,
+    ) -> list[SourceDocument]:
+        """Return same-industry SEC 8-K filings for acquisition-history recall.
+
+        Phase 4 treats EDGAR 8-K filings as the primary M&A-history source. The caller still decides whether this
+        source is enabled through datasources.yaml; this method only performs the configured EDGAR retrieval path.
+        """
+
+        target_sic = _normalize_sic(getattr(target_profile, "sic", None))
+        if not target_sic:
+            return []
+
+        params = {
+            "action": "getcompany",
+            "SIC": target_sic,
+            "type": form_type,
+            "dateb": datetime.now(UTC).date().isoformat(),
+            "owner": "exclude",
+            "count": min(limit, 100),
+            "output": "atom",
+        }
+        _text, raw_records = self._get_text(
+            operation="browse_edgar_8k_transaction_signals_by_sic",
+            url=self.browse_edgar_url,
+            params=params,
+            headers={"User-Agent": self.settings.sec_user_agent},
+            source_dimension=source_dimension,
+            raw_records_from_text=_browse_8k_transaction_raw_records_from_text,
+        )
+
+        documents: list[SourceDocument] = []
+        for raw_record in raw_records:
+            filing_date = _date_from_text(raw_record.published_at or raw_record.raw_payload.get("filing_date"))
+            if filing_date and filing_date < since:
+                continue
+            documents.append(
+                source_document_from_raw_record(
+                    raw_record,
+                    source_strength=source_strength,
+                    ttl_hours=ttl_hours,
+                )
+            )
+            if len(documents) >= limit:
+                break
+        return documents
+
+    def _fetch_browse_edgar_companies_by_sic(
+        self,
+        sic: str,
+        limit: int,
+        ttl_hours: int,
+        source_strength: SourceStrength,
+        source_dimension: str | None,
+    ) -> list[SourceDocument]:
+        params = {
+            "action": "getcompany",
+            "SIC": sic,
+            "owner": "exclude",
+            "count": min(limit, 100),
+            "output": "atom",
+        }
+        logger.info(
+            "SEC browse-edgar same-SIC request: sic=%s limit=%s count=%s dimension=%s",
+            sic,
+            limit,
+            params["count"],
+            source_dimension,
+        )
+        _text, raw_records = self._get_text(
+            operation="browse_edgar_by_sic",
+            url=self.browse_edgar_url,
+            params=params,
+            headers={"User-Agent": self.settings.sec_user_agent},
+            source_dimension=source_dimension,
+            raw_records_from_text=_browse_sic_raw_records_from_text,
+        )
+        logger.info(
+            "SEC browse-edgar same-SIC response parsed: sic=%s raw_records=%s returned_documents=%s",
+            sic,
+            len(raw_records),
+            len([raw_record for raw_record in raw_records[:limit] if raw_record.url]),
+        )
+        return [
+            source_document_from_raw_record(
+                raw_record,
+                source_strength=source_strength,
+                ttl_hours=ttl_hours,
+            )
+            for raw_record in raw_records[:limit]
+            if raw_record.url
+        ]
+
+    def _enrich_company_profile_documents_from_submissions(
+        self,
+        documents: list[SourceDocument],
+        source_dimension: str | None,
+    ) -> list[SourceDocument]:
+        enriched_documents: list[SourceDocument] = []
+        enriched_count = 0
+        failed_count = 0
+        for document in documents:
+            if document.metadata.get("canonical_name"):
+                enriched_documents.append(document)
+                continue
+
+            cik = _normalize_cik(document.metadata.get("cik") or document.target_cik)
+            if not cik:
+                enriched_documents.append(document)
+                continue
+
+            try:
+                profile_metadata = self._fetch_company_profile_from_submissions(cik, source_dimension)
+            except Exception as error:
+                failed_count += 1
+                logger.warning("SEC submissions same-SIC enrichment failed: cik=%s error=%s", cik, error)
+                enriched_documents.append(document)
+                continue
+
+            if not profile_metadata.get("canonical_name"):
+                enriched_documents.append(document)
+                continue
+
+            metadata = {
+                **document.metadata,
+                **profile_metadata,
+                "provider_method": "sec_browse_edgar_by_sic_enriched_with_submissions",
+            }
+            enriched_count += 1
+            enriched_documents.append(
+                document.model_copy(
+                    update={
+                        "target_ticker": profile_metadata.get("ticker") or document.target_ticker,
+                        "metadata": {key: value for key, value in metadata.items() if value is not None},
+                    }
+                )
+            )
+
+        if documents:
+            logger.info(
+                "SEC same-SIC submissions enrichment completed: documents=%s enriched=%s failed=%s",
+                len(documents),
+                enriched_count,
+                failed_count,
+            )
+        return enriched_documents
+
+    def _fetch_company_profile_from_submissions(self, cik: str, source_dimension: str | None) -> dict[str, Any]:
+        normalized_cik = _normalize_cik(cik)
+        if not normalized_cik:
+            return {}
+
+        target = ResolvedTarget(
+            canonical_name=f"CIK {normalized_cik}",
+            ticker=normalized_cik,
+            cik=normalized_cik,
+            resolution_confidence=0.0,
+            matched_input=normalized_cik,
+            source_provenance=["edgar:submissions_company_profile"],
+        )
+        payload = self._fetch_submissions(target)
+        ticker = _first_or_none([str(value) for value in _json_safe_list(payload.get("tickers")) if value])
+        exchange = _first_or_none([str(value) for value in _json_safe_list(payload.get("exchanges")) if value])
+        return {
+            "canonical_name": payload.get("name"),
+            "ticker": ticker,
+            "exchange": exchange,
+            "cik": _normalize_cik(payload.get("cik") or normalized_cik),
+            "sic": _normalize_sic(payload.get("sic")),
+            "sic_description": payload.get("sicDescription"),
+        }
+
     def _fetch_filing_text_with_edgartools(
         self,
         target: ResolvedTarget,
@@ -595,6 +871,7 @@ class SecEdgarClient(ExternalDataSourceClient):
             ticker=row["ticker"],
             cik=str(row["cik"]).zfill(10),
             exchange=row.get("exchange"),
+            sic=_normalize_sic(row.get("sic") or row.get("sic_code") or row.get("SIC")),
             resolution_confidence=confidence,
             matched_input=matched_input,
             source_provenance=["edgar:company_tickers_exchange"],
@@ -681,6 +958,154 @@ def _company_mapping_raw_records_from_payload(
                 url=context.url,
                 raw_payload=raw_payload,
                 metadata={"record_role": "company_mapping", "record_index": index},
+                retrieved_at=retrieved_at,
+            )
+        )
+    return raw_records
+
+
+def _company_mapping_by_cik(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    mapping: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        cik = str(row.get("cik")).zfill(10) if row.get("cik") else None
+        if cik:
+            mapping[cik] = row
+    return mapping
+
+
+def _enrich_company_profile_documents_from_mapping(
+    documents: list[SourceDocument],
+    mapping_by_cik: dict[str, dict[str, Any]],
+) -> list[SourceDocument]:
+    enriched_documents: list[SourceDocument] = []
+    for document in documents:
+        cik = _normalize_cik(document.metadata.get("cik") or document.target_cik)
+        mapping_row = mapping_by_cik.get(cik or "")
+        if not mapping_row:
+            enriched_documents.append(document)
+            continue
+
+        # SEC browse-edgar's SIC Atom feed often provides only CIK/SIC; company_tickers_exchange fills the
+        # public-company name, ticker, and exchange needed by candidate construction while preserving SIC evidence.
+        metadata = {
+            **document.metadata,
+            "canonical_name": mapping_row.get("name") or document.metadata.get("canonical_name"),
+            "ticker": mapping_row.get("ticker") or document.metadata.get("ticker"),
+            "exchange": mapping_row.get("exchange") or document.metadata.get("exchange"),
+            "cik": cik,
+            "provider_method": "sec_browse_edgar_by_sic_enriched_with_company_mapping",
+        }
+        enriched_documents.append(
+            document.model_copy(
+                update={
+                    "target_ticker": str(mapping_row.get("ticker")) if mapping_row.get("ticker") else document.target_ticker,
+                    "metadata": {key: value for key, value in metadata.items() if value is not None},
+                }
+            )
+        )
+    return enriched_documents
+
+
+def _browse_sic_raw_records_from_text(
+    text: str,
+    context: DataSourceRequestContext,
+    retrieved_at: datetime,
+    _response: httpx.Response,
+) -> list[DataSourceRawRecord]:
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return []
+
+    namespace = {"atom": "http://www.w3.org/2005/Atom"}
+    raw_records: list[DataSourceRawRecord] = []
+    sic = _normalize_sic(context.request_params.get("SIC"))
+    for index, entry in enumerate(root.findall(".//atom:entry", namespace), start=1):
+        title = _xml_text(entry, "atom:title", namespace)
+        summary = _xml_text(entry, "atom:summary", namespace)
+        link = entry.find("atom:link", namespace)
+        link_url = link.attrib.get("href") if link is not None else context.url
+        cik = _cik_from_text(" ".join(value for value in (title, summary, link_url) if value))
+        company_name = _company_name_from_browse_title(title) or title
+        raw_payload = {
+            "canonical_name": company_name,
+            "cik": cik,
+            "sic": sic,
+            "title": title,
+            "summary": summary,
+            "provider_method": "sec_browse_edgar_by_sic",
+        }
+        raw_records.append(
+            DataSourceRawRecord(
+                request_id=context.request_id,
+                source_id=context.source_id,
+                provider=context.provider,
+                source_dimension=context.source_dimension,
+                source_type=SourceType.sec_company_mapping,
+                target_cik=cik,
+                record_id=str(cik or title or index),
+                url=link_url,
+                raw_payload={key: value for key, value in raw_payload.items() if value is not None},
+                metadata={"record_role": "browse_edgar_sic_result", "record_index": index},
+                retrieved_at=retrieved_at,
+            )
+        )
+    return raw_records
+
+
+def _browse_8k_transaction_raw_records_from_text(
+    text: str,
+    context: DataSourceRequestContext,
+    retrieved_at: datetime,
+    _response: httpx.Response,
+) -> list[DataSourceRawRecord]:
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return []
+
+    namespace = {"atom": "http://www.w3.org/2005/Atom"}
+    raw_records: list[DataSourceRawRecord] = []
+    sic = _normalize_sic(context.request_params.get("SIC"))
+    form_type = str(context.request_params.get("type") or "8-K")
+    for index, entry in enumerate(root.findall(".//atom:entry", namespace), start=1):
+        title = _xml_text(entry, "atom:title", namespace)
+        summary = _xml_text(entry, "atom:summary", namespace)
+        updated = _xml_text(entry, "atom:updated", namespace)
+        link = entry.find("atom:link", namespace)
+        link_url = link.attrib.get("href") if link is not None else context.url
+        accession = _accession_from_text(" ".join(value for value in (link_url, title, summary) if value))
+        cik = _cik_from_text(" ".join(value for value in (title, summary, link_url) if value))
+        company_name = _company_name_from_8k_title(title)
+        raw_payload = {
+            "canonical_name": company_name,
+            "cik": cik,
+            "sic": sic,
+            "form": form_type,
+            "filing_date": _date_string(updated),
+            "publishedAt": _date_string(updated),
+            "title": title,
+            "summary": summary,
+            "provider_method": f"sec_browse_edgar_same_sic_{_source_token(form_type)}",
+            "industry_match_basis": "same_sic",
+        }
+        raw_text = " ".join(value for value in (title, summary) if value)
+        raw_records.append(
+            DataSourceRawRecord(
+                request_id=context.request_id,
+                source_id=context.source_id,
+                provider=context.provider,
+                source_dimension=context.source_dimension,
+                source_type=SourceType.sec_filing,
+                target_cik=cik,
+                record_id=str(accession or cik or title or index),
+                url=link_url,
+                filing_accession=accession,
+                title=title,
+                published_at=_date_string(updated),
+                raw_payload={key: value for key, value in raw_payload.items() if value is not None},
+                raw_text=raw_text or None,
+                metadata={"record_role": "same_sic_8k_transaction_signal", "record_index": index},
                 retrieved_at=retrieved_at,
             )
         )
@@ -1042,6 +1467,92 @@ def _json_safe_list(value: Any) -> list[Any]:
 
 def _normalize_name(value: str) -> str:
     return " ".join(value.lower().replace(",", " ").replace(".", " ").split())
+
+
+def _xml_text(element: ET.Element, path: str, namespace: dict[str, str]) -> str | None:
+    child = element.find(path, namespace)
+    if child is None or child.text is None:
+        return None
+    text = child.text.strip()
+    return text or None
+
+
+def _cik_from_text(value: str) -> str | None:
+    match = re.search(r"\bCIK(?:[:=#\s]+)(?P<cik>\d{1,10})\b", value, flags=re.IGNORECASE)
+    if not match:
+        match = re.search(r"\bCIK(?P<cik>\d{1,10})\b", value, flags=re.IGNORECASE)
+    return match.group("cik").zfill(10) if match else None
+
+
+def _normalize_cik(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    return text.zfill(10) if text.isdigit() else text
+
+
+def _accession_from_text(value: str) -> str | None:
+    match = re.search(r"\b(?P<accession>\d{10}-\d{2}-\d{6})\b", value)
+    return match.group("accession") if match else None
+
+
+def _company_name_from_browse_title(value: str | None) -> str | None:
+    if not value:
+        return None
+    text = re.sub(r"\s+", " ", value).strip()
+    text = re.sub(r"\s*\(CIK[:=#\s]*\d{1,10}\).*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*CIK[:=#\s]*\d{1,10}.*", "", text, flags=re.IGNORECASE)
+    return text.strip(" -|,") or None
+
+
+def _company_name_from_8k_title(value: str | None) -> str | None:
+    if not value:
+        return None
+    text = _company_name_from_browse_title(value) or value
+    text = re.sub(r"^\s*8-K(?:/A)?\s*[-:]\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*\((?:Filer|Subject|Filed by|Reporting)\).*", "", text, flags=re.IGNORECASE)
+    return text.strip(" -|,") or None
+
+
+def _source_token(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.casefold()) or "filing"
+
+
+def _date_string(value: Any) -> str | None:
+    parsed = _date_from_text(value)
+    return parsed.isoformat() if parsed else None
+
+
+def _date_from_text(value: Any) -> date | None:
+    if not value:
+        return None
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, datetime):
+        return value.astimezone(UTC).date() if value.tzinfo else value.date()
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
+    except ValueError:
+        pass
+    try:
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        return None
+
+
+def _normalize_sic(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    digits = re.sub(r"\D", "", text)
+    return digits or text
 
 
 def _safe_index(values: list[Any], index: int) -> Any:

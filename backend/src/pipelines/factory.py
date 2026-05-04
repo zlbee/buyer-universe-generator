@@ -13,6 +13,16 @@ from src.repositories.data_source_audit_log import DataSourceAuditLog
 from src.repositories.llm_interaction_log import LLMInteractionLog
 from src.repositories.source_cache import SourceCache
 from src.repositories.target_profile_cache import TargetProfileCache
+from src.retrievers import (
+    AdjacentIndustryRetriever,
+    BusinessSimilarityRetriever,
+    BuyerCandidateRetriever,
+    MAHistoryRetriever,
+    PeerCompanyRetriever,
+    ProductCustomerChannelRetriever,
+    SameSicRetriever,
+    SupplyChainRetriever,
+)
 from src.sources.investor_relations import InvestorRelationsPageDiscovery
 from src.sources.registry import SourceRegistry
 from src.sources.strategy import DataSourceStrategy
@@ -69,4 +79,28 @@ def build_target_profile_extractor(
         edgar_client=edgar_client,
         llm_client=provider,
         ir_page_discovery=ir_page_discovery,
+    )
+
+
+def build_strategic_buyer_candidate_retriever(settings: Settings, session: Session) -> BuyerCandidateRetriever:
+    """Build the Phase 4 strategic first-pass retriever fan-out."""
+
+    strategy = DataSourceStrategy.from_settings(settings)
+    request_recorder = DataSourceAuditLog(session)
+    registry = SourceRegistry(settings, strategy=strategy, request_recorder=request_recorder)
+    edgar_client = registry.edgar()
+    return BuyerCandidateRetriever(
+        [
+            SameSicRetriever(strategy, edgar_client),
+            AdjacentIndustryRetriever(strategy),
+            BusinessSimilarityRetriever(strategy),
+            ProductCustomerChannelRetriever(strategy),
+            PeerCompanyRetriever(strategy),
+            MAHistoryRetriever(
+                strategy,
+                newsapi_client=registry.newsapi(),
+                edgar_client=edgar_client,
+            ),
+            SupplyChainRetriever(strategy),
+        ]
     )

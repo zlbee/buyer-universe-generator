@@ -84,6 +84,57 @@ class NewsApiClient(ExternalDataSourceClient):
             if raw_record.url
         ]
 
+    def fetch_articles_for_query(
+        self,
+        query: str,
+        target: ResolvedTarget,
+        ttl_hours: int,
+        page_size: int = 10,
+        source_strength: SourceStrength = SourceStrength.B,
+        source_dimension: str | None = None,
+        domains: Sequence[str] | None = None,
+        from_date: str | None = None,
+    ) -> list[SourceDocument]:
+        """Run a configured NewsAPI Everything query for transaction-signal retrieval."""
+
+        params: dict[str, Any] = {
+            "q": query,
+            "language": "en",
+            "sortBy": "publishedAt",
+            "pageSize": page_size,
+            "apiKey": self.settings.news_api_key,
+        }
+        if from_date:
+            params["from"] = from_date
+        if domains:
+            params["domains"] = ",".join(domains)
+
+        _log_info("NewsAPI request: url=%s params=%s", self.everything_url, _redacted_params(params))
+        payload, raw_records = self._get_json(
+            operation="everything_query",
+            url=self.everything_url,
+            params=params,
+            target=target,
+            source_dimension=source_dimension,
+            raw_records_from_payload=_newsapi_raw_records_from_payload,
+        )
+        _log_info(
+            "NewsAPI response: status=%s total_results=%s article_count=%s",
+            payload.get("status"),
+            payload.get("totalResults"),
+            len(payload.get("articles", [])),
+        )
+
+        return [
+            source_document_from_raw_record(
+                raw_record,
+                source_strength=source_strength,
+                ttl_hours=ttl_hours,
+            )
+            for raw_record in raw_records
+            if raw_record.url
+        ]
+
 
 def _log_info(message: str, *args: Any) -> None:
     """Emit NewsAPI diagnostics through the shared application logging setup."""

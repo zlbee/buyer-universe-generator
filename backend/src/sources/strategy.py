@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 
 from src.config import Settings
-from src.domain import DataSourceConfig, DataSourceDimensionConfig, DataSourcePolicy, SourceStrength
+from src.domain import DataSourceConfig, DataSourceDimensionConfig, DataSourcePolicy, DataSourceRetrieverConfig, SourceStrength
 
 
 @dataclass(frozen=True)
@@ -72,6 +72,9 @@ class DataSourceStrategy:
             (source for source in self.select(use_case, include_disabled=include_disabled) if source.source_id == source_id),
             None,
         )
+
+    def retriever_config(self, retriever_name: str) -> DataSourceRetrieverConfig | None:
+        return self.policy.retrievers.get(retriever_name)
 
     def cache_ttl_hours(self, source_id: str) -> int:
         return self.policy.sources[source_id].cache_ttl_hours

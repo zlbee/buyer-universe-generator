@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 
 type HealthResponse = {
   status: string;
@@ -79,10 +79,38 @@ type TargetProfileExtractionResult = {
   extraction_metadata: Record<string, unknown>;
 };
 
+type CandidateHit = {
+  candidate_name: string;
+  candidate_ticker: string | null;
+  candidate_cik: string | null;
+  candidate_domain: string | null;
+  buyer_type: "strategic" | "financial";
+  retriever_name: string;
+  source_path: string[];
+  fit_reason: string;
+  evidence: Evidence[];
+  confidence: number;
+  pending_verification: boolean;
+  retrieval_metadata: Record<string, unknown>;
+};
+
+type StrategicCandidateRetrievalResult = {
+  target_profile: TargetProfile;
+  hits: CandidateHit[];
+  warnings: string[];
+  metadata: Record<string, unknown>;
+};
+
 type TargetProfileDebugState =
   | { status: "idle" }
   | { status: "loading"; query: string }
   | { status: "success"; query: string; data: TargetProfileExtractionResult }
+  | { status: "error"; query: string; message: string; errorCode?: string; candidates?: ResolvedTarget[] };
+
+type CandidateRetrievalState =
+  | { status: "idle" }
+  | { status: "loading"; query: string }
+  | { status: "success"; query: string; data: StrategicCandidateRetrievalResult }
   | { status: "error"; query: string; message: string; errorCode?: string; candidates?: ResolvedTarget[] };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -91,6 +119,7 @@ function App() {
   const [targetInput, setTargetInput] = useState("ELF");
   const [health, setHealth] = useState<HealthState>({ status: "checking" });
   const [debugState, setDebugState] = useState<TargetProfileDebugState>({ status: "idle" });
+  const [candidateState, setCandidateState] = useState<CandidateRetrievalState>({ status: "idle" });
 
   const trimmedTarget = useMemo(() => targetInput.trim(), [targetInput]);
 
@@ -137,7 +166,7 @@ function App() {
       const response = await fetch(`${API_BASE_URL}/targets/profile?query=${encodeURIComponent(trimmedTarget)}`);
 
       if (!response.ok) {
-        throw await readTargetProfileDebugError(response);
+        throw await readDebugError(response);
       }
 
       const data = (await response.json()) as TargetProfileExtractionResult;
@@ -162,6 +191,44 @@ function App() {
     }
   }
 
+  async function handleCandidateRetrieval(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!trimmedTarget || candidateState.status === "loading") {
+      return;
+    }
+
+    setCandidateState({ status: "loading", query: trimmedTarget });
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/buyers/strategic-candidates?query=${encodeURIComponent(trimmedTarget)}`);
+
+      if (!response.ok) {
+        throw await readDebugError(response);
+      }
+
+      const data = (await response.json()) as StrategicCandidateRetrievalResult;
+      setCandidateState({ status: "success", query: trimmedTarget, data });
+    } catch (error) {
+      if (isDebugError(error)) {
+        setCandidateState({
+          status: "error",
+          query: trimmedTarget,
+          message: error.message,
+          errorCode: error.errorCode,
+          candidates: error.candidates
+        });
+        return;
+      }
+
+      setCandidateState({
+        status: "error",
+        query: trimmedTarget,
+        message: error instanceof Error ? error.message : "Unknown candidate retrieval error"
+      });
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="workspace">
@@ -171,49 +238,74 @@ function App() {
             <h1>Buyer Universe Generator</h1>
           </div>
           <div className="topbar-actions">
-            <a className="debug-entry-link" href="#target-profile-debug">
-              TargetProfile Debug
+            <a className="debug-entry-link" href="#target-profile-card">
+              TargetProfile
+            </a>
+            <a className="debug-entry-link" href="#buyer-recall-card">
+              Buyer Recall
             </a>
             <BackendStatus health={health} />
           </div>
         </header>
 
-        <section className="control-panel" aria-labelledby="target-form-title">
-          <div className="panel-copy">
-            <h2 id="target-form-title">Start a buyer universe run</h2>
-            <p>
-              Enter a US-listed ticker or exact company name. The current debug path resolves
-              the target, fetches source text, runs required LLM extraction, and renders the
-              evidence-backed TargetProfile.
-            </p>
-          </div>
-
-          <form className="target-form" onSubmit={handleTargetProfileDebug}>
-            <label htmlFor="target-input">Target ticker or company name</label>
-            <div className="input-row">
-              <input
-                id="target-input"
-                name="target"
-                value={targetInput}
-                onChange={(event) => setTargetInput(event.target.value)}
-                placeholder="e.g. ELF or e.l.f. Beauty"
-                autoComplete="off"
-              />
-              <button type="submit" disabled={!trimmedTarget || debugState.status === "loading"}>
-                {debugState.status === "loading" ? "Building" : "Build Profile"}
-              </button>
-            </div>
-          </form>
-        </section>
-
         <section className="status-grid" aria-label="Implementation status">
           <StatusTile label="Target Feature Extractor" value="Phase 2 Ready" tone="ready" />
-          <StatusTile label="Buyer Candidate Retriever" value="Planned" tone="pending" />
+          <StatusTile label="Buyer Candidate Retriever" value="Phase 4 Ready" tone="ready" />
           <StatusTile label="Evidence Store" value="Profile Cache Ready" tone="ready" />
           <StatusTile label="API Health" value={health.status === "online" ? "Online" : "Checking"} tone="ready" />
         </section>
 
-        <TargetProfileDebugPanel state={debugState} />
+        <section className="page-card-grid" aria-label="Phase tools">
+          <PageCard
+            id="target-profile-card"
+            eyebrow="Phase 2"
+            title="TargetProfile Builder"
+            status={debugState.status}
+          >
+            <form className="target-form" onSubmit={handleTargetProfileDebug}>
+              <label htmlFor="target-input">Target ticker or company name</label>
+              <div className="input-row">
+                <input
+                  id="target-input"
+                  name="target"
+                  value={targetInput}
+                  onChange={(event) => setTargetInput(event.target.value)}
+                  placeholder="e.g. ELF or e.l.f. Beauty"
+                  autoComplete="off"
+                />
+                <button type="submit" disabled={!trimmedTarget || debugState.status === "loading"}>
+                  {debugState.status === "loading" ? "Building" : "Build Profile"}
+                </button>
+              </div>
+            </form>
+            <TargetProfileDebugPanel state={debugState} />
+          </PageCard>
+
+          <PageCard
+            id="buyer-recall-card"
+            eyebrow="Phase 4"
+            title="Potential Buyer Recaller"
+            status={candidateState.status}
+          >
+            <form className="target-form" onSubmit={handleCandidateRetrieval}>
+              <label htmlFor="buyer-target-input">Target ticker or company name</label>
+              <div className="input-row">
+                <input
+                  id="buyer-target-input"
+                  name="buyer-target"
+                  value={targetInput}
+                  onChange={(event) => setTargetInput(event.target.value)}
+                  placeholder="e.g. ELF or e.l.f. Beauty"
+                  autoComplete="off"
+                />
+                <button type="submit" disabled={!trimmedTarget || candidateState.status === "loading"}>
+                  {candidateState.status === "loading" ? "Recalling" : "Recall Buyers"}
+                </button>
+              </div>
+            </form>
+            <CandidateRetrievalPanel state={candidateState} />
+          </PageCard>
+        </section>
       </section>
     </main>
   );
@@ -248,6 +340,33 @@ function BackendStatus({ health }: { health: HealthState }) {
   );
 }
 
+function PageCard({
+  id,
+  eyebrow,
+  title,
+  status,
+  children
+}: {
+  id: string;
+  eyebrow: string;
+  title: string;
+  status: TargetProfileDebugState["status"] | CandidateRetrievalState["status"];
+  children: ReactNode;
+}) {
+  return (
+    <section className="page-card" id={id} aria-labelledby={`${id}-title`}>
+      <div className="page-card__header">
+        <div>
+          <p className="eyebrow">{eyebrow}</p>
+          <h2 id={`${id}-title`}>{title}</h2>
+        </div>
+        <span className={`debug-state debug-state--${status}`}>{status}</span>
+      </div>
+      <div className="page-card__body">{children}</div>
+    </section>
+  );
+}
+
 function StatusTile({
   label,
   value,
@@ -267,15 +386,7 @@ function StatusTile({
 
 function TargetProfileDebugPanel({ state }: { state: TargetProfileDebugState }) {
   return (
-    <section className="debug-panel" id="target-profile-debug" aria-labelledby="target-profile-debug-title">
-      <div className="debug-panel__header">
-        <div>
-          <p className="eyebrow">Debug</p>
-          <h2 id="target-profile-debug-title">TargetProfile builder</h2>
-        </div>
-        <span className={`debug-state debug-state--${state.status}`}>{state.status}</span>
-      </div>
-
+    <div className="debug-panel">
       {state.status === "idle" && <div className="debug-empty">Build a profile from the target input above.</div>}
 
       {state.status === "loading" && (
@@ -289,7 +400,27 @@ function TargetProfileDebugPanel({ state }: { state: TargetProfileDebugState }) 
       )}
 
       {state.status === "success" && <DebugResult state={state} />}
-    </section>
+    </div>
+  );
+}
+
+function CandidateRetrievalPanel({ state }: { state: CandidateRetrievalState }) {
+  return (
+    <div className="debug-panel">
+      {state.status === "idle" && <div className="debug-empty">Run strategic first-pass recall from the target input above.</div>}
+
+      {state.status === "loading" && (
+        <div className="debug-empty">
+          Building the target profile and running strategic candidate retrievers for {state.query}.
+        </div>
+      )}
+
+      {state.status === "error" && (
+        <DebugError message={state.message} errorCode={state.errorCode} candidates={state.candidates} />
+      )}
+
+      {state.status === "success" && <CandidateRetrievalResult state={state} />}
+    </div>
   );
 }
 
@@ -468,6 +599,85 @@ function DebugResult({
   );
 }
 
+function CandidateRetrievalResult({
+  state
+}: {
+  state: Extract<CandidateRetrievalState, { status: "success" }>;
+}) {
+  const { data } = state;
+  const profile = data.target_profile;
+
+  return (
+    <div className="debug-result">
+      {data.warnings.length > 0 && (
+        <div className="debug-warning-list" aria-label="Retrieval warnings">
+          {data.warnings.map((warning) => (
+            <span key={warning}>{warning}</span>
+          ))}
+        </div>
+      )}
+
+      <div className="debug-section">
+        <h3>Recall Summary</h3>
+        <dl className="debug-metrics">
+          <DebugMetric label="Target" value={profile.ticker} />
+          <DebugMetric label="SIC" value={profile.sic ?? "N/A"} />
+          <DebugMetric label="Raw Hits" value={String(data.hits.length)} />
+        </dl>
+      </div>
+
+      <div className="debug-section">
+        <h3>Candidate Hits</h3>
+        {data.hits.length === 0 ? (
+          <div className="debug-empty">No strategic candidate hits returned.</div>
+        ) : (
+          <div className="debug-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Candidate</th>
+                  <th>Retriever</th>
+                  <th>Path</th>
+                  <th>Confidence</th>
+                  <th>Evidence</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.hits.map((hit, index) => (
+                  <tr key={`${hit.candidate_name}-${hit.retriever_name}-${index}`}>
+                    <td>
+                      <strong>{hit.candidate_name}</strong>
+                      <span className="table-subtext">
+                        {[hit.candidate_ticker, hit.candidate_cik].filter(Boolean).join(" · ") || "No ticker/CIK"}
+                      </span>
+                    </td>
+                    <td>{hit.retriever_name}</td>
+                    <td>{hit.source_path.join(", ") || "N/A"}</td>
+                    <td>{formatConfidence(hit.confidence)}</td>
+                    <td>{hit.evidence.length}</td>
+                    <td>{hit.fit_reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <details className="debug-raw">
+        <summary>Retrieval metadata</summary>
+        <pre>{JSON.stringify(data.metadata, null, 2)}</pre>
+      </details>
+
+      <details className="debug-raw">
+        <summary>Raw API response</summary>
+        <pre>{JSON.stringify(data, null, 2)}</pre>
+      </details>
+    </div>
+  );
+}
+
 function DebugMetric({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -477,7 +687,11 @@ function DebugMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-async function readTargetProfileDebugError(
+function formatConfidence(value: number) {
+  return `${Math.round(value * 100)}%`;
+}
+
+async function readDebugError(
   response: Response
 ): Promise<Error & { candidates?: ResolvedTarget[]; errorCode?: string }> {
   try {
