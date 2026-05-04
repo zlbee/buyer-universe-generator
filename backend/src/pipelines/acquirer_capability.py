@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections import Counter
 from datetime import UTC, datetime
 import json
-from typing import Any
 
 from src.config import Settings
 from src.domain import (
+    AcquirerEntity,
     AcquirerCapabilityCandidate,
     AcquirerCapabilityUniverseResult,
     AcquirerCapacityRuleResult,
@@ -17,7 +17,12 @@ from src.domain import (
     Evidence,
     ResolvedTarget,
     SourceDocument,
-    SourceStrength,
+)
+from src.pipelines.acquirer_universe_sources import (
+    AcquirerUniverseSource,
+    SEC_METRICS_FINGERPRINT,
+    SecListedCompanyUniverseSource,
+    resolved_target_from_acquirer_entity,
 )
 from src.pipelines.target_resolution import TargetResolver
 from src.repositories.financial_metrics_cache import CompanyFinancialMetricsCache, find_metrics_by_query
@@ -25,9 +30,6 @@ from src.repositories.source_cache import SourceCache
 from src.sources.polygon import PolygonClient
 from src.sources.sec import SecEdgarClient, is_main_us_operating_company_name
 from src.sources.strategy import DataSourceStrategy, SelectedDataSource
-
-
-SEC_METRICS_FINGERPRINT = "sec-companyfacts-financial-metrics-v1"
 
 
 class AcquirerCapabilityError(RuntimeError):
@@ -52,6 +54,7 @@ class AcquirerCapabilityUniverseBuilder:
         metrics_cache: CompanyFinancialMetricsCache,
         edgar_client: SecEdgarClient,
         polygon_client: PolygonClient | None = None,
+        universe_sources: list[AcquirerUniverseSource] | None = None,
     ) -> None:
         self.settings = settings
         self.strategy = strategy
@@ -60,6 +63,7 @@ class AcquirerCapabilityUniverseBuilder:
         self.metrics_cache = metrics_cache
         self.edgar_client = edgar_client
         self.polygon_client = polygon_client
+        self.universe_sources = universe_sources
 
     def build_universe(self, query: str) -> AcquirerCapabilityUniverseResult:
         if self.settings.acquirer_cache_only_mode:
@@ -93,28 +97,51 @@ class AcquirerCapabilityUniverseBuilder:
         coverage: Counter[str] = Counter()
         candidates: list[AcquirerCapabilityCandidate] = []
 
-        seed_universe = self.edgar_client.fetch_public_company_universe()
-        bulk_sec_metrics = self._sec_metrics_bulk(seed_universe, edgar_source, warnings)
-        coverage["seed_companies"] = len(seed_universe)
-        for candidate_target in seed_universe:
-            if _same_company(candidate_target, target):
+        seed_entities: list[tuple[AcquirerUniverseSource, AcquirerEntity]] = []
+        bulk_metrics: dict[tuple[str, str], CompanyFinancialMetrics] = {}
+        for universe_source in self._active_universe_sources():
+            source_entities = universe_source.list_seed_entities()
+            coverage[f"{universe_source.source_id}_seed_companies"] += len(source_entities)
+            coverage["seed_companies"] += len(source_entities)
+            seed_entities.extend((universe_source, entity) for entity in source_entities)
+            fetched_metrics = universe_source.fetch_metrics_bulk(
+                source_entities,
+                source_strength=edgar_source.source_strength,
+                source_dimension=edgar_source.dimension_id,
+                warnings=warnings,
+            )
+            bulk_metrics.update(
+                {
+                    (universe_source.source_id, entity_id): metrics
+                    for entity_id, metrics in fetched_metrics.items()
+                }
+            )
+
+        for universe_source, candidate_entity in seed_entities:
+            if _same_entity_as_target(candidate_entity, target):
                 excluded_counts["target_self"] += 1
                 continue
-            if not _is_supported_exchange(candidate_target.exchange):
+            if not _is_supported_exchange(candidate_entity.exchange):
                 excluded_counts["unsupported_exchange"] += 1
                 continue
-            if not is_main_us_operating_company_name(candidate_target.canonical_name):
+            if not is_main_us_operating_company_name(candidate_entity.canonical_name):
                 excluded_counts["non_operating_security"] += 1
                 continue
 
             coverage["screened_companies"] += 1
             try:
-                metrics = bulk_sec_metrics.get(candidate_target.cik) or self._sec_metrics(candidate_target, edgar_source)
+                candidate_target = resolved_target_from_acquirer_entity(candidate_entity)
+                metrics = bulk_metrics.get((universe_source.source_id, candidate_entity.entity_id)) or universe_source.fetch_metrics(
+                    candidate_entity,
+                    source_strength=edgar_source.source_strength,
+                    source_dimension=edgar_source.dimension_id,
+                )
             except Exception as error:
                 excluded_counts["financial_metrics_fetch_error"] += 1
                 _append_limited_warning(
                     warnings,
-                    f"SEC companyfacts metrics failed for {candidate_target.ticker}: {type(error).__name__}: {error}",
+                    "acquirer source metrics failed for "
+                    f"{candidate_entity.ticker or candidate_entity.entity_id}: {type(error).__name__}: {error}",
                 )
                 continue
 
@@ -165,6 +192,17 @@ class AcquirerCapabilityUniverseBuilder:
             warnings=warnings,
             generated_at=datetime.now(UTC),
         )
+
+    def _active_universe_sources(self) -> list[AcquirerUniverseSource]:
+        if self.universe_sources is not None:
+            return self.universe_sources
+        return [
+            SecListedCompanyUniverseSource(
+                edgar_client=self.edgar_client,
+                metrics_cache=self.metrics_cache,
+                cache_ttl_hours=self.strategy.cache_ttl_hours("edgar"),
+            )
+        ]
 
     def _build_universe_from_cache(self, query: str) -> AcquirerCapabilityUniverseResult:
         cached_metrics = self.metrics_cache.list_valid(SEC_METRICS_FINGERPRINT)
@@ -269,42 +307,6 @@ class AcquirerCapabilityUniverseBuilder:
         )
         self.metrics_cache.save(metrics, SEC_METRICS_FINGERPRINT, self.strategy.cache_ttl_hours("edgar"))
         return metrics
-
-    def _sec_metrics_bulk(
-        self,
-        targets: list[ResolvedTarget],
-        edgar_source: SelectedDataSource,
-        warnings: list[str],
-    ) -> dict[str, CompanyFinancialMetrics]:
-        cached_metrics: dict[str, CompanyFinancialMetrics] = {}
-        uncached_targets: list[ResolvedTarget] = []
-        for target in targets:
-            cached = self.metrics_cache.get_valid(target.cik, SEC_METRICS_FINGERPRINT)
-            if cached:
-                cached_metrics[target.cik] = cached
-            else:
-                uncached_targets.append(target)
-
-        bulk_fetch = getattr(self.edgar_client, "fetch_company_financial_metrics_bulk", None)
-        if not callable(bulk_fetch) or not uncached_targets:
-            return cached_metrics
-
-        try:
-            fetched_metrics = bulk_fetch(
-                uncached_targets,
-                source_strength=edgar_source.source_strength,
-                source_dimension=edgar_source.dimension_id,
-            )
-        except Exception as error:
-            _append_limited_warning(
-                warnings,
-                f"SEC bulk companyfacts metrics failed; falling back to per-company fetches: {type(error).__name__}: {error}",
-            )
-            return cached_metrics
-
-        for metrics in fetched_metrics.values():
-            self.metrics_cache.save(metrics, SEC_METRICS_FINGERPRINT, self.strategy.cache_ttl_hours("edgar"))
-        return {**cached_metrics, **fetched_metrics}
 
     def _with_polygon_market_cap(
         self,
@@ -499,8 +501,8 @@ def _positive_target_metric(value: float | None) -> float | None:
     return value if value is not None and value > 0 else None
 
 
-def _same_company(candidate: ResolvedTarget, target: ResolvedTarget) -> bool:
-    return candidate.cik == target.cik or candidate.ticker.upper() == target.ticker.upper()
+def _same_entity_as_target(entity: AcquirerEntity, target: ResolvedTarget) -> bool:
+    return entity.cik == target.cik or (entity.ticker or "").upper() == target.ticker.upper()
 
 
 def _target_from_metrics(metrics: CompanyFinancialMetrics, matched_input: str) -> ResolvedTarget:

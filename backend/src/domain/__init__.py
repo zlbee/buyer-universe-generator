@@ -1,10 +1,12 @@
 """Public domain contracts for the long-list pipeline."""
 
 from src.domain.models import (
+    AcquirerEntity,
     AcquirerCapabilityCandidate,
     AcquirerCapabilityUniverseResult,
     AcquirerCapacityRuleResult,
     AcquirerCapacityRuleStatus,
+    AcquirerListingStatus,
     BuyerType,
     CandidateHit,
     CompanyFinancialMetrics,
@@ -32,10 +34,12 @@ from src.domain.models import (
 )
 
 __all__ = [
+    "AcquirerEntity",
     "AcquirerCapabilityCandidate",
     "AcquirerCapabilityUniverseResult",
     "AcquirerCapacityRuleResult",
     "AcquirerCapacityRuleStatus",
+    "AcquirerListingStatus",
     "BuyerType",
     "CandidateHit",
     "CompanyFinancialMetrics",

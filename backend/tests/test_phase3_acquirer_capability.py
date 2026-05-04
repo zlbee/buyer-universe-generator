@@ -11,6 +11,8 @@ from src.api.main import create_app
 from src.cli import main as cli_main
 from src.config import Settings
 from src.domain import (
+    AcquirerEntity,
+    AcquirerListingStatus,
     AcquirerCapabilityUniverseResult,
     AcquirerCapacityRuleStatus,
     CompanyFinancialMetrics,
@@ -184,6 +186,36 @@ def test_acquirer_capability_builder_filters_and_returns_passing_candidates(tmp_
         "candidate_revenue_min_usd": 200.0,
     }
     assert result.source_coverage["polygon_market_cap_available"] == 3
+
+
+def test_acquirer_capability_builder_accepts_injected_universe_source(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path)
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
+    fake_sec = NoUniverseSecClient()
+    buyer = company("BIG", "0000000002", "Big Buyer Inc.")
+    universe_source = FakeUniverseSource([buyer], {"0000000002": sample_metrics(buyer, revenue=300, cash=10, market_cap=None)})
+
+    with session_factory() as session:
+        strategy = DataSourceStrategy.from_settings(settings)
+        source_cache = SourceCache(session)
+        builder = AcquirerCapabilityUniverseBuilder(
+            settings=settings,
+            strategy=strategy,
+            resolver=TargetResolver(strategy=strategy, edgar_client=fake_sec, source_cache=source_cache),
+            source_cache=source_cache,
+            metrics_cache=CompanyFinancialMetricsCache(session),
+            edgar_client=fake_sec,
+            polygon_client=None,
+            universe_sources=[universe_source],
+        )
+        result = builder.build_universe("TGT")
+
+    assert fake_sec.public_universe_calls == 0
+    assert universe_source.list_calls == 1
+    assert universe_source.bulk_calls == 1
+    assert [candidate.ticker for candidate in result.candidates] == ["BIG"]
+    assert result.source_coverage["custom_seed_companies"] == 1
 
 
 def test_acquirer_capability_cache_only_mode_uses_cached_metrics_without_external_reads(tmp_path: Path) -> None:
@@ -475,6 +507,48 @@ class FakeAcquirerPolygonClient:
         )
 
 
+class FakeUniverseSource:
+    source_id = "custom"
+    source_fingerprint = "custom-v1"
+
+    def __init__(self, targets: list[ResolvedTarget], metrics_by_cik: dict[str, CompanyFinancialMetrics]) -> None:
+        self.targets = targets
+        self.metrics_by_cik = metrics_by_cik
+        self.list_calls = 0
+        self.bulk_calls = 0
+
+    def list_seed_entities(self) -> list[AcquirerEntity]:
+        self.list_calls += 1
+        return [
+            AcquirerEntity(
+                source_id=self.source_id,
+                entity_id=target.cik,
+                entity_id_type="cik",
+                canonical_name=target.canonical_name,
+                ticker=target.ticker,
+                cik=target.cik,
+                exchange=target.exchange,
+                sic=target.sic,
+                listing_status=AcquirerListingStatus.public,
+                source_provenance=["custom:test_fixture"],
+            )
+            for target in self.targets
+        ]
+
+    def fetch_metrics_bulk(self, entities, source_strength, source_dimension, warnings):
+        self.bulk_calls += 1
+        return {
+            entity.entity_id: self.metrics_by_cik[entity.cik]
+            for entity in entities
+            if entity.cik in self.metrics_by_cik
+        }
+
+    def fetch_metrics(self, entity, source_strength, source_dimension):
+        if entity.cik not in self.metrics_by_cik:
+            raise AssertionError("test fixture should provide metrics in bulk")
+        return self.metrics_by_cik[entity.cik]
+
+
 class CountingSourceCache(SourceCache):
     def __init__(self, session) -> None:
         super().__init__(session)
@@ -509,6 +583,16 @@ class ExplodingSecClient:
 
     def fetch_company_financial_metrics(self, *_args, **_kwargs):
         raise AssertionError("cache-only mode must not fetch SEC companyfacts")
+
+
+class NoUniverseSecClient(FakeAcquirerSecClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.public_universe_calls = 0
+
+    def fetch_public_company_universe(self) -> list[ResolvedTarget]:
+        self.public_universe_calls += 1
+        raise AssertionError("injected source should replace SEC seed universe")
 
 
 class ExplodingPolygonClient:

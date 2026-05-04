@@ -56,6 +56,13 @@ class PipelineRunStatus(str, Enum):
     failed = "failed"
 
 
+class AcquirerListingStatus(str, Enum):
+    public = "public"
+    private = "private"
+    subsidiary = "subsidiary"
+    unknown = "unknown"
+
+
 class AcquirerCapacityRuleStatus(str, Enum):
     passed = "pass"
     failed = "fail"
@@ -301,6 +308,22 @@ class TargetProfileExtractionResult(StrictBaseModel):
     source_documents: list[SourceDocument] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     extraction_metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AcquirerEntity(StrictBaseModel):
+    """Source-neutral seed entity emitted by acquirer-universe data sources."""
+
+    source_id: str = Field(min_length=1)
+    entity_id: str = Field(min_length=1)
+    entity_id_type: str = Field(min_length=1)
+    canonical_name: str = Field(min_length=1)
+    ticker: str | None = None
+    cik: str | None = None
+    exchange: str | None = None
+    sic: str | None = None
+    domain: str | None = None
+    listing_status: AcquirerListingStatus = AcquirerListingStatus.unknown
+    source_provenance: list[str] = Field(default_factory=list)
 
 
 class CompanyFinancialMetrics(StrictBaseModel):
