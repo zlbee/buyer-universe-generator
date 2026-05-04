@@ -7,6 +7,7 @@ import json
 from typing import Sequence
 
 from src.config import get_settings
+from src.logging_config import configure_logging
 from src.pipelines.factory import build_source_ingestion_service, build_target_profile_extractor
 from src.pipelines.target_profile_extraction import TargetProfileExtractionError
 from src.pipelines.target_resolution import AmbiguousTargetError, TargetNotFoundError
@@ -25,6 +26,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     settings = get_settings()
+    configure_logging(settings.log_level)
 
     if args.command == "init-db":
         init_db(settings)

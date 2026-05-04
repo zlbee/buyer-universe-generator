@@ -15,10 +15,6 @@ from src.sources.base import DataSourceRequestContext, DataSourceRequestRecorder
 
 
 logger = logging.getLogger(__name__)
-uvicorn_console_logger = logging.getLogger("uvicorn.error")
-# Keep NewsAPI request diagnostics visible even when the application root logger stays at WARNING.
-logger.setLevel(logging.INFO)
-uvicorn_console_logger.setLevel(logging.INFO)
 
 
 class NewsApiClient(ExternalDataSourceClient):
@@ -90,10 +86,9 @@ class NewsApiClient(ExternalDataSourceClient):
 
 
 def _log_info(message: str, *args: Any) -> None:
-    """Emit NewsAPI diagnostics to both module logs and the Uvicorn console."""
+    """Emit NewsAPI diagnostics through the shared application logging setup."""
 
     logger.info(message, *args)
-    uvicorn_console_logger.info(message, *args)
 
 
 def _redacted_params(params: dict[str, Any]) -> dict[str, Any]:

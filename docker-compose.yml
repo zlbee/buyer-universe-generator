@@ -7,6 +7,7 @@ services:
       BUG_DATABASE_URL: sqlite:////app/data/buyer_universe.db
       BUG_CACHE_DIR: /app/data/cache
       BUG_ENVIRONMENT: docker
+      BUG_LOG_LEVEL: ${BUG_LOG_LEVEL:-INFO}
       BUG_SEC_USER_AGENT: buyer-universe-generator/0.1 contact@example.com
       BUG_CORS_ORIGINS: '["http://localhost:5173","http://127.0.0.1:5173"]'
       EDGAR_IDENTITY: ${EDGAR_IDENTITY:-buyer-universe-generator/0.1 contact@example.com}

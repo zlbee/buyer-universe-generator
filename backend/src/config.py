@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     app_name: str = "Buyer Universe Generator"
     environment: str = "local"
     debug: bool = False
+    log_level: str = "INFO"
 
     database_url: str = "sqlite:///./data/buyer_universe.db"
     cache_dir: Path = Path("./data/cache")
@@ -100,6 +101,14 @@ class Settings(BaseSettings):
         if not value.strip():
             raise ValueError("database_url must not be empty")
         return value
+
+    @field_validator("log_level")
+    @classmethod
+    def log_level_must_be_known(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if normalized not in {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"}:
+            raise ValueError("log_level must be one of CRITICAL, ERROR, WARNING, INFO, DEBUG, or NOTSET")
+        return normalized
 
 
 @lru_cache

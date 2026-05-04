@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src import __version__
 from src.config import Settings, get_settings
+from src.logging_config import configure_logging
 from src.pipelines.factory import build_source_ingestion_service, build_target_profile_extractor
 from src.pipelines.target_profile_extraction import TargetProfileExtractionError
 from src.pipelines.target_resolution import AmbiguousTargetError, TargetNotFoundError
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     active_settings = settings or get_settings()
+    configure_logging(active_settings.log_level)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

@@ -245,14 +245,11 @@ def test_newsapi_client_returns_article_documents(tmp_path: Path, caplog: pytest
     assert documents[0].source_id == "newsapi"
     assert documents[0].source_type == SourceType.news_article
     assert documents[0].source_strength == SourceStrength.B
-    newsapi_log_text = "\n".join(
-        record.message for record in caplog.records if record.name in {"src.sources.newsapi", "uvicorn.error"}
-    )
+    newsapi_log_text = "\n".join(record.message for record in caplog.records if record.name == "src.sources.newsapi")
     assert "NewsAPI request" in newsapi_log_text
     assert ",".join(domains) in newsapi_log_text
     assert "news-test-key" not in newsapi_log_text
     assert "<redacted>" in newsapi_log_text
-    assert any(record.name == "uvicorn.error" and "NewsAPI request" in record.message for record in caplog.records)
 
 
 def test_source_ingestion_applies_newsapi_domains_from_policy(tmp_path: Path) -> None:

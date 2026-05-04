@@ -62,4 +62,5 @@ Required and optional source keys:
 $env:BUG_OPENROUTER_API_KEY = "..."
 $env:BUG_POLYGON_API_KEY = "..."
 $env:BUG_NEWS_API_KEY = "..."
+$env:BUG_LOG_LEVEL = "INFO"
 ```
