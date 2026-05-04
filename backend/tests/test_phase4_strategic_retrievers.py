@@ -213,28 +213,67 @@ def test_sec_client_enriches_browse_sic_records_from_submissions_when_mapping_ha
 
 def test_sec_client_fetches_same_sic_8k_transaction_signals(tmp_path: Path) -> None:
     settings = settings_for_tests(tmp_path)
-    seen_params: list[dict[str, str]] = []
+    seen_urls: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        seen_params.append(dict(request.url.params))
+        seen_urls.append(str(request.url))
+        url = str(request.url)
+        if url.startswith("https://www.sec.gov/files/company_tickers_exchange.json"):
+            return httpx.Response(
+                200,
+                json={
+                    "fields": ["cik", "name", "ticker", "exchange", "sic"],
+                    "data": [
+                        [2000, "BeautyCo", "BTY", "NYSE", "2844"],
+                        [1600033, "e.l.f. Beauty, Inc.", "ELF", "NYSE", "2844"],
+                    ],
+                },
+            )
+        if url.startswith("https://data.sec.gov/submissions/CIK0000002000.json"):
+            return httpx.Response(
+                200,
+                json={
+                    "cik": "0000002000",
+                    "name": "BeautyCo",
+                    "tickers": ["BTY"],
+                    "exchanges": ["NYSE"],
+                    "sic": "2844",
+                    "filings": {
+                        "recent": {
+                            "form": ["8-K", "8-K", "8-K"],
+                            "filingDate": ["2025-06-01", "2025-07-01", "2020-01-01"],
+                            "reportDate": ["2025-06-01", "2025-07-01", "2020-01-01"],
+                            "accessionNumber": [
+                                "0000002000-25-000001",
+                                "0000002000-25-000002",
+                                "0000002000-20-000001",
+                            ],
+                            "items": ["2.01,9.01", "1.01,9.01", "2.01,9.01"],
+                            "primaryDocument": ["bty-20250601.htm", "bty-20250701.htm", "bty-20200101.htm"],
+                        }
+                    },
+                },
+            )
+        if url.startswith("https://data.sec.gov/submissions/CIK0001600033.json"):
+            return httpx.Response(
+                200,
+                json={
+                    "cik": "0001600033",
+                    "name": "e.l.f. Beauty, Inc.",
+                    "tickers": ["ELF"],
+                    "exchanges": ["NYSE"],
+                    "sic": "2844",
+                    "filings": {"recent": {}},
+                },
+            )
         return httpx.Response(
             200,
             text=(
-                "<?xml version='1.0' encoding='UTF-8'?>"
-                "<feed xmlns='http://www.w3.org/2005/Atom'>"
-                "<entry>"
-                "<title>8-K - BeautyCo CIK: 2000</title>"
-                "<summary>BeautyCo acquired SkinCare Labs, a cosmetics brand.</summary>"
-                "<updated>2025-06-01T10:00:00Z</updated>"
-                "<link href='https://www.sec.gov/Archives/edgar/data/2000/000000200025000001/0000002000-25-000001-index.htm' />"
-                "</entry>"
-                "<entry>"
-                "<title>8-K - Old BeautyCo CIK: 2000</title>"
-                "<summary>BeautyCo acquired Old Cosmetics Co.</summary>"
-                "<updated>2020-01-01T10:00:00Z</updated>"
-                "<link href='https://www.sec.gov/Archives/edgar/data/2000/000000200020000001/0000002000-20-000001-index.htm' />"
-                "</entry>"
-                "</feed>"
+                "<html><body>"
+                "<h1>Item 2.01 Completion of Acquisition or Disposition of Assets</h1>"
+                "<p>BeautyCo completed the acquisition of SkinCare Labs, a cosmetics brand.</p>"
+                "<h1>Item 9.01 Financial Statements and Exhibits</h1>"
+                "</body></html>"
             ),
         )
 
@@ -250,19 +289,28 @@ def test_sec_client_fetches_same_sic_8k_transaction_signals(tmp_path: Path) -> N
         ttl_hours=24,
         form_type="8-K",
         limit=50,
+        company_limit=10,
         source_strength=SourceStrength.C,
         source_dimension="buyer_long_list_recall.transaction_signal",
+        primary_items=["2.01"],
+        supporting_items=["1.01"],
+        require_primary_item=True,
+        fetch_filing_text=True,
+        text_scope="primary_item_section",
+        as_of_date=date(2026, 5, 4),
     )
 
-    assert seen_params[0]["SIC"] == "2844"
-    assert seen_params[0]["type"] == "8-K"
+    assert any(url.startswith("https://data.sec.gov/submissions/CIK0000002000.json") for url in seen_urls)
     assert len(documents) == 1
     assert documents[0].source_type == SourceType.sec_filing
     assert documents[0].source_dimension == "buyer_long_list_recall.transaction_signal"
     assert documents[0].metadata["form"] == "8-K"
     assert documents[0].metadata["sic"] == "2844"
+    assert documents[0].metadata["filing_items"] == ["2.01", "9.01"]
+    assert documents[0].metadata["edgar_item_match"]["primary"] == ["2.01"]
+    assert documents[0].metadata["text_scope"] == "primary_item_section"
     assert documents[0].filing_accession == "0000002000-25-000001"
-    assert "BeautyCo acquired SkinCare Labs" in (documents[0].raw_text or "")
+    assert "BeautyCo completed the acquisition of SkinCare Labs" in (documents[0].raw_text or "")
 
 
 def test_ma_history_retriever_recalls_same_and_adjacent_recent_deals(tmp_path: Path) -> None:
@@ -281,6 +329,8 @@ def test_ma_history_retriever_recalls_same_and_adjacent_recent_deals(tmp_path: P
 
     assert [hit.candidate_name for hit in result.hits] == ["BeautyCo", "Retail Corp"]
     by_name = {hit.candidate_name: hit for hit in result.hits}
+    assert by_name["BeautyCo"].candidate_ticker == "BTY"
+    assert by_name["BeautyCo"].candidate_cik == "0000002000"
     beauty_events = by_name["BeautyCo"].retrieval_metadata["deal_events"]
     retail_events = by_name["Retail Corp"].retrieval_metadata["deal_events"]
     assert beauty_events[0]["target_acquired"] == "SkinCare Labs"
@@ -292,10 +342,34 @@ def test_ma_history_retriever_recalls_same_and_adjacent_recent_deals(tmp_path: P
     assert result.metadata["secondary_source"] == "newsapi"
     assert result.metadata["edgar_documents_checked"] == 1
     assert result.metadata["news_documents_checked"] == 25
+    assert result.metadata["news_lookback_start"] == "2026-04-04"
+    assert news_source.calls[0]["kwargs"]["from_date"] == "2026-04-04"
+    assert result.metadata["skip_reasons"]["no_transaction_language"] == 0
     assert result.metadata["lookback_start"] == "2021-05-04"
     assert any("older than 2021-05-04" in warning for warning in result.warnings)
     assert any("unrelated transaction events" in warning for warning in result.warnings)
     assert any("without a parsed buyer" in warning for warning in result.warnings)
+
+
+def test_ma_history_retriever_uses_sec_filer_identity_for_item_201_hits(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path, news_api_key=None)
+    strategy = DataSourceStrategy.from_settings(settings)
+    edgar_source = FakeEdgarTransactionSource(sec_item_201_fragment_document())
+    retriever = MAHistoryRetriever(
+        strategy,
+        edgar_client=edgar_source,
+        as_of_date=date(2026, 5, 4),
+    )
+
+    result = retriever.retrieve_with_context(sample_profile())
+
+    assert [hit.candidate_name for hit in result.hits] == ["EDGEWELL PERSONAL CARE Co"]
+    hit = result.hits[0]
+    assert hit.candidate_ticker == "EPC"
+    assert hit.candidate_cik == "0001096752"
+    assert "Item 2.01" not in hit.candidate_name
+    assert "completed the previously" not in hit.candidate_name.casefold()
+    assert hit.retrieval_metadata["deal_events"][0]["target_acquired"] == "Luxury Labs"
 
 
 def test_ma_history_retriever_handles_disabled_newsapi_without_throwing(tmp_path: Path) -> None:
@@ -483,14 +557,54 @@ def edgar_transaction_documents() -> list[SourceDocument]:
             source_type=SourceType.sec_filing,
             source_strength=SourceStrength.C,
             target_cik="0000002000",
+            target_ticker="BTY",
             url="https://www.sec.gov/Archives/edgar/data/2000/000000200025000001/0000002000-25-000001-index.htm",
             filing_accession="0000002000-25-000001",
             raw_text="BeautyCo acquired SkinCare Labs.",
             metadata={
+                "canonical_name": "BeautyCo",
+                "ticker": "BTY",
+                "cik": "0000002000",
                 "form": "8-K",
                 "filing_date": "2025-06-01",
                 "sic": "2844",
                 "title": "BeautyCo acquired SkinCare Labs.",
+            },
+            retrieved_at=datetime(2026, 5, 4, tzinfo=UTC),
+        )
+    ]
+
+
+def sec_item_201_fragment_document() -> list[SourceDocument]:
+    return [
+        SourceDocument(
+            source_id="edgar",
+            source_dimension="buyer_long_list_recall.transaction_signal",
+            source_type=SourceType.sec_filing,
+            source_strength=SourceStrength.C,
+            target_cik="0001096752",
+            target_ticker="EPC",
+            url="https://www.sec.gov/Archives/edgar/data/1096752/000109675225000001/0001096752-25-000001-index.htm",
+            filing_accession="0001096752-25-000001",
+            raw_text=(
+                "Item 2.01 Completion of Acquisition or Disposition of Assets. "
+                "The Company completed the previously announced acquisition of Luxury Labs. "
+                "The shares which were settled immediately prior to closing were cancelled."
+            ),
+            metadata={
+                "canonical_name": "EDGEWELL PERSONAL CARE Co",
+                "ticker": "EPC",
+                "cik": "0001096752",
+                "form": "8-K",
+                "filing_date": "2025-06-01",
+                "sic": "2844",
+                "filing_items": ["2.01", "9.01"],
+                "edgar_item_match": {
+                    "primary": ["2.01"],
+                    "supporting": [],
+                    "basis": "sec_submissions_recent.items",
+                },
+                "title": "8-K Item 2.01 - EDGEWELL PERSONAL CARE Co",
             },
             retrieved_at=datetime(2026, 5, 4, tzinfo=UTC),
         )
@@ -542,9 +656,11 @@ class FakeNewsSource:
     def __init__(self, documents: list[SourceDocument]) -> None:
         self.documents = documents
         self.queries: list[str] = []
+        self.calls: list[dict[str, Any]] = []
 
     def fetch_articles_for_query(self, query: str, *_args, **_kwargs) -> list[SourceDocument]:
         self.queries.append(query)
+        self.calls.append({"query": query, "kwargs": _kwargs})
         return self.documents
 
 

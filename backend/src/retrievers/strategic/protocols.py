@@ -49,7 +49,14 @@ class TransactionFilingSource(Protocol):
         ttl_hours: int,
         form_type: str,
         limit: int,
+        company_limit: int,
         source_strength: SourceStrength = SourceStrength.C,
         source_dimension: str | None = None,
+        primary_items: list[str] | None = None,
+        supporting_items: list[str] | None = None,
+        require_primary_item: bool = False,
+        fetch_filing_text: bool = False,
+        text_scope: str | None = None,
+        as_of_date: date | None = None,
     ) -> list[SourceDocument]:
         ...

@@ -51,7 +51,6 @@ class NewsApiClient(ExternalDataSourceClient):
             "language": "en",
             "sortBy": "publishedAt",
             "pageSize": page_size,
-            "apiKey": self.settings.news_api_key,
         }
         if domains:
             # NewsAPI expects a comma-delimited allowlist in the `domains` query parameter.
@@ -63,6 +62,7 @@ class NewsApiClient(ExternalDataSourceClient):
             operation="everything",
             url=self.everything_url,
             params=params,
+            headers=_newsapi_auth_headers(self.settings.news_api_key),
             target=target,
             source_dimension=source_dimension,
             raw_records_from_payload=_newsapi_raw_records_from_payload,
@@ -102,7 +102,6 @@ class NewsApiClient(ExternalDataSourceClient):
             "language": "en",
             "sortBy": "publishedAt",
             "pageSize": page_size,
-            "apiKey": self.settings.news_api_key,
         }
         if from_date:
             params["from"] = from_date
@@ -114,6 +113,7 @@ class NewsApiClient(ExternalDataSourceClient):
             operation="everything_query",
             url=self.everything_url,
             params=params,
+            headers=_newsapi_auth_headers(self.settings.news_api_key),
             target=target,
             source_dimension=source_dimension,
             raw_records_from_payload=_newsapi_raw_records_from_payload,
@@ -146,6 +146,12 @@ def _redacted_params(params: dict[str, Any]) -> dict[str, Any]:
     """Return log-safe request params without exposing provider credentials."""
 
     return {key: ("<redacted>" if key == "apiKey" else value) for key, value in params.items()}
+
+
+def _newsapi_auth_headers(api_key: str | None) -> dict[str, str]:
+    """Send NewsAPI credentials outside the URL so provider errors do not leak keys."""
+
+    return {"X-Api-Key": api_key} if api_key else {}
 
 
 def _newsapi_raw_records_from_payload(

@@ -304,4 +304,4 @@ def _redact_value(value: Any, key: str | None = None) -> Any:
 
 def _is_sensitive_key(key: str) -> bool:
     normalized = key.replace("-", "_").casefold()
-    return normalized in {"apikey", "api_key", "authorization", "token", "secret"} or normalized.endswith("_token")
+    return normalized in {"apikey", "api_key", "authorization", "token", "secret"} or normalized.endswith(("_api_key", "_token"))

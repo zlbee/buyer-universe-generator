@@ -186,6 +186,7 @@ class DataSourceRetrievalConfig(StrictBaseModel):
     """Source-level controls applied when querying raw provider APIs."""
 
     domains: list[str] = Field(default_factory=list)
+    max_lookback_days: int | None = Field(default=None, ge=1)
     markdown_item_parser_enabled: bool = False
     markdown_item_parser_min_chars: int = Field(default=500, ge=1)
 
@@ -227,11 +228,17 @@ class DataSourceRetrieverConfig(StrictBaseModel):
     source_roles: dict[str, str] = Field(default_factory=dict)
     source_priority: list[str] = Field(default_factory=list)
     max_candidates: int | None = Field(default=None, ge=1)
+    max_companies: int | None = Field(default=None, ge=1)
     max_documents: int | None = Field(default=None, ge=1)
     lookback_years: int | None = Field(default=None, ge=1)
     max_queries: int | None = Field(default=None, ge=1)
     page_size: int | None = Field(default=None, ge=1)
     edgar_form_type: str | None = None
+    edgar_primary_items: list[str] = Field(default_factory=list)
+    edgar_supporting_items: list[str] = Field(default_factory=list)
+    require_edgar_primary_item: bool = False
+    fetch_edgar_filing_text: bool = False
+    edgar_text_scope: str | None = None
     eligible_sector_matches: list[str] = Field(default_factory=list)
     transaction_terms: list[str] = Field(default_factory=list)
 
@@ -240,7 +247,7 @@ class DataSourceRetrieverConfig(StrictBaseModel):
     def normalize_source_roles(cls, value: dict[str, str]) -> dict[str, str]:
         return {role.strip(): source_id.strip() for role, source_id in value.items() if role.strip() and source_id.strip()}
 
-    @field_validator("source_priority", "eligible_sector_matches", "transaction_terms")
+    @field_validator("source_priority", "eligible_sector_matches", "transaction_terms", "edgar_primary_items", "edgar_supporting_items")
     @classmethod
     def normalize_text_list(cls, value: list[str]) -> list[str]:
         return [item.strip() for item in value if item.strip()]

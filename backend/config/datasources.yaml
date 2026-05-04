@@ -141,6 +141,8 @@ sources:
     api_key_env: BUG_NEWS_API_KEY
     cache_ttl_hours: 12
     retrieval:
+      # NewsAPI Developer keys only support a short historical search window. Increase this for paid plans.
+      max_lookback_days: 30
       domains:
         - bloomberg.com
         - reuters.com
@@ -208,10 +210,19 @@ retrievers:
       - edgar
       - newsapi
     lookback_years: 5
+    max_companies: 150
     max_documents: 50
     max_queries: 5
     page_size: 10
     edgar_form_type: 8-K
+    # SEC 8-K Item 2.01 is the primary completed-acquisition signal. Item 1.01 is retained only as support.
+    edgar_primary_items:
+      - "2.01"
+    edgar_supporting_items:
+      - "1.01"
+    require_edgar_primary_item: true
+    fetch_edgar_filing_text: true
+    edgar_text_scope: primary_item_section
     eligible_sector_matches:
       - same
       - adjacent

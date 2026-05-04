@@ -60,6 +60,7 @@ def test_data_source_policy_disables_optional_sources_without_keys(tmp_path: Pat
     assert news_source.enabled is False
     assert news_source.disabled_reason == "missing BUG_NEWS_API_KEY"
     assert {"bloomberg.com", "reuters.com", "wsj.com"} <= set(news_source.config.retrieval.domains)
+    assert news_source.config.retrieval.max_lookback_days == 30
     edgar_config = strategy.source("edgar").retrieval
     assert edgar_config.markdown_item_parser_enabled is True
     assert edgar_config.markdown_item_parser_min_chars == 500
@@ -241,7 +242,8 @@ def test_newsapi_client_returns_article_documents(tmp_path: Path, caplog: pytest
     domains = ["bloomberg.com", "reuters.com", "wsj.com"]
 
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.params["apiKey"] == "news-test-key"
+        assert "apiKey" not in request.url.params
+        assert request.headers["X-Api-Key"] == "news-test-key"
         assert request.url.params["domains"] == ",".join(domains)
         return httpx.Response(
             200,
@@ -269,7 +271,6 @@ def test_newsapi_client_returns_article_documents(tmp_path: Path, caplog: pytest
     assert "NewsAPI request" in newsapi_log_text
     assert ",".join(domains) in newsapi_log_text
     assert "news-test-key" not in newsapi_log_text
-    assert "<redacted>" in newsapi_log_text
 
 
 def test_source_ingestion_applies_newsapi_domains_from_policy(tmp_path: Path) -> None:
