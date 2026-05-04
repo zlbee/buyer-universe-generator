@@ -246,6 +246,14 @@ def test_source_ingestion_restores_filing_text_metadata() -> None:
             "text_scope": "item_1_business",
             "raw_text_char_count": 394227,
             "cached_text_char_count": 18,
+            "structured_sections": {
+                "business": "ITEM 1. Business e.l.f. Beauty sells cosmetics.",
+                "management_discussion": "ITEM 7. Management discusses channel expansion.",
+            },
+            "structured_section_char_counts": {
+                "business": 47,
+                "management_discussion": 47,
+            },
         },
     )
     service = object.__new__(SourceIngestionService)
@@ -257,6 +265,8 @@ def test_source_ingestion_restores_filing_text_metadata() -> None:
     assert restored_filings[0].text_scope == "item_1_business"
     assert restored_filings[0].raw_text_char_count == 394227
     assert restored_filings[0].cached_text_char_count == 18
+    assert restored_filings[0].structured_sections["business"] == "ITEM 1. Business e.l.f. Beauty sells cosmetics."
+    assert restored_filings[0].structured_section_char_counts["management_discussion"] == 47
 
 
 def test_company_page_client_prefers_investor_page_over_homepage(tmp_path: Path) -> None:

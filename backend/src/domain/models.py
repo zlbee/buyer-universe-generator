@@ -81,6 +81,10 @@ class FilingMetadata(StrictBaseModel):
     text_scope: str | None = None
     raw_text_char_count: int | None = Field(default=None, ge=0)
     cached_text_char_count: int | None = Field(default=None, ge=0)
+    # Structured sections are cached from EDGAR parsing so downstream steps can
+    # reuse the parsed filing content without re-fetching the same document.
+    structured_sections: dict[str, str] = Field(default_factory=dict)
+    structured_section_char_counts: dict[str, int] = Field(default_factory=dict)
 
 
 class SourceDocument(StrictBaseModel):
