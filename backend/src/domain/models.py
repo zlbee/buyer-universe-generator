@@ -231,6 +231,11 @@ class RetrievalRetrieverConfig(StrictBaseModel):
     source_priority: list[str] = Field(default_factory=list)
     max_candidates: int | None = Field(default=None, ge=1)
     max_companies: int | None = Field(default=None, ge=1)
+    # Optional retriever-level batch size for provider-managed web-search calls.
+    web_search_batch_size: int | None = Field(default=None, ge=1)
+    # Optional low-recall retry controls for LLM/web-search retrievers.
+    min_candidates_before_retry: int | None = Field(default=None, ge=1)
+    max_web_search_attempts: int | None = Field(default=None, ge=1)
     max_documents: int | None = Field(default=None, ge=1)
     max_evidence_per_candidate: int | None = Field(default=None, ge=1)
     lookback_years: int | None = Field(default=None, ge=1)

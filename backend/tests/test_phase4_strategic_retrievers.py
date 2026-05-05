@@ -344,11 +344,13 @@ def test_ma_history_retriever_recalls_same_and_adjacent_recent_deals(tmp_path: P
     assert beauty_events[0]["sector_match"] == "same"
     assert retail_events[0]["sector_match"] == "adjacent"
     assert edgar_source.calls[0]["since"] == date(2021, 5, 4)
-    assert len(news_source.queries) == 1
+    assert len(news_source.queries) == 5
+    assert news_source.queries[0].startswith('"cosmetics"')
+    assert news_source.queries[-1].startswith('"personal care"')
     assert result.metadata["primary_source"] == "edgar_8k"
     assert result.metadata["secondary_source"] == "newsapi"
     assert result.metadata["edgar_documents_checked"] == 1
-    assert result.metadata["news_documents_checked"] == 5
+    assert result.metadata["news_documents_checked"] == 25
     assert result.metadata["news_lookback_start"] == "2026-04-04"
     assert news_source.calls[0]["kwargs"]["from_date"] == "2026-04-04"
     assert result.metadata["skip_reasons"]["no_transaction_language"] == 0
@@ -469,7 +471,7 @@ def test_ma_history_retriever_recalls_google_rss_resolved_and_pending_buyers(tmp
     by_name = {hit.candidate_name: hit for hit in result.hits}
     assert set(by_name) == {"L'Oreal S.A.", "Private Buyer", "Ulta Beauty, Inc."}
     assert google_source.topic_calls == ["BUSINESS"]
-    assert len(google_source.search_queries) == 1
+    assert len(google_source.search_queries) == 5
     assert google_source.search_queries[0].startswith('"Perfumes, cosmetics, and other toilet preparations"')
     assert "acquisition OR acquired" in google_source.search_queries[0]
     assert by_name["Ulta Beauty, Inc."].candidate_ticker == "ULTA"
@@ -483,7 +485,7 @@ def test_ma_history_retriever_recalls_google_rss_resolved_and_pending_buyers(tmp
     assert by_name["Private Buyer"].retrieval_metadata["identity_resolution"][0]["status"] == "unresolved"
     assert by_name["Ulta Beauty, Inc."].retrieval_metadata["deal_events"][0]["target_acquired"] == "Clean Cosmetics Lab"
     assert result.metadata["rss_topic"] == "BUSINESS"
-    assert result.metadata["rss_search_documents_checked"] == 3
+    assert result.metadata["rss_search_documents_checked"] == 15
     assert result.metadata["rss_topic_documents_checked"] == 1
     assert result.metadata["rss_topic_documents_filtered"] == 1
     assert result.metadata["rss_llm_mna_count"] == 3
@@ -629,28 +631,38 @@ def test_strategic_acquisition_intent_retriever_recalls_llm_web_search_intent_wi
     assert result.metadata["candidate_records_available_before_cap"] == 1
     assert result.metadata["evidence_available_before_cap"] == 3
     assert result.metadata["evidence_truncated"] == 1
-    assert result.metadata["skip_reasons"]["self_candidate"] == 1
-    assert result.metadata["skip_reasons"]["unrelated_sector"] == 1
-    assert result.metadata["skip_reasons"]["missing_evidence"] == 1
-    assert web_search.source_business_types == ["strategic_buyer_acquisition_intent_web_search"]
-    assert web_search.calls[0]["max_results"] == 25
-    assert web_search.calls[0]["max_total_results"] == 100
+    assert result.metadata["skip_reasons"]["self_candidate"] == 2
+    assert result.metadata["skip_reasons"]["unrelated_sector"] == 2
+    assert result.metadata["skip_reasons"]["missing_evidence"] == 2
+    assert result.metadata["skip_reasons"]["duplicate_candidate"] == 1
+    assert result.metadata["llm_web_search_attempts"] == 2
+    assert result.metadata["min_candidates_before_retry"] == 5
+    assert web_search.source_business_types == [
+        "strategic_buyer_acquisition_intent_web_search",
+        "strategic_buyer_acquisition_intent_web_search",
+    ]
+    assert web_search.calls[0]["max_results"] == 10
+    assert web_search.calls[0]["max_total_results"] == 40
     assert web_search.calls[0]["search_context_size"] == "low"
-    assert web_search.calls[0]["fetch_max_uses"] == 20
-    assert web_search.calls[0]["fetch_max_content_tokens"] == 50000
+    assert web_search.calls[0]["fetch_max_uses"] == 5
+    assert web_search.calls[0]["fetch_max_content_tokens"] == 12000
     assert "use exactly same, adjacent, or unrelated" in web_search.calls[0]["system_prompt"]
     assert web_search.calls[0]["json_schema"]["properties"]["candidates"]["maxItems"] == 25
     assert web_search.calls[0]["json_schema"]["properties"]["candidates"]["items"]["properties"]["evidence"]["maxItems"] == 2
     assert "Use web search" in web_search.prompts[0]
     assert "e.l.f. Beauty, Inc." not in web_search.prompts[0]
+    assert "ELF" not in web_search.prompts[0]
     assert "e.l.f. Cosmetics" not in web_search.prompts[0]
-    assert "Same-industry terms" not in web_search.prompts[0]
+    assert "Same-industry terms" in web_search.prompts[0]
+    assert "cosmetics" in web_search.prompts[0]
     assert "SIC=2844" in web_search.prompts[0]
     assert "from 2025-05-04 through 2026-05-04" in web_search.prompts[0]
     assert "Adjacent-industry terms" in web_search.prompts[0]
-    assert "Prioritize SEC filings, investor-relations press releases, official acquisition pages" in web_search.prompts[0]
-    assert "at most 25 companies" in web_search.prompts[0]
+    assert "Enumerate qualifying companies from SEC filings, investor-relations decks" in web_search.prompts[0]
+    assert "up to 25" in web_search.prompts[0]
+    assert "do not stop after finding the first valid example" in web_search.prompts[0]
     assert "at most 2 evidence" in web_search.prompts[0]
+    assert "low-recall retry" in web_search.prompts[1]
 
 
 def test_strategic_acquisition_intent_retriever_tolerates_llm_type_drift(tmp_path: Path) -> None:
@@ -686,8 +698,69 @@ def test_strategic_acquisition_intent_retriever_tolerates_llm_type_drift(tmp_pat
 
     assert [hit.candidate_name for hit in result.hits] == ["Beauty Strategy Co."]
     assert result.metadata["target_sic"] == "2844"
-    assert result.metadata["llm_web_search_candidates_checked"] == 1
+    assert result.metadata["llm_web_search_candidates_checked"] == 2
+    assert result.metadata["llm_web_search_attempts"] == 2
     assert not any("LLM web search failed" in warning for warning in result.warnings)
+
+
+def test_strategic_acquisition_intent_retriever_retries_low_recall_and_merges_term_matched_candidates(
+    tmp_path: Path,
+) -> None:
+    settings = settings_for_tests(tmp_path)
+    strategy = DataSourceStrategy.from_settings(settings)
+    retry_candidates = [
+        {
+            "company_name": f"Broad Beauty Buyer {index}",
+            "ticker": f"BBB{index}",
+            "fit_reason": "The company describes an active corporate development strategy for cosmetics acquisitions.",
+            "evidence": [
+                {
+                    "evidence_summary": "Management said it is seeking acquisitions across cosmetics and personal care.",
+                    "source_url": f"https://example.com/broad-beauty-buyer-{index}",
+                    "source_title": "Corporate development strategy",
+                }
+            ],
+        }
+        for index in range(1, 5)
+    ]
+    web_search = FakeStrategicWebSearchJSONClient(
+        [
+            {
+                "target_sic": "2844",
+                "candidates": [
+                    {
+                        "company_name": "Initial Beauty Buyer",
+                        "sector_relevance": "same",
+                        "fit_reason": "Initial buyer has sourced acquisition intent in beauty products.",
+                        "evidence": [
+                            {
+                                "evidence_summary": "Initial buyer is pursuing beauty products acquisitions.",
+                                "source_url": "https://example.com/initial-beauty-buyer",
+                                "sector_relevance": "same",
+                            }
+                        ],
+                    }
+                ],
+            },
+            {"target_sic": "2844", "candidates": retry_candidates},
+        ]
+    )
+    retriever = StrategicAcquisitionIntentRetriever(strategy, web_search_client=web_search, as_of_date=date(2026, 5, 4))
+
+    result = retriever.retrieve_with_context(sample_profile())
+
+    assert {hit.candidate_name for hit in result.hits} == {
+        "Initial Beauty Buyer",
+        "Broad Beauty Buyer 1",
+        "Broad Beauty Buyer 2",
+        "Broad Beauty Buyer 3",
+        "Broad Beauty Buyer 4",
+    }
+    assert len(web_search.prompts) == 2
+    assert "low-recall retry" in web_search.prompts[1]
+    assert result.metadata["llm_web_search_candidates_checked"] == 5
+    assert result.metadata["candidate_records_available_before_cap"] == 5
+    assert result.metadata["skip_reasons"] == {}
 
 
 def test_strategic_acquisition_intent_retriever_infers_relevance_from_reason_when_llm_uses_scores(tmp_path: Path) -> None:
@@ -742,7 +815,8 @@ def test_strategic_acquisition_intent_retriever_infers_relevance_from_reason_whe
 
     assert [hit.candidate_name for hit in result.hits] == ["L'Oreal S.A."]
     assert result.hits[0].retrieval_metadata["sector_relevance"] == "adjacent"
-    assert result.metadata["skip_reasons"]["self_candidate"] == 1
+    assert result.metadata["skip_reasons"]["self_candidate"] == 2
+    assert result.metadata["skip_reasons"]["duplicate_candidate"] == 1
     assert "unrelated_sector" not in result.metadata["skip_reasons"]
 
 
@@ -1226,8 +1300,8 @@ class FakeMnaLlmClient:
 
 
 class FakeStrategicWebSearchJSONClient:
-    def __init__(self, payload: dict[str, Any]) -> None:
-        self.payload = payload
+    def __init__(self, payload: dict[str, Any] | list[dict[str, Any]]) -> None:
+        self.payloads = payload if isinstance(payload, list) else [payload]
         self.prompts: list[str] = []
         self.source_business_types: list[str] = []
         self.calls: list[dict[str, Any]] = []
@@ -1262,7 +1336,7 @@ class FakeStrategicWebSearchJSONClient:
                 "fetch_max_content_tokens": fetch_max_content_tokens,
             }
         )
-        return self.payload
+        return self.payloads[min(len(self.calls) - 1, len(self.payloads) - 1)]
 
 
 class FakeBuyerIdentityResolver:

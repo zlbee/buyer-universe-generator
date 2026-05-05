@@ -126,8 +126,10 @@ def test_retrieval_rules_scope_strength_by_dimension(tmp_path: Path) -> None:
     assert google_transaction_source.source_strength == SourceStrength.C
     assert sponsor_source.source_strength == SourceStrength.B
     assert strategic_intent_source.source_strength == SourceStrength.C
-    assert strategic_intent_source.config.retrieval.web_fetch_max_uses == 20
-    assert strategic_intent_source.config.retrieval.web_fetch_max_content_tokens == 50000
+    assert strategic_intent_source.config.retrieval.web_search_max_results == 10
+    assert strategic_intent_source.config.retrieval.web_search_max_total_results == 40
+    assert strategic_intent_source.config.retrieval.web_fetch_max_uses == 5
+    assert strategic_intent_source.config.retrieval.web_fetch_max_content_tokens == 12000
 
 
 def test_retrieval_rules_configure_strategic_retriever_strategy(tmp_path: Path) -> None:
@@ -161,6 +163,8 @@ def test_retrieval_rules_configure_strategic_retriever_strategy(tmp_path: Path) 
     assert strategic_intent_policy.lookback_years == 1
     assert strategic_intent_policy.max_candidates == 25
     assert strategic_intent_policy.max_evidence_per_candidate == 2
+    assert strategic_intent_policy.min_candidates_before_retry == 5
+    assert strategic_intent_policy.max_web_search_attempts == 2
     assert strategic_intent_policy.eligible_sector_matches == ["same", "adjacent"]
 
 

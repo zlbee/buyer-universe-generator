@@ -7,7 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import yaml
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, ValidationError
@@ -79,57 +79,109 @@ class _PEDealWebSearchDeal(BaseModel):
     deal_type: str | None = Field(default=None, validation_alias=AliasChoices("deal_type", "transaction_type", "type"))
 
 
-class _PEDealWebSearchOutput(BaseModel):
-    """Top-level LLM web-search output for one configured PE firm and one target SIC."""
+class _PEDealWebSearchFirmResult(BaseModel):
+    """One PE firm result returned by batched provider-managed web search."""
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    pe_firm: str | None = None
+    pe_firm: str | None = Field(default=None, validation_alias=AliasChoices("pe_firm", "firm", "firm_name", "name"))
     sic: str | None = None
     deals: list[_PEDealWebSearchDeal] = Field(default_factory=list)
+
+
+class _PEDealWebSearchOutput(BaseModel):
+    """Top-level LLM web-search output for a PE firm batch and one target SIC."""
+
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    sic: str | None = None
+    firms: list[_PEDealWebSearchFirmResult] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("firms", "firm_results", "pe_firms", "sponsors", "results"),
+    )
 
 
 _PE_DEAL_WEB_SEARCH_SCHEMA_NAME = "PEDealActivityWebSearch"
 _PE_DEAL_WEB_SEARCH_BUSINESS_TYPE = "financial_buyer_pe_deal_activity_web_search"
 _LLM_WEB_SEARCH_SOURCE_ID = "llm_web_search"
 _WEB_SEARCH_SOURCE_PATH = "pe_deal_activity_llm_web_search"
+
+_PE_DEAL_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "has_relevant_deal",
+        "evidence_summary",
+        "acquisition_date",
+        "acquired_company",
+        "source_url",
+        "source_title",
+        "sector_relevance",
+        "deal_type",
+    ],
+    "properties": {
+        "has_relevant_deal": {"type": "boolean"},
+        "evidence_summary": {"type": "string"},
+        "acquisition_date": {"type": ["string", "null"]},
+        "acquired_company": {"type": ["string", "null"]},
+        "source_url": {"type": ["string", "null"]},
+        "source_title": {"type": ["string", "null"]},
+        "sector_relevance": {
+            "type": "string",
+            "description": (
+                "Industry relevance. Prefer same, adjacent, or unrelated, but short explanatory values "
+                "such as 'Same-industry: cosmetics' are accepted."
+            ),
+        },
+        "deal_type": {"type": ["string", "null"]},
+    },
+}
+
+
+def _pe_deal_web_search_json_schema(max_firms: int) -> dict[str, Any]:
+    """Build the prompt-facing schema for one batched PE web-search request."""
+
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["sic", "firms"],
+        "properties": {
+            "sic": {"type": ["string", "null"]},
+            "firms": {
+                "type": "array",
+                "maxItems": max_firms,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["pe_firm", "deals"],
+                    "properties": {
+                        "pe_firm": {"type": "string"},
+                        "deals": {
+                            "type": "array",
+                            "items": _PE_DEAL_SCHEMA,
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+
 _PE_DEAL_WEB_SEARCH_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["pe_firm", "sic", "deals"],
+    "required": ["sic", "firms"],
     "properties": {
-        "pe_firm": {"type": ["string", "null"]},
         "sic": {"type": ["string", "null"]},
-        "deals": {
+        "firms": {
             "type": "array",
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": [
-                    "has_relevant_deal",
-                    "evidence_summary",
-                    "acquisition_date",
-                    "acquired_company",
-                    "source_url",
-                    "source_title",
-                    "sector_relevance",
-                    "deal_type",
-                ],
+                "required": ["pe_firm", "deals"],
                 "properties": {
-                    "has_relevant_deal": {"type": "boolean"},
-                    "evidence_summary": {"type": "string"},
-                    "acquisition_date": {"type": ["string", "null"]},
-                    "acquired_company": {"type": ["string", "null"]},
-                    "source_url": {"type": ["string", "null"]},
-                    "source_title": {"type": ["string", "null"]},
-                    "sector_relevance": {
-                        "type": "string",
-                        "description": (
-                            "Industry relevance. Prefer same, adjacent, or unrelated, but short explanatory values "
-                            "such as 'Same-industry: cosmetics' are accepted."
-                        ),
-                    },
-                    "deal_type": {"type": ["string", "null"]},
+                    "pe_firm": {"type": "string"},
+                    "deals": {"type": "array", "items": _PE_DEAL_SCHEMA},
                 },
             },
         },
@@ -196,6 +248,7 @@ class PEDealActivityRetriever:
             warnings.append(f"{self.name} skipped: PE seed universe is empty or unavailable")
             return StrategicRetrievalResult(warnings=warnings, metadata={"retriever": self.name})
         company_limit = config.max_companies or len(seed_universe.firms)
+        web_search_batch_size = config.web_search_batch_size or 10
 
         matcher = PESeedMatcher(seed_universe)
         since = calendar_years_before(self.as_of_date, lookback_years)
@@ -210,6 +263,7 @@ class PEDealActivityRetriever:
         llm_deal_count = 0
         llm_error_count = 0
         llm_skipped_firm_count = 0
+        llm_batch_count = 0
 
         for source_id in source_execution_order(config):
             if source_id != deal_source_id:
@@ -220,12 +274,14 @@ class PEDealActivityRetriever:
                     if not self.web_search_client:
                         warnings.append(f"{self.name} {source_id} unavailable: adapter unavailable")
                         continue
-                    for firm in seed_universe.firms[:company_limit]:
+                    for firm_batch in _batched(seed_universe.firms[:company_limit], web_search_batch_size):
+                        llm_batch_count += 1
+                        firm_names = [firm.canonical_name for firm in firm_batch]
                         try:
-                            web_documents = _web_search_documents_for_firm(
+                            web_documents, firms_with_documents = _web_search_documents_for_firms(
                                 self.web_search_client,
                                 llm_source.config.retrieval,
-                                firm.canonical_name,
+                                firm_names,
                                 target_profile,
                                 same_terms,
                                 adjacent_terms,
@@ -241,11 +297,12 @@ class PEDealActivityRetriever:
                         except (LLMResponseError, ValidationError, ValueError) as error:
                             llm_error_count += 1
                             warnings.append(
-                                f"{self.name} LLM web search failed for {firm.canonical_name}: {type(error).__name__}: {error}"
+                                f"{self.name} LLM web search failed for batch {', '.join(firm_names)}: "
+                                f"{type(error).__name__}: {error}"
                             )
                             continue
+                        llm_skipped_firm_count += max(0, len(firm_names) - len(firms_with_documents))
                         if not web_documents:
-                            llm_skipped_firm_count += 1
                             continue
                         llm_document_count += len(web_documents)
                         llm_deal_count += len(web_documents)
@@ -370,6 +427,8 @@ class PEDealActivityRetriever:
                 "adjacent_industry_terms": adjacent_terms,
                 "seed_firm_count": len(seed_universe.firms),
                 "seed_firms_checked": min(company_limit, len(seed_universe.firms)),
+                "llm_web_search_batch_size": web_search_batch_size,
+                "llm_web_search_batches_checked": llm_batch_count,
                 "fmp_documents_checked": fmp_document_count,
                 "llm_web_search_documents_checked": llm_document_count,
                 "llm_web_search_deal_count": llm_deal_count,
@@ -515,10 +574,10 @@ def _evidence_from_event(event: DealEvent, document: SourceDocument) -> Evidence
     )
 
 
-def _web_search_documents_for_firm(
+def _web_search_documents_for_firms(
     web_search_client: WebSearchJSONClient,
     retrieval_config: Any,
-    pe_firm: str,
+    pe_firms: list[str],
     target_profile: TargetProfile,
     same_terms: list[str],
     adjacent_terms: list[str],
@@ -528,11 +587,14 @@ def _web_search_documents_for_firm(
     source_id: str,
     source_dimension: str | None,
     source_strength: SourceStrength,
-) -> list[SourceDocument]:
+) -> tuple[list[SourceDocument], set[str]]:
+    if not pe_firms:
+        return [], set()
+
     payload = web_search_client.generate_json_with_web_search(
-        _pe_deal_web_search_prompt(pe_firm, target_profile, same_terms, adjacent_terms, since, as_of_date),
+        _pe_deal_web_search_prompt(pe_firms, target_profile, same_terms, adjacent_terms, since, as_of_date),
         _PE_DEAL_WEB_SEARCH_SCHEMA_NAME,
-        _PE_DEAL_WEB_SEARCH_JSON_SCHEMA,
+        _pe_deal_web_search_json_schema(len(pe_firms)),
         system_prompt=_pe_deal_web_search_system_prompt(),
         max_results=retrieval_config.web_search_max_results,
         max_total_results=retrieval_config.web_search_max_total_results,
@@ -543,56 +605,132 @@ def _web_search_documents_for_firm(
         fetch_max_content_tokens=retrieval_config.web_fetch_max_content_tokens,
         source_business_type=_PE_DEAL_WEB_SEARCH_BUSINESS_TYPE,
     )
-    output = _PEDealWebSearchOutput.model_validate(_normalize_web_search_payload(payload))
+    output = _PEDealWebSearchOutput.model_validate(_normalize_web_search_payload(payload, pe_firms))
     documents: list[SourceDocument] = []
-    for deal in output.deals:
-        if not deal.has_relevant_deal or deal.sector_relevance == "unrelated":
+    firms_with_documents: set[str] = set()
+    for firm_result in output.firms:
+        pe_firm = _requested_firm_name(firm_result.pe_firm, pe_firms)
+        if not pe_firm:
             continue
-        if not deal.source_url or not deal.acquired_company:
-            continue
-        document = SourceDocument(
-            source_id=source_id,
-            source_dimension=source_dimension,
-            source_type=SourceType.transaction_signal,
-            source_strength=source_strength,
-            url=deal.source_url,
-            raw_text=deal.evidence_summary or f"{pe_firm} had a deal involving {deal.acquired_company}.",
-            metadata={
-                "discovered_from": "llm_web_search",
-                "source_path": _WEB_SEARCH_SOURCE_PATH,
-                "llm_schema_name": _PE_DEAL_WEB_SEARCH_SCHEMA_NAME,
-                "acquiringCompanyName": pe_firm,
-                "acquiredCompanyName": deal.acquired_company,
-                "transactionDate": deal.acquisition_date,
-                "transactionType": deal.deal_type,
-                "sector_relevance": deal.sector_relevance,
-                "source_title": deal.source_title,
-                "sic": normalize_sic(target_profile.sic),
-                "lookback_start": since.isoformat(),
-                "lookback_end": as_of_date.isoformat(),
-            },
-        )
-        documents.append(document)
-    return documents
+        firm_key = normalize_entity_key(pe_firm)
+        firm_had_document = False
+        for deal in firm_result.deals:
+            if not deal.has_relevant_deal or deal.sector_relevance == "unrelated":
+                continue
+            if not deal.source_url or not deal.acquired_company:
+                continue
+            document = SourceDocument(
+                source_id=source_id,
+                source_dimension=source_dimension,
+                source_type=SourceType.transaction_signal,
+                source_strength=source_strength,
+                url=deal.source_url,
+                raw_text=deal.evidence_summary or f"{pe_firm} had a deal involving {deal.acquired_company}.",
+                metadata={
+                    "discovered_from": "llm_web_search",
+                    "source_path": _WEB_SEARCH_SOURCE_PATH,
+                    "llm_schema_name": _PE_DEAL_WEB_SEARCH_SCHEMA_NAME,
+                    "acquiringCompanyName": pe_firm,
+                    "acquiredCompanyName": deal.acquired_company,
+                    "transactionDate": deal.acquisition_date,
+                    "transactionType": deal.deal_type,
+                    "sector_relevance": deal.sector_relevance,
+                    "source_title": deal.source_title,
+                    "sic": normalize_sic(target_profile.sic),
+                    "lookback_start": since.isoformat(),
+                    "lookback_end": as_of_date.isoformat(),
+                },
+            )
+            documents.append(document)
+            firm_had_document = True
+        if firm_had_document:
+            firms_with_documents.add(firm_key)
+    return documents, firms_with_documents
 
 
-def _normalize_web_search_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Accept common LLM field variants so useful sourced deals are not dropped by naming drift."""
+def _normalize_web_search_payload(payload: dict[str, Any], requested_firms: list[str]) -> dict[str, Any]:
+    """Accept batched and legacy single-firm shapes before local validation."""
 
     normalized = dict(payload)
-    if "deals" not in normalized:
-        for key in ("acquisitions", "transactions", "results", "records", "deal_activity"):
+    if "firms" not in normalized:
+        for key in ("firm_results", "pe_firms", "sponsors"):
             value = normalized.get(key)
             if isinstance(value, list):
-                normalized["deals"] = value
+                normalized["firms"] = value
                 break
-        deal = normalized.get("deal")
-        if "deals" not in normalized and isinstance(deal, dict):
-            normalized["deals"] = [deal]
-    deals = normalized.get("deals")
-    if isinstance(deals, list):
-        normalized["deals"] = [_normalize_web_search_deal(deal) for deal in deals if isinstance(deal, dict)]
+
+    results = normalized.get("results")
+    if "firms" not in normalized and isinstance(results, list):
+        if any(isinstance(item, dict) and _looks_like_firm_result(item) for item in results):
+            normalized["firms"] = results
+        else:
+            normalized["firms"] = [_legacy_firm_result(normalized, requested_firms, results)]
+
+    if "firms" not in normalized:
+        deals = _raw_web_search_deals(normalized)
+        if deals is not None or first_text(normalized, "pe_firm", "firm", "firm_name", "name"):
+            normalized["firms"] = [_legacy_firm_result(normalized, requested_firms, deals or [])]
+
+    firms = normalized.get("firms")
+    if isinstance(firms, dict):
+        normalized["firms"] = [firms]
+    elif isinstance(firms, list):
+        normalized["firms"] = [
+            _normalize_web_search_firm_result(firm, requested_firms) for firm in firms if isinstance(firm, dict)
+        ]
     return normalized
+
+
+def _normalize_web_search_firm_result(firm_result: dict[str, Any], requested_firms: list[str]) -> dict[str, Any]:
+    normalized = dict(firm_result)
+    pe_firm = first_text(normalized, "pe_firm", "firm", "firm_name", "name")
+    if not pe_firm and len(requested_firms) == 1:
+        pe_firm = requested_firms[0]
+    if pe_firm:
+        normalized["pe_firm"] = pe_firm
+
+    deals = _raw_web_search_deals(normalized) or []
+    normalized["deals"] = [_normalize_web_search_deal(deal) for deal in deals if isinstance(deal, dict)]
+    return normalized
+
+
+def _legacy_firm_result(payload: dict[str, Any], requested_firms: list[str], deals: list[Any]) -> dict[str, Any]:
+    pe_firm = first_text(payload, "pe_firm", "firm", "firm_name", "name")
+    if not pe_firm and len(requested_firms) == 1:
+        pe_firm = requested_firms[0]
+    return {
+        "pe_firm": pe_firm,
+        "sic": payload.get("sic"),
+        "deals": deals,
+    }
+
+
+def _looks_like_firm_result(value: dict[str, Any]) -> bool:
+    return any(key in value for key in ("pe_firm", "firm", "firm_name", "deals", "acquisitions", "transactions"))
+
+
+def _raw_web_search_deals(value: dict[str, Any]) -> list[Any] | None:
+    for key in ("deals", "acquisitions", "transactions", "records", "deal_activity"):
+        deals = value.get(key)
+        if isinstance(deals, list):
+            return deals
+    deal = value.get("deal")
+    if isinstance(deal, dict):
+        return [deal]
+    return None
+
+
+def _requested_firm_name(value: str | None, requested_firms: list[str]) -> str | None:
+    if value:
+        normalized_value = normalize_entity_key(value)
+        for firm in requested_firms:
+            firm_key = normalize_entity_key(firm)
+            if firm_key == normalized_value or normalized_value.startswith(firm_key) or firm_key.startswith(normalized_value):
+                return firm
+        return requested_firms[0] if len(requested_firms) == 1 else None
+    if len(requested_firms) == 1:
+        return requested_firms[0]
+    return None
 
 
 def _normalize_web_search_deal(deal: dict[str, Any]) -> dict[str, Any]:
@@ -649,7 +787,7 @@ def _first_source_reference(value: dict[str, Any]) -> tuple[str | None, str | No
 
 
 def _pe_deal_web_search_prompt(
-    pe_firm: str,
+    pe_firms: list[str],
     target_profile: TargetProfile,
     same_terms: list[str],
     adjacent_terms: list[str],
@@ -659,26 +797,41 @@ def _pe_deal_web_search_prompt(
     sic = normalize_sic(target_profile.sic) or "unknown"
     same_text = ", ".join(same_terms[:10]) or "not available"
     adjacent_text = ", ".join(adjacent_terms[:10]) or "not available"
+    firm_list = "\n".join(f"- {firm}" for firm in pe_firms)
     return (
         "Use web search. "
-        f"Find whether {pe_firm} has acquisition, buyout, add-on, or investment records in the past five years "
-        f"for SIC={sic}, from {since.isoformat()} through {as_of_date.isoformat()}. "
+        "For each private equity firm listed below, find whether that firm has acquisition, buyout, add-on, "
+        f"or investment records in the past five years for SIC={sic}, from {since.isoformat()} through "
+        f"{as_of_date.isoformat()}. "
+        f"PE firms to check:\n{firm_list}\n"
+        f"Same-industry terms: {same_text}. "
         f"Adjacent-industry terms: {adjacent_text}. "
-        "Use only the SIC and industry terms as search guidance."
+        "Use only the SIC and industry terms as search guidance. "
         "The source page does not need to literally mention the SIC code. "
-        "Return deals where the source page supports the PE firm, acquired company, approximate acquisition date, "
-        "source URL, and relevance to the same or adjacent industry. Prefer official PE announcements, portfolio pages, "
-        "company press releases, and reputable news. Do not include broad fund news without a named acquired company."
+        "Return one firms array item for every listed PE firm, using an empty deals array when no relevant sourced "
+        "deal is found. Return deals only when the source page supports the PE firm, acquired company, approximate "
+        "acquisition date, source URL, and relevance to the same or adjacent industry. Prefer official PE "
+        "announcements, portfolio pages, company press releases, and reputable news. Do not include broad fund news "
+        "without a named acquired company."
     )
 
 
 def _pe_deal_web_search_system_prompt() -> str:
     return (
         f"Return only valid JSON for schema {_PE_DEAL_WEB_SEARCH_SCHEMA_NAME}. "
-        "The JSON object must contain pe_firm, sic, and deals. Each deal must include has_relevant_deal, "
-        "evidence_summary, acquisition_date, acquired_company, source_url, source_title, sector_relevance, and deal_type. "
-        "Use null for unknown optional values and an empty deals array when no relevant sourced deal is found."
+        "The JSON object must contain sic and firms. Each firms item must include pe_firm and deals. Each deal must "
+        "include has_relevant_deal, evidence_summary, acquisition_date, acquired_company, source_url, source_title, "
+        "sector_relevance, and deal_type. Use null for unknown optional values and an empty deals array when no "
+        "relevant sourced deal is found."
     )
+
+
+def _batched(values: list[Any], batch_size: int) -> Iterator[list[Any]]:
+    """Yield stable fixed-size batches without reordering the configured seed universe."""
+
+    effective_batch_size = max(1, batch_size)
+    for index in range(0, len(values), effective_batch_size):
+        yield values[index : index + effective_batch_size]
 
 
 def _industry_query_terms(target_profile: TargetProfile, max_queries: int, taxonomy_path: Any) -> tuple[list[str], list[str], list[str]]:

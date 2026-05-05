@@ -8,398 +8,398 @@ firms:
       - Advent
       - Advent International Corporation
     domain: adventinternational.com
-  # - canonical_name: Apollo Global Management
-  #   aliases:
-  #     - Apollo
-  #     - Apollo Funds
-  #   domain: apollo.com
-  # - canonical_name: Bain Capital
-  #   aliases:
-  #     - Bain Capital Private Equity
-  #     - Bain Capital, LP
-  #   domain: baincapital.com
-  # - canonical_name: Blackstone
-  #   aliases:
-  #     - Blackstone Inc.
-  #     - Blackstone Group
-  #     - Blackstone Funds
-  #   domain: blackstone.com
-  # - canonical_name: Carlyle
-  #   aliases:
-  #     - The Carlyle Group
-  #     - Carlyle Group
-  #   domain: carlyle.com
-  # - canonical_name: Centerbridge Partners
-  #   aliases:
-  #     - Centerbridge
-  #   domain: centerbridge.com
-  # - canonical_name: Clayton, Dubilier & Rice
-  #   aliases:
-  #     - CD&R
-  #     - Clayton Dubilier Rice
-  #   domain: cdr-inc.com
-  # - canonical_name: EQT
-  #   aliases:
-  #     - EQT Private Capital
-  #     - EQT Partners
-  #   domain: eqtgroup.com
-  # - canonical_name: Francisco Partners
-  #   aliases:
-  #     - Francisco Partners Management
-  #   domain: franciscopartners.com
-  # - canonical_name: Genstar Capital
-  #   aliases:
-  #     - Genstar
-  #   domain: gencap.com
-  # - canonical_name: GTCR
-  #   aliases:
-  #     - GTCR LLC
-  #   domain: gtcr.com
-  # - canonical_name: Hellman & Friedman
-  #   aliases:
-  #     - H&F
-  #     - Hellman Friedman
-  #   domain: hf.com
-  # - canonical_name: KKR
-  #   aliases:
-  #     - Kohlberg Kravis Roberts
-  #     - KKR Funds
-  #   domain: kkr.com
-  # - canonical_name: Leonard Green & Partners
-  #   aliases:
-  #     - Leonard Green
-  #     - LGP
-  #   domain: leonardgreen.com
-  # - canonical_name: Silver Lake
-  #   aliases:
-  #     - Silver Lake Partners
-  #   domain: silverlake.com
-  # - canonical_name: TA Associates
-  #   aliases:
-  #     - TA
-  #   domain: ta.com
-  # - canonical_name: Thoma Bravo
-  #   aliases:
-  #     - Thoma Bravo Funds
-  #   domain: thomabravo.com
-  # - canonical_name: TPG
-  #   aliases:
-  #     - TPG Capital
-  #     - Texas Pacific Group
-  #   domain: tpg.com
-  # - canonical_name: Vista Equity Partners
-  #   aliases:
-  #     - Vista Equity
-  #     - Vista
-  #   domain: vistaequitypartners.com
-  # - canonical_name: Warburg Pincus
-  #   aliases:
-  #     - Warburg Pincus LLC
-  #   domain: warburgpincus.com
-  # - canonical_name: CVC Capital Partners
-  #   aliases:
-  #     - CVC
-  #     - CVC Capital
-  #   domain: cvc.com
-  # - canonical_name: Hillhouse Investment
-  #   aliases:
-  #     - Hillhouse Capital
-  #     - 高瓴资本
-  #     - Hillhouse
-  #   domain: hillhouseinvestment.com
-  # - canonical_name: Permira
-  #   aliases:
-  #     - Permira Advisers
-  #     - Permira Funds
-  #   domain: permira.com
-  # - canonical_name: Insight Partners
-  #   aliases:
-  #     - Insight
-  #     - Insight Venture Partners
-  #   domain: insightpartners.com
-  # - canonical_name: Brookfield Asset Management
-  #   aliases:
-  #     - Brookfield
-  #     - Brookfield Private Equity
-  #   domain: brookfield.com
-  # - canonical_name: Summit Partners
-  #   aliases:
-  #     - Summit
-  #     - Summit Partners, L.P.
-  #   domain: summitpartners.com
-  # - canonical_name: Roark Capital Group
-  #   aliases:
-  #     - Roark Capital
-  #     - Roark
-  #   domain: roarkcapital.com
-  # - canonical_name: American Securities
-  #   aliases:
-  #     - American Securities LLC
-  #   domain: american-securities.com
-  # - canonical_name: Madison Dearborn Partners
-  #   aliases:
-  #     - MDP
-  #     - Madison Dearborn
-  #   domain: mdp.com
-  # - canonical_name: BPEA EQT
-  #   aliases:
-  #     - Baring Private Equity Asia
-  #     - BPEA
-  #   domain: bpeasia.com
-  # - canonical_name: Partners Group
-  #   aliases:
-  #     - Partners Group Holding AG
-  #   domain: partnersgroup.com
-  # - canonical_name: Neuberger Berman
-  #   aliases:
-  #     - NB
-  #     - Neuberger Berman Group
-  #   domain: nb.com
-  # - canonical_name: Ares Management
-  #   aliases:
-  #     - Ares
-  #     - Ares Management Corporation
-  #   domain: aresmgmt.com
-  # - canonical_name: General Atlantic
-  #   aliases:
-  #     - GA
-  #     - General Atlantic Service Company
-  #   domain: generalatlantic.com
-  # - canonical_name: Golden Gate Capital
-  #   aliases:
-  #     - Golden Gate
-  #     - GGC
-  #   domain: goldengatecap.com
-  # - canonical_name: Harvest Partners
-  #   aliases:
-  #     - Harvest
-  #   domain: harvestpartners.com
-  # - canonical_name: New Mountain Capital
-  #   aliases:
-  #     - New Mountain
-  #     - NMC
-  #   domain: newmountaincapital.com
-  # - canonical_name: Onex
-  #   aliases:
-  #     - Onex Corporation
-  #   domain: onex.com
-  # - canonical_name: Veritas Capital
-  #   aliases:
-  #     - Veritas
-  #   domain: veritascapital.com
-  # - canonical_name: Vestar Capital Partners
-  #   aliases:
-  #     - Vestar
-  #   domain: vestarcapital.com
-  # - canonical_name: Astorg
-  #   aliases:
-  #     - Astorg Partners
-  #   domain: astorg.com
-  # - canonical_name: BC Partners
-  #   aliases:
-  #     - BC Partners LLP
-  #   domain: bcpartners.com
-  # - canonical_name: Bridgepoint
-  #   aliases:
-  #     - Bridgepoint Group
-  #     - Bridgepoint Advisers
-  #   domain: bridgepoint.eu
-  # - canonical_name: Cinven
-  #   aliases:
-  #     - Cinven Group
-  #   domain: cinven.com
-  # - canonical_name: HgCapital
-  #   aliases:
-  #     - Hg
-  #     - Hg Pooled Management
-  #   domain: hgcapital.com
-  # - canonical_name: J.W. Childs Associates
-  #   aliases:
-  #     - J.W. Childs
-  #     - Prospect Hill Growth Partners
-  #   domain: prospecthillgrowth.com
-  # - canonical_name: Kelso & Company
-  #   aliases:
-  #     - Kelso
-  #   domain: kelso.com
-  # - canonical_name: Nordic Capital
-  #   aliases:
-  #     - Nordic Capital Limited
-  #   domain: nordiccapital.com
-  # - canonical_name: Providence Equity Partners
-  #   aliases:
-  #     - Providence Equity
-  #     - Providence
-  #   domain: provequity.com
-  # - canonical_name: Searchlight Capital Partners
-  #   aliases:
-  #     - Searchlight
-  #     - Searchlight Capital
-  #   domain: searchlightcap.com
-  # - canonical_name: Oaktree Capital Management
-  #   aliases:
-  #     - Oaktree
-  #     - Oaktree Capital
-  #   domain: oaktreecapital.com
-  # - canonical_name: Bain Capital Double Impact
-  #   aliases:
-  #     - Bain Capital Impact
-  #   domain: baincapitaldoubleimpact.com
-  # - canonical_name: Charlesbank Capital Partners
-  #   aliases:
-  #     - Charlesbank
-  #   domain: charlesbank.com
-  # - canonical_name: GTCR
-  #   aliases:
-  #     - GTCR LLC
-  #   domain: gtcr.com
-  # - canonical_name: H.I.G. Capital
-  #   aliases:
-  #     - HIG Capital
-  #     - H.I.G.
-  #   domain: higcapital.com
-  # - canonical_name: KPS Capital Partners
-  #   aliases:
-  #     - KPS
-  #   domain: kpsfunds.com
-  # - canonical_name: Littlejohn & Co.
-  #   aliases:
-  #     - Littlejohn
-  #   domain: littlejohninc.com
-  # - canonical_name: Madison Dearborn Partners
-  #   aliases:
-  #     - MDP
-  #   domain: mdp.com
-  # - canonical_name: MidOcean Partners
-  #   aliases:
-  #     - MidOcean
-  #   domain: midoceanpartners.com
-  # - canonical_name: One Equity Partners
-  #   aliases:
-  #     - OEP
-  #   domain: oneequity.com
-  # - canonical_name: Palladium Equity Partners
-  #   aliases:
-  #     - Palladium Equity
-  #   domain: palladiumequity.com
-  # - canonical_name: Platinum Equity
-  #   aliases:
-  #     - Platinum
-  #   domain: platinumequity.com
-  # - canonical_name: Siris Capital Group
-  #   aliases:
-  #     - Siris
-  #     - Siris Capital
-  #   domain: siris.com
-  # - canonical_name: Stone Point Capital
-  #   aliases:
-  #     - Stone Point
-  #   domain: stonepoint.com
-  # - canonical_name: TowerBrook Capital Partners
-  #   aliases:
-  #     - TowerBrook
-  #   domain: towerbrook.com
-  # - canonical_name: Trilantic Capital Partners
-  #   aliases:
-  #     - Trilantic
-  #   domain: trilanticnorthamerica.com
-  # - canonical_name: TSG Consumer Partners
-  #   aliases:
-  #     - TSG
-  #   domain: tsgconsumer.com
-  # - canonical_name: Vector Capital
-  #   aliases:
-  #     - Vector
-  #   domain: vectorcapital.com
-  # - canonical_name: Waterland Private Equity
-  #   aliases:
-  #     - Waterland
-  #   domain: waterland.be
-  # - canonical_name: Wind Point Partners
-  #   aliases:
-  #     - Wind Point
-  #   domain: wppartners.com
-  # - canonical_name: Audax Private Equity
-  #   aliases:
-  #     - Audax Group
-  #     - Audax
-  #   domain: audaxprivateequity.com
-  # - canonical_name: Gridiron Capital
-  #   aliases:
-  #     - Gridiron
-  #   domain: gridironcapital.com
-  # - canonical_name: Huron Capital
-  #   aliases:
-  #     - Huron
-  #     - Huron Capital Partners
-  #   domain: huroncapital.com
-  # - canonical_name: Luminate Capital Partners
-  #   aliases:
-  #     - Luminate
-  #   domain: luminatecapital.com
-  # - canonical_name: Monomoy Capital Partners
-  #   aliases:
-  #     - Monomoy
-  #   domain: mcp.com
-  # - canonical_name: Nautic Partners
-  #   aliases:
-  #     - Nautic
-  #   domain: nautic.com
-  # - canonical_name: ParkerGale Capital
-  #   aliases:
-  #     - ParkerGale
-  #   domain: parkergale.com
-  # - canonical_name: Riverside Company
-  #   aliases:
-  #     - The Riverside Company
-  #     - Riverside
-  #   domain: riversidecompany.com
-  # - canonical_name: Shore Capital Partners
-  #   aliases:
-  #     - Shore Capital
-  #     - Shore
-  #   domain: shorecp.com
-  # - canonical_name: Sun Capital Partners
-  #   aliases:
-  #     - Sun Capital
-  #   domain: suncap.com
-  # - canonical_name: Main Street Capital
-  #   aliases:
-  #     - Main Street
-  #   domain: mainstcapital.com
-  # - canonical_name: Inflexion
-  #   aliases:
-  #     - Inflexion Private Equity
-  #   domain: inflexion.com
-  # - canonical_name: Gryphon Investors
-  #   aliases:
-  #     - Gryphon
-  #   domain: gryphon-inv.com
-  # - canonical_name: HGGC
-  #   aliases:
-  #     - Huntsman Gay Global Capital
-  #   domain: hggc.com
-  # - canonical_name: FFP
-  #   aliases:
-  #     - Flexpoint Ford
-  #   domain: flexpointford.com
-  # - canonical_name: Parthenon Capital
-  #   aliases:
-  #     - Parthenon
-  #   domain: parthenoncapital.com
-  # - canonical_name: Linden Capital Partners
-  #   aliases:
-  #     - Linden
-  #   domain: lindenlp.com
-  # - canonical_name: Kohlberg & Company
-  #   aliases:
-  #     - Kohlberg
-  #   domain: kohlberg.com
-  # - canonical_name: Bertram Capital
-  #   aliases:
-  #     - Bertram
-  #   domain: bertramcapital.com
-  # - canonical_name: JLL Partners
-  #   aliases:
-  #     - JLL
-  #   domain: jllpartners.com
+  - canonical_name: Apollo Global Management
+    aliases:
+      - Apollo
+      - Apollo Funds
+    domain: apollo.com
+  - canonical_name: Bain Capital
+    aliases:
+      - Bain Capital Private Equity
+      - Bain Capital, LP
+    domain: baincapital.com
+  - canonical_name: Blackstone
+    aliases:
+      - Blackstone Inc.
+      - Blackstone Group
+      - Blackstone Funds
+    domain: blackstone.com
+  - canonical_name: Carlyle
+    aliases:
+      - The Carlyle Group
+      - Carlyle Group
+    domain: carlyle.com
+  - canonical_name: Centerbridge Partners
+    aliases:
+      - Centerbridge
+    domain: centerbridge.com
+  - canonical_name: Clayton, Dubilier & Rice
+    aliases:
+      - CD&R
+      - Clayton Dubilier Rice
+    domain: cdr-inc.com
+  - canonical_name: EQT
+    aliases:
+      - EQT Private Capital
+      - EQT Partners
+    domain: eqtgroup.com
+  - canonical_name: Francisco Partners
+    aliases:
+      - Francisco Partners Management
+    domain: franciscopartners.com
+  - canonical_name: Genstar Capital
+    aliases:
+      - Genstar
+    domain: gencap.com
+  - canonical_name: GTCR
+    aliases:
+      - GTCR LLC
+    domain: gtcr.com
+  - canonical_name: Hellman & Friedman
+    aliases:
+      - H&F
+      - Hellman Friedman
+    domain: hf.com
+  - canonical_name: KKR
+    aliases:
+      - Kohlberg Kravis Roberts
+      - KKR Funds
+    domain: kkr.com
+  - canonical_name: Leonard Green & Partners
+    aliases:
+      - Leonard Green
+      - LGP
+    domain: leonardgreen.com
+  - canonical_name: Silver Lake
+    aliases:
+      - Silver Lake Partners
+    domain: silverlake.com
+  - canonical_name: TA Associates
+    aliases:
+      - TA
+    domain: ta.com
+  - canonical_name: Thoma Bravo
+    aliases:
+      - Thoma Bravo Funds
+    domain: thomabravo.com
+  - canonical_name: TPG
+    aliases:
+      - TPG Capital
+      - Texas Pacific Group
+    domain: tpg.com
+  - canonical_name: Vista Equity Partners
+    aliases:
+      - Vista Equity
+      - Vista
+    domain: vistaequitypartners.com
+  - canonical_name: Warburg Pincus
+    aliases:
+      - Warburg Pincus LLC
+    domain: warburgpincus.com
+  - canonical_name: CVC Capital Partners
+    aliases:
+      - CVC
+      - CVC Capital
+    domain: cvc.com
+  - canonical_name: Hillhouse Investment
+    aliases:
+      - Hillhouse Capital
+      - 高瓴资本
+      - Hillhouse
+    domain: hillhouseinvestment.com
+  - canonical_name: Permira
+    aliases:
+      - Permira Advisers
+      - Permira Funds
+    domain: permira.com
+  - canonical_name: Insight Partners
+    aliases:
+      - Insight
+      - Insight Venture Partners
+    domain: insightpartners.com
+  - canonical_name: Brookfield Asset Management
+    aliases:
+      - Brookfield
+      - Brookfield Private Equity
+    domain: brookfield.com
+  - canonical_name: Summit Partners
+    aliases:
+      - Summit
+      - Summit Partners, L.P.
+    domain: summitpartners.com
+  - canonical_name: Roark Capital Group
+    aliases:
+      - Roark Capital
+      - Roark
+    domain: roarkcapital.com
+  - canonical_name: American Securities
+    aliases:
+      - American Securities LLC
+    domain: american-securities.com
+  - canonical_name: Madison Dearborn Partners
+    aliases:
+      - MDP
+      - Madison Dearborn
+    domain: mdp.com
+  - canonical_name: BPEA EQT
+    aliases:
+      - Baring Private Equity Asia
+      - BPEA
+    domain: bpeasia.com
+  - canonical_name: Partners Group
+    aliases:
+      - Partners Group Holding AG
+    domain: partnersgroup.com
+  - canonical_name: Neuberger Berman
+    aliases:
+      - NB
+      - Neuberger Berman Group
+    domain: nb.com
+  - canonical_name: Ares Management
+    aliases:
+      - Ares
+      - Ares Management Corporation
+    domain: aresmgmt.com
+  - canonical_name: General Atlantic
+    aliases:
+      - GA
+      - General Atlantic Service Company
+    domain: generalatlantic.com
+  - canonical_name: Golden Gate Capital
+    aliases:
+      - Golden Gate
+      - GGC
+    domain: goldengatecap.com
+  - canonical_name: Harvest Partners
+    aliases:
+      - Harvest
+    domain: harvestpartners.com
+  - canonical_name: New Mountain Capital
+    aliases:
+      - New Mountain
+      - NMC
+    domain: newmountaincapital.com
+  - canonical_name: Onex
+    aliases:
+      - Onex Corporation
+    domain: onex.com
+  - canonical_name: Veritas Capital
+    aliases:
+      - Veritas
+    domain: veritascapital.com
+  - canonical_name: Vestar Capital Partners
+    aliases:
+      - Vestar
+    domain: vestarcapital.com
+  - canonical_name: Astorg
+    aliases:
+      - Astorg Partners
+    domain: astorg.com
+  - canonical_name: BC Partners
+    aliases:
+      - BC Partners LLP
+    domain: bcpartners.com
+  - canonical_name: Bridgepoint
+    aliases:
+      - Bridgepoint Group
+      - Bridgepoint Advisers
+    domain: bridgepoint.eu
+  - canonical_name: Cinven
+    aliases:
+      - Cinven Group
+    domain: cinven.com
+  - canonical_name: HgCapital
+    aliases:
+      - Hg
+      - Hg Pooled Management
+    domain: hgcapital.com
+  - canonical_name: J.W. Childs Associates
+    aliases:
+      - J.W. Childs
+      - Prospect Hill Growth Partners
+    domain: prospecthillgrowth.com
+  - canonical_name: Kelso & Company
+    aliases:
+      - Kelso
+    domain: kelso.com
+  - canonical_name: Nordic Capital
+    aliases:
+      - Nordic Capital Limited
+    domain: nordiccapital.com
+  - canonical_name: Providence Equity Partners
+    aliases:
+      - Providence Equity
+      - Providence
+    domain: provequity.com
+  - canonical_name: Searchlight Capital Partners
+    aliases:
+      - Searchlight
+      - Searchlight Capital
+    domain: searchlightcap.com
+  - canonical_name: Oaktree Capital Management
+    aliases:
+      - Oaktree
+      - Oaktree Capital
+    domain: oaktreecapital.com
+  - canonical_name: Bain Capital Double Impact
+    aliases:
+      - Bain Capital Impact
+    domain: baincapitaldoubleimpact.com
+  - canonical_name: Charlesbank Capital Partners
+    aliases:
+      - Charlesbank
+    domain: charlesbank.com
+  - canonical_name: GTCR
+    aliases:
+      - GTCR LLC
+    domain: gtcr.com
+  - canonical_name: H.I.G. Capital
+    aliases:
+      - HIG Capital
+      - H.I.G.
+    domain: higcapital.com
+  - canonical_name: KPS Capital Partners
+    aliases:
+      - KPS
+    domain: kpsfunds.com
+  - canonical_name: Littlejohn & Co.
+    aliases:
+      - Littlejohn
+    domain: littlejohninc.com
+  - canonical_name: Madison Dearborn Partners
+    aliases:
+      - MDP
+    domain: mdp.com
+  - canonical_name: MidOcean Partners
+    aliases:
+      - MidOcean
+    domain: midoceanpartners.com
+  - canonical_name: One Equity Partners
+    aliases:
+      - OEP
+    domain: oneequity.com
+  - canonical_name: Palladium Equity Partners
+    aliases:
+      - Palladium Equity
+    domain: palladiumequity.com
+  - canonical_name: Platinum Equity
+    aliases:
+      - Platinum
+    domain: platinumequity.com
+  - canonical_name: Siris Capital Group
+    aliases:
+      - Siris
+      - Siris Capital
+    domain: siris.com
+  - canonical_name: Stone Point Capital
+    aliases:
+      - Stone Point
+    domain: stonepoint.com
+  - canonical_name: TowerBrook Capital Partners
+    aliases:
+      - TowerBrook
+    domain: towerbrook.com
+  - canonical_name: Trilantic Capital Partners
+    aliases:
+      - Trilantic
+    domain: trilanticnorthamerica.com
+  - canonical_name: TSG Consumer Partners
+    aliases:
+      - TSG
+    domain: tsgconsumer.com
+  - canonical_name: Vector Capital
+    aliases:
+      - Vector
+    domain: vectorcapital.com
+  - canonical_name: Waterland Private Equity
+    aliases:
+      - Waterland
+    domain: waterland.be
+  - canonical_name: Wind Point Partners
+    aliases:
+      - Wind Point
+    domain: wppartners.com
+  - canonical_name: Audax Private Equity
+    aliases:
+      - Audax Group
+      - Audax
+    domain: audaxprivateequity.com
+  - canonical_name: Gridiron Capital
+    aliases:
+      - Gridiron
+    domain: gridironcapital.com
+  - canonical_name: Huron Capital
+    aliases:
+      - Huron
+      - Huron Capital Partners
+    domain: huroncapital.com
+  - canonical_name: Luminate Capital Partners
+    aliases:
+      - Luminate
+    domain: luminatecapital.com
+  - canonical_name: Monomoy Capital Partners
+    aliases:
+      - Monomoy
+    domain: mcp.com
+  - canonical_name: Nautic Partners
+    aliases:
+      - Nautic
+    domain: nautic.com
+  - canonical_name: ParkerGale Capital
+    aliases:
+      - ParkerGale
+    domain: parkergale.com
+  - canonical_name: Riverside Company
+    aliases:
+      - The Riverside Company
+      - Riverside
+    domain: riversidecompany.com
+  - canonical_name: Shore Capital Partners
+    aliases:
+      - Shore Capital
+      - Shore
+    domain: shorecp.com
+  - canonical_name: Sun Capital Partners
+    aliases:
+      - Sun Capital
+    domain: suncap.com
+  - canonical_name: Main Street Capital
+    aliases:
+      - Main Street
+    domain: mainstcapital.com
+  - canonical_name: Inflexion
+    aliases:
+      - Inflexion Private Equity
+    domain: inflexion.com
+  - canonical_name: Gryphon Investors
+    aliases:
+      - Gryphon
+    domain: gryphon-inv.com
+  - canonical_name: HGGC
+    aliases:
+      - Huntsman Gay Global Capital
+    domain: hggc.com
+  - canonical_name: FFP
+    aliases:
+      - Flexpoint Ford
+    domain: flexpointford.com
+  - canonical_name: Parthenon Capital
+    aliases:
+      - Parthenon
+    domain: parthenoncapital.com
+  - canonical_name: Linden Capital Partners
+    aliases:
+      - Linden
+    domain: lindenlp.com
+  - canonical_name: Kohlberg & Company
+    aliases:
+      - Kohlberg
+    domain: kohlberg.com
+  - canonical_name: Bertram Capital
+    aliases:
+      - Bertram
+    domain: bertramcapital.com
+  - canonical_name: JLL Partners
+    aliases:
+      - JLL
+    domain: jllpartners.com

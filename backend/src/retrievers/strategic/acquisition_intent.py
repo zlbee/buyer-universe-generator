@@ -170,40 +170,74 @@ class StrategicAcquisitionIntentRetriever:
         since = calendar_years_before(self.as_of_date, lookback_years)
         same_terms, adjacent_terms = _industry_terms(target_profile, max_queries, self.strategy.settings.keyword_taxonomy_path)
         target_sic = normalize_sic(target_profile.sic)
-        prompt = _strategic_intent_web_search_prompt(
-            target_profile,
-            same_terms,
-            adjacent_terms,
-            config.transaction_terms,
-            since,
-            self.as_of_date,
-            max_candidates=max_candidates,
-            max_evidence_per_candidate=max_evidence_per_candidate,
-        )
-        try:
-            payload = self.web_search_client.generate_json_with_web_search(
-                prompt,
-                _STRATEGIC_INTENT_SCHEMA_NAME,
-                _strategic_intent_json_schema(max_candidates, max_evidence_per_candidate),
-                system_prompt=_strategic_intent_web_search_system_prompt(),
-                max_results=web_search_source.config.retrieval.web_search_max_results,
-                max_total_results=web_search_source.config.retrieval.web_search_max_total_results,
-                search_engine=web_search_source.config.retrieval.web_search_engine,
-                search_context_size=web_search_source.config.retrieval.web_search_context_size,
-                fetch_engine=web_search_source.config.retrieval.web_fetch_engine,
-                fetch_max_uses=web_search_source.config.retrieval.web_fetch_max_uses,
-                fetch_max_content_tokens=web_search_source.config.retrieval.web_fetch_max_content_tokens,
-                source_business_type=_STRATEGIC_INTENT_BUSINESS_TYPE,
+        min_candidates_before_retry = min(max_candidates, config.min_candidates_before_retry or 0)
+        max_web_search_attempts = config.max_web_search_attempts or 1
+        all_candidates: list[_StrategicIntentCandidate] = []
+        records: list[_StrategicIntentRecord] = []
+        skip_reasons: dict[str, int] = {}
+        candidates_checked = 0
+        attempts_run = 0
+        attempt_metadata: list[dict[str, int]] = []
+        for attempt_index in range(max_web_search_attempts):
+            prompt = _strategic_intent_web_search_prompt(
+                target_profile,
+                same_terms,
+                adjacent_terms,
+                config.transaction_terms,
+                since,
+                self.as_of_date,
+                max_candidates=max_candidates,
+                max_evidence_per_candidate=max_evidence_per_candidate,
+                broad_retry=attempt_index > 0,
+                min_candidates_before_retry=min_candidates_before_retry,
             )
-            output = _StrategicIntentOutput.model_validate(_normalize_web_search_payload(payload))
-        except MissingLLMConfigurationError as error:
-            warnings.append(f"{self.name} LLM web search unavailable: {error}")
-            return StrategicRetrievalResult(warnings=warnings, metadata=metadata)
-        except (LLMResponseError, ValidationError, ValueError) as error:
-            warnings.append(f"{self.name} LLM web search failed: {type(error).__name__}: {error}")
-            return StrategicRetrievalResult(warnings=warnings, metadata=metadata)
+            try:
+                payload = self.web_search_client.generate_json_with_web_search(
+                    prompt,
+                    _STRATEGIC_INTENT_SCHEMA_NAME,
+                    _strategic_intent_json_schema(max_candidates, max_evidence_per_candidate),
+                    system_prompt=_strategic_intent_web_search_system_prompt(),
+                    max_results=web_search_source.config.retrieval.web_search_max_results,
+                    max_total_results=web_search_source.config.retrieval.web_search_max_total_results,
+                    search_engine=web_search_source.config.retrieval.web_search_engine,
+                    search_context_size=web_search_source.config.retrieval.web_search_context_size,
+                    fetch_engine=web_search_source.config.retrieval.web_fetch_engine,
+                    fetch_max_uses=web_search_source.config.retrieval.web_fetch_max_uses,
+                    fetch_max_content_tokens=web_search_source.config.retrieval.web_fetch_max_content_tokens,
+                    source_business_type=_STRATEGIC_INTENT_BUSINESS_TYPE,
+                )
+                output = _StrategicIntentOutput.model_validate(_normalize_web_search_payload(payload))
+            except MissingLLMConfigurationError as error:
+                warnings.append(f"{self.name} LLM web search unavailable: {error}")
+                return StrategicRetrievalResult(warnings=warnings, metadata=metadata)
+            except (LLMResponseError, ValidationError, ValueError) as error:
+                if not all_candidates:
+                    warnings.append(f"{self.name} LLM web search failed: {type(error).__name__}: {error}")
+                    return StrategicRetrievalResult(warnings=warnings, metadata=metadata)
+                warnings.append(f"{self.name} LLM web search retry failed: {type(error).__name__}: {error}")
+                break
 
-        records, skip_reasons = _strategic_intent_records(output, target_profile, eligible_sector_matches)
+            attempts_run += 1
+            candidates_checked += len(output.candidates)
+            all_candidates.extend(output.candidates)
+            merged_output = _StrategicIntentOutput(target_sic=target_sic, candidates=all_candidates)
+            records, skip_reasons = _strategic_intent_records(
+                merged_output,
+                target_profile,
+                eligible_sector_matches,
+                same_terms,
+                adjacent_terms,
+            )
+            attempt_metadata.append(
+                {
+                    "attempt": attempts_run,
+                    "llm_candidates_returned": len(output.candidates),
+                    "merged_candidates_checked": len(all_candidates),
+                    "records_available": len(records),
+                }
+            )
+            if not min_candidates_before_retry or len(records) >= min_candidates_before_retry:
+                break
         evidence_available_before_cap = sum(len(record.evidence_items) for record in records)
         hits: list[CandidateHit] = []
         evidence_used = 0
@@ -244,7 +278,11 @@ class StrategicAcquisitionIntentRetriever:
                 "same_industry_terms": same_terms,
                 "adjacent_industry_terms": adjacent_terms,
                 "intent_terms": config.transaction_terms,
-                "llm_web_search_candidates_checked": len(output.candidates),
+                "llm_web_search_candidates_checked": candidates_checked,
+                "llm_web_search_attempts": attempts_run,
+                "min_candidates_before_retry": min_candidates_before_retry,
+                "max_web_search_attempts": max_web_search_attempts,
+                "attempts": attempt_metadata,
                 "candidate_records_available_before_cap": len(records),
                 "candidate_records_truncated": candidate_records_truncated,
                 "evidence_available_before_cap": evidence_available_before_cap,
@@ -261,6 +299,8 @@ def _strategic_intent_records(
     output: _StrategicIntentOutput,
     target_profile: TargetProfile,
     eligible_sector_matches: set[str],
+    same_terms: list[str],
+    adjacent_terms: list[str],
 ) -> tuple[list[_StrategicIntentRecord], dict[str, int]]:
     records: list[_StrategicIntentRecord] = []
     skip_reasons: dict[str, int] = {}
@@ -280,12 +320,15 @@ def _strategic_intent_records(
         if candidate_key in seen:
             _increment(skip_reasons, "duplicate_candidate")
             continue
-        sector_relevance = _candidate_sector_relevance(candidate)
+        sector_relevance = _candidate_sector_relevance(candidate, same_terms, adjacent_terms)
+        if not sector_relevance:
+            _increment(skip_reasons, "unknown_sector_relevance")
+            continue
         if sector_relevance not in eligible_sector_matches:
             _increment(skip_reasons, "unrelated_sector")
             continue
 
-        evidence_items = _valid_evidence_items(candidate.evidence, sector_relevance, eligible_sector_matches)
+        evidence_items = _valid_evidence_items(candidate.evidence, sector_relevance, eligible_sector_matches, same_terms, adjacent_terms)
         if not evidence_items:
             _increment(skip_reasons, "missing_evidence")
             continue
@@ -368,6 +411,8 @@ def _valid_evidence_items(
     evidence_items: list[_StrategicIntentEvidence],
     candidate_relevance: str,
     eligible_sector_matches: set[str],
+    same_terms: list[str],
+    adjacent_terms: list[str],
 ) -> list[_StrategicIntentEvidence]:
     valid_items: list[_StrategicIntentEvidence] = []
     seen_urls: set[str] = set()
@@ -377,7 +422,14 @@ def _valid_evidence_items(
         source_url = _clean_text(item.source_url)
         if not source_url or source_url in seen_urls:
             continue
-        relevance = _normalize_sector_relevance(item.sector_relevance) or candidate_relevance
+        relevance = _normalize_sector_relevance(item.sector_relevance)
+        if relevance == "unrelated":
+            continue
+        relevance = relevance or candidate_relevance or _industry_relevance_from_texts(
+            [item.evidence_summary, item.quote_or_snippet, item.source_title],
+            same_terms,
+            adjacent_terms,
+        )
         if relevance not in eligible_sector_matches:
             continue
         if not _evidence_text(item):
@@ -387,22 +439,28 @@ def _valid_evidence_items(
     return valid_items
 
 
-def _candidate_sector_relevance(candidate: _StrategicIntentCandidate) -> str:
+def _candidate_sector_relevance(
+    candidate: _StrategicIntentCandidate,
+    same_terms: list[str],
+    adjacent_terms: list[str],
+) -> str | None:
     relevance = _normalize_sector_relevance(candidate.sector_relevance)
     if relevance:
         return relevance
     relevance = _normalize_sector_relevance(candidate.fit_reason)
     if relevance:
         return relevance
+    fallback_texts: list[str | None] = [candidate.fit_reason]
     for item in candidate.evidence:
         relevance = _normalize_sector_relevance(item.sector_relevance)
         if relevance:
             return relevance
-        for text in (item.evidence_summary, item.quote_or_snippet):
+        fallback_texts.extend([item.evidence_summary, item.quote_or_snippet, item.source_title])
+        for text in (item.evidence_summary, item.quote_or_snippet, item.source_title):
             relevance = _normalize_sector_relevance(text)
             if relevance:
                 return relevance
-    return "unrelated"
+    return _industry_relevance_from_texts(fallback_texts, same_terms, adjacent_terms)
 
 
 def _candidate_identity_metadata(candidate: _StrategicIntentCandidate) -> dict[str, Any]:
@@ -547,6 +605,35 @@ def _normalize_sector_relevance(value: str | None) -> str | None:
     return None
 
 
+def _industry_relevance_from_texts(
+    texts: list[str | None],
+    same_terms: list[str],
+    adjacent_terms: list[str],
+) -> str | None:
+    combined_text = _normalize_match_text(" ".join(text for text in texts if text))
+    if not combined_text:
+        return None
+    if _contains_industry_term(combined_text, same_terms):
+        return "same"
+    if _contains_industry_term(combined_text, adjacent_terms):
+        return "adjacent"
+    return None
+
+
+def _contains_industry_term(normalized_text: str, terms: list[str]) -> bool:
+    for term in terms:
+        normalized_term = _normalize_match_text(term)
+        if len(normalized_term) < 4:
+            continue
+        if re.search(rf"\b{re.escape(normalized_term)}\b", normalized_text):
+            return True
+    return False
+
+
+def _normalize_match_text(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
+
+
 def _strategic_intent_web_search_prompt(
     target_profile: TargetProfile,
     same_terms: list[str],
@@ -557,23 +644,40 @@ def _strategic_intent_web_search_prompt(
     *,
     max_candidates: int,
     max_evidence_per_candidate: int,
+    broad_retry: bool = False,
+    min_candidates_before_retry: int = 0,
 ) -> str:
     sic = normalize_sic(target_profile.sic) or "unknown"
+    same_text = ", ".join(same_terms[:12]) or "not available"
     adjacent_text = ", ".join(adjacent_terms[:12]) or "not available"
     intent_text = ", ".join(intent_terms[:12]) or "acquisition, M&A, corporate development"
+    breadth_instruction = (
+        f"Return a broad candidate pool: aim for 8 to 15 distinct sourced operating companies when sources exist, "
+        f"up to {max_candidates}; do not stop after finding the first valid example. "
+    )
+    if broad_retry:
+        retry_floor = min_candidates_before_retry or 5
+        breadth_instruction = (
+            f"This is a low-recall retry; broaden discovery and fill the candidate pool to at least {retry_floor} "
+            f"distinct sourced operating companies when possible, up to {max_candidates}. "
+            "Prefer new companies not already obvious from the first narrow search. "
+        )
     return (
         "Use web search. "
         "Find operating companies, not private equity or other financial sponsors, that have sourced strategic acquisition "
         f"intent in the same or adjacent industries from {since.isoformat()} through {as_of_date.isoformat()}. "
         f"Industry context only: SIC={sic}. "
+        f"Same-industry terms: {same_text}. "
         f"Adjacent-industry terms: {adjacent_text}. "
         f"Strategic intent terms: {intent_text}. "
-        "Prioritize SEC filings, investor-relations press releases, official acquisition pages, and official investor presentations. "
+        "Enumerate qualifying companies from SEC filings, investor-relations decks, official press releases, official acquisition "
+        "or strategy pages, official investor presentations, and reputable sector M&A articles. "
         "Do not search by or mention a specific seller company name, and do not infer a seller-specific transaction rumor. "
         "Accept evidence such as official strategy pages, investor presentations, earnings-call statements, corporate-development "
         "hiring pages, press releases, or reputable news saying the company plans, seeks, prioritizes, or actively pursues "
         "acquisitions or M&A in the relevant category. "
-        f"Return at most {max_candidates} companies and at most {max_evidence_per_candidate} evidence items per company. "
+        f"{breadth_instruction}"
+        f"Return at most {max_evidence_per_candidate} evidence items per company. "
         "Every evidence item must include a source URL."
     )
 
@@ -664,11 +768,68 @@ def _strategic_intent_json_schema(max_candidates: int, max_evidence_per_candidat
 
 def _industry_terms(target_profile: TargetProfile, max_queries: int, taxonomy_path: Any) -> tuple[list[str], list[str]]:
     taxonomy_terms = _sic_taxonomy_terms(taxonomy_path, normalize_sic(target_profile.sic))
-    same_terms = unique_terms([*taxonomy_terms, *target_profile.products, *target_profile.keywords])[:max_queries]
-    adjacent_terms = unique_terms(
-        [*target_profile.adjacent_categories, *target_profile.customer_segments, *target_profile.channels]
-    )[:max_queries]
+    same_terms = _prompt_safe_industry_terms(
+        target_profile,
+        [*taxonomy_terms, *target_profile.products, *target_profile.keywords],
+        max_queries,
+    )
+    adjacent_terms = _prompt_safe_industry_terms(
+        target_profile,
+        [*target_profile.adjacent_categories, *target_profile.customer_segments, *target_profile.channels],
+        max_queries,
+    )
     return same_terms, adjacent_terms
+
+
+def _prompt_safe_industry_terms(target_profile: TargetProfile, terms: list[str], max_terms: int) -> list[str]:
+    target_markers = _target_specific_markers(target_profile)
+    safe_terms: list[str] = []
+    for term in unique_terms(terms):
+        cleaned = _clean_text(term)
+        if not cleaned:
+            continue
+        if _contains_target_marker(cleaned, target_markers):
+            continue
+        # Long profile-derived phrases tend to describe the seller's positioning rather than the buyer market.
+        if len(_match_tokens(cleaned)) > 7:
+            continue
+        safe_terms.append(cleaned)
+        if len(safe_terms) >= max_terms:
+            break
+    return safe_terms
+
+
+def _target_specific_markers(target_profile: TargetProfile) -> tuple[set[str], set[str]]:
+    word_markers: set[str] = set()
+    compact_markers: set[str] = set()
+    ticker = _normalize_match_text(target_profile.ticker)
+    if ticker:
+        word_markers.add(ticker)
+        word_markers.add(" ".join(ticker))
+    target_name = _normalize_match_text(target_profile.name)
+    if target_name:
+        word_markers.add(target_name)
+        compact_name = target_name.replace(" ", "")
+        if len(compact_name) >= 6:
+            compact_markers.add(compact_name)
+    return word_markers, compact_markers
+
+
+def _contains_target_marker(term: str, target_markers: tuple[set[str], set[str]]) -> bool:
+    word_markers, compact_markers = target_markers
+    normalized_term = _normalize_match_text(term)
+    compact_term = normalized_term.replace(" ", "")
+    for marker in word_markers:
+        if marker and re.search(rf"\b{re.escape(marker)}\b", normalized_term):
+            return True
+    for marker in compact_markers:
+        if marker and marker in compact_term:
+            return True
+    return False
+
+
+def _match_tokens(value: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", value.casefold())
 
 
 def _sic_taxonomy_terms(taxonomy_path: Any, sic: str | None) -> list[str]:

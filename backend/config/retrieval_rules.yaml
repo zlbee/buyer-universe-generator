@@ -74,12 +74,12 @@ providers:
     api_key_env: BUG_OPENROUTER_API_KEY
     cache_ttl_hours: 0
     retrieval:
-      web_search_max_results: 25
-      web_search_max_total_results: 100
+      web_search_max_results: 10
+      web_search_max_total_results: 40
       web_search_engine: auto
       web_search_context_size: low
-      web_fetch_max_uses: 20
-      web_fetch_max_content_tokens: 50000
+      web_fetch_max_uses: 5
+      web_fetch_max_content_tokens: 12000
 
 # Evidence profiles are the runtime evidence-strength policy for each provider/dimension pair.
 evidence_profiles:
@@ -236,6 +236,8 @@ stages:
         max_documents: 60
         max_queries: 8
         max_evidence_per_candidate: 2
+        min_candidates_before_retry: 5
+        max_web_search_attempts: 2
         eligible_sector_matches:
           - same
           - adjacent
@@ -264,6 +266,9 @@ stages:
         max_queries: 5
         page_size: 20
         max_candidates: 100
+        # Bound PE sponsor web-search spend by scanning the ordered seed universe in small batches.
+        max_companies: 30
+        web_search_batch_size: 10
         eligible_sector_matches:
           - same
           - adjacent

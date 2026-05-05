@@ -46,15 +46,18 @@ def test_data_source_policy_configures_pe_deal_activity_retriever(tmp_path: Path
     assert sponsor_source.dimension_id == "buyer_long_list_recall.financial_sponsor_activity"
     assert sponsor_source.source_strength == SourceStrength.B
     assert llm_sponsor_source.source_strength == SourceStrength.C
-    assert llm_sponsor_source.config.retrieval.web_fetch_max_uses == 20
-    assert llm_sponsor_source.config.retrieval.web_fetch_max_content_tokens == 50000
+    assert llm_sponsor_source.config.retrieval.web_search_max_results == 10
+    assert llm_sponsor_source.config.retrieval.web_search_max_total_results == 40
+    assert llm_sponsor_source.config.retrieval.web_fetch_max_uses == 5
+    assert llm_sponsor_source.config.retrieval.web_fetch_max_content_tokens == 12000
     assert policy is not None
     assert policy.use_case == "buyer_recall_financial_sponsors"
     assert policy.source_roles["deal_activity_source"] == "fmp"
     assert policy.source_roles["llm_web_search_source"] == "llm_web_search"
     assert policy.source_priority == ["fmp", "llm_web_search"]
     assert policy.lookback_years == 5
-    assert policy.max_companies is None
+    assert policy.max_companies == 30
+    assert policy.web_search_batch_size == 10
     assert policy.max_queries == 5
     assert policy.eligible_sector_matches == ["same", "adjacent"]
 
@@ -166,8 +169,11 @@ def test_pe_deal_activity_retriever_adds_llm_web_search_deal_signals(tmp_path: P
     assert result.metadata["llm_web_search_documents_checked"] == 1
     assert result.metadata["llm_web_search_deal_count"] == 1
     assert web_search.source_business_types == ["financial_buyer_pe_deal_activity_web_search"]
-    assert web_search.calls[0]["fetch_max_uses"] == 20
-    assert web_search.calls[0]["fetch_max_content_tokens"] == 50000
+    assert web_search.calls[0]["max_results"] == 10
+    assert web_search.calls[0]["max_total_results"] == 40
+    assert web_search.calls[0]["fetch_max_uses"] == 5
+    assert web_search.calls[0]["fetch_max_content_tokens"] == 12000
+    assert web_search.calls[0]["json_schema"]["properties"]["firms"]["maxItems"] == 1
     assert "Use web search" in web_search.prompts[0]
     assert "Advent International" in web_search.prompts[0]
     assert "SIC=2844" in web_search.prompts[0]
@@ -176,7 +182,7 @@ def test_pe_deal_activity_retriever_adds_llm_web_search_deal_signals(tmp_path: P
     assert "Adjacent-industry terms" in web_search.prompts[0]
 
 
-def test_pe_deal_activity_retriever_checks_all_seed_firms_with_llm_by_default(tmp_path: Path) -> None:
+def test_pe_deal_activity_retriever_batches_seed_firms_for_llm_by_default(tmp_path: Path) -> None:
     strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path, fmp_api_key=None))
     web_search = FakeWebSearchJSONClient({"pe_firm": None, "sic": "2844", "deals": []})
     retriever = PEDealActivityRetriever(
@@ -195,13 +201,61 @@ def test_pe_deal_activity_retriever_checks_all_seed_firms_with_llm_by_default(tm
     result = retriever.retrieve_with_context(sample_profile())
 
     assert result.hits == []
-    assert len(web_search.prompts) == 3
+    assert len(web_search.prompts) == 1
     assert "Advent International" in web_search.prompts[0]
-    assert "Bain Capital" in web_search.prompts[1]
-    assert "KKR" in web_search.prompts[2]
+    assert "Bain Capital" in web_search.prompts[0]
+    assert "KKR" in web_search.prompts[0]
+    assert web_search.calls[0]["json_schema"]["properties"]["firms"]["maxItems"] == 3
     assert result.metadata["seed_firm_count"] == 3
     assert result.metadata["seed_firms_checked"] == 3
+    assert result.metadata["llm_web_search_batch_size"] == 10
+    assert result.metadata["llm_web_search_batches_checked"] == 1
     assert result.metadata["llm_web_search_no_deal_firm_count"] == 3
+
+
+def test_pe_deal_activity_retriever_parses_batched_llm_firm_results(tmp_path: Path) -> None:
+    strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path, fmp_api_key=None))
+    web_search = FakeWebSearchJSONClient(
+        {
+            "sic": "2844",
+            "firms": [
+                {
+                    "pe_firm": "Advent International",
+                    "deals": [
+                        {
+                            "has_relevant_deal": True,
+                            "evidence_summary": "Advent International acquired Beauty Labs, a cosmetics company.",
+                            "acquisition_date": "2025-03-01",
+                            "acquired_company": "Beauty Labs",
+                            "sector_relevance": "same",
+                            "source_url": "https://www.adventinternational.com/beauty-labs",
+                            "source_title": "Advent International acquires Beauty Labs",
+                            "deal_type": "acquisition",
+                        }
+                    ],
+                },
+                {"pe_firm": "Bain Capital", "deals": []},
+            ],
+        }
+    )
+    retriever = PEDealActivityRetriever(
+        strategy,
+        web_search_client=web_search,
+        seed_universe=PESeedUniverse(
+            firms=[
+                PESeedFirm(canonical_name="Advent International"),
+                PESeedFirm(canonical_name="Bain Capital"),
+            ]
+        ),
+        as_of_date=date(2026, 5, 4),
+    )
+
+    result = retriever.retrieve_with_context(sample_profile())
+
+    assert [hit.candidate_name for hit in result.hits] == ["Advent International"]
+    assert len(web_search.prompts) == 1
+    assert result.metadata["llm_web_search_documents_checked"] == 1
+    assert result.metadata["llm_web_search_no_deal_firm_count"] == 1
 
 
 def test_pe_deal_activity_retriever_preserves_llm_hits_under_document_cap(tmp_path: Path) -> None:

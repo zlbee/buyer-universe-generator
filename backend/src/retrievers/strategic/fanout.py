@@ -21,7 +21,7 @@ class BuyerCandidateRetriever:
         cache: BuyerRecallCache | None = None,
         cache_ttl_hours: int = 24,
         stage_name: str = DEFAULT_STRATEGIC_BUYER_RECALL_STAGE,
-        stage_version: str = "buyer-recall-v1",
+        stage_version: str = "buyer-recall-v2",
     ) -> None:
         self.retrievers = retrievers
         self.cache = cache
