@@ -36,7 +36,7 @@ def test_data_source_policy_configures_pe_deal_activity_retriever(tmp_path: Path
     strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path))
 
     sponsor_source = strategy.selected_source("buyer_recall_financial_sponsors", "fmp", include_disabled=True)
-    llm_sponsor_source = strategy.selected_source("buyer_recall_financial_sponsors", "openrouter_web_search", include_disabled=True)
+    llm_sponsor_source = strategy.selected_source("buyer_recall_financial_sponsors", "llm_web_search", include_disabled=True)
     policy = strategy.retriever_config("PEDealActivityRetriever")
 
     assert sponsor_source is not None
@@ -47,8 +47,8 @@ def test_data_source_policy_configures_pe_deal_activity_retriever(tmp_path: Path
     assert policy is not None
     assert policy.use_case == "buyer_recall_financial_sponsors"
     assert policy.source_roles["deal_activity_source"] == "fmp"
-    assert policy.source_roles["llm_web_search_source"] == "openrouter_web_search"
-    assert policy.source_priority == ["fmp", "openrouter_web_search"]
+    assert policy.source_roles["llm_web_search_source"] == "llm_web_search"
+    assert policy.source_priority == ["fmp", "llm_web_search"]
     assert policy.lookback_years == 5
     assert policy.max_companies is None
     assert policy.max_queries == 5

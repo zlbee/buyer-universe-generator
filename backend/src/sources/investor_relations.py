@@ -250,7 +250,7 @@ class InvestorRelationsPageDiscovery(ExternalDataSourceClient):
             metadata={
                 "page_role": "investor_relations",
                 "discovered_from": "llm_web_search",
-                "discovery_provider": "openrouter_web_search",
+                "discovery_provider": "openrouter.ai",
                 "domain": urlparse(final_url).netloc,
                 "source_candidate_url": candidate_url,
                 "candidate_rank": rank,

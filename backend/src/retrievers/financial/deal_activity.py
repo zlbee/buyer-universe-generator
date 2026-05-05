@@ -91,6 +91,7 @@ class _PEDealWebSearchOutput(BaseModel):
 
 _PE_DEAL_WEB_SEARCH_SCHEMA_NAME = "PEDealActivityWebSearch"
 _PE_DEAL_WEB_SEARCH_BUSINESS_TYPE = "financial_buyer_pe_deal_activity_web_search"
+_LLM_WEB_SEARCH_SOURCE_ID = "llm_web_search"
 _WEB_SEARCH_SOURCE_PATH = "pe_deal_activity_llm_web_search"
 _PE_DEAL_WEB_SEARCH_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -406,10 +407,10 @@ def _hit_from_signals(signals: list[_PEDealSignal], retriever_name: str, since: 
     evidence = [signal.evidence for signal in signals]
     same_count = sum(1 for event in events if event.sector_match == "same")
     adjacent_count = sum(1 for event in events if event.sector_match == "adjacent")
-    pending_verification = any(signal.document.source_id == "openrouter_web_search" for signal in signals)
+    pending_verification = any(_is_llm_web_search_document(signal.document) for signal in signals)
     base_confidence = 0.76 if same_count else 0.66
     confidence = min(0.9, base_confidence + max(0, len(events) - 1) * 0.04)
-    if pending_verification and all(signal.document.source_id == "openrouter_web_search" for signal in signals):
+    if pending_verification and all(_is_llm_web_search_document(signal.document) for signal in signals):
         confidence = min(confidence, 0.58)
 
     return CandidateHit(
@@ -431,7 +432,7 @@ def _hit_from_signals(signals: list[_PEDealSignal], retriever_name: str, since: 
             "deal_events": [event.model_dump(mode="json") for event in events],
             "same_sector_event_count": same_count,
             "adjacent_sector_event_count": adjacent_count,
-            "llm_web_search_event_count": sum(1 for signal in signals if signal.document.source_id == "openrouter_web_search"),
+            "llm_web_search_event_count": sum(1 for signal in signals if _is_llm_web_search_document(signal.document)),
         },
     )
 
@@ -897,14 +898,20 @@ def _dedupe_documents(documents: list[SourceDocument]) -> list[SourceDocument]:
     return deduped
 
 
+def _is_llm_web_search_document(document: SourceDocument) -> bool:
+    """Identify LLM web-search evidence independently from the concrete LLM provider."""
+
+    return document.source_id == _LLM_WEB_SEARCH_SOURCE_ID or document.metadata.get("discovered_from") == "llm_web_search"
+
+
 def _cap_documents_preserving_sources(documents: list[SourceDocument], max_documents: int) -> list[SourceDocument]:
     """Apply the retriever-level document cap while keeping LLM web-search evidence from being starved by FMP volume."""
 
     if len(documents) <= max_documents:
         return documents
 
-    web_documents = [document for document in documents if document.source_id == "openrouter_web_search"]
-    other_documents = [document for document in documents if document.source_id != "openrouter_web_search"]
+    web_documents = [document for document in documents if _is_llm_web_search_document(document)]
+    other_documents = [document for document in documents if not _is_llm_web_search_document(document)]
     if not web_documents or not other_documents:
         return documents[:max_documents]
 

@@ -93,7 +93,7 @@ class DataSourceStrategy:
             return False, "missing BUG_NEWS_API_KEY"
         if source_id == "fmp" and not self.settings.fmp_api_key:
             return False, "missing BUG_FMP_API_KEY"
-        if source_id == "openrouter_web_search" and not self.settings.openrouter_api_key:
+        if config.provider == "openrouter.ai" and not self.settings.openrouter_api_key:
             return False, "missing BUG_OPENROUTER_API_KEY"
 
         if config.api_key_env and not os.getenv(config.api_key_env) and not self._settings_key_present(config.api_key_env):

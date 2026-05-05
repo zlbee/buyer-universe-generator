@@ -301,7 +301,7 @@ sources:
           - channel_relationship_mentions
         rationale: RSS search can surface supplemental strategic-signal leads, but later validation must cite the underlying publisher.
 
-  openrouter_web_search:
+  llm_web_search:
     provider: openrouter.ai
     enabled: true
     required: false
@@ -375,10 +375,10 @@ retrievers:
     use_case: buyer_recall_financial_sponsors
     source_roles:
       deal_activity_source: fmp
-      llm_web_search_source: openrouter_web_search
+      llm_web_search_source: llm_web_search
     source_priority:
       - fmp
-      - openrouter_web_search
+      - llm_web_search
     lookback_years: 5
     max_documents: 100
     max_queries: 5
@@ -470,7 +470,7 @@ use_cases:
   buyer_recall_financial_sponsors:
     - source_id: fmp
       dimension: buyer_long_list_recall.financial_sponsor_activity
-    - source_id: openrouter_web_search
+    - source_id: llm_web_search
       dimension: buyer_long_list_recall.financial_sponsor_activity
     - source_id: newsapi
       dimension: buyer_long_list_recall.financial_sponsor_activity
