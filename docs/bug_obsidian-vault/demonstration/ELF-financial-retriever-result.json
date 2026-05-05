@@ -1,0 +1,539 @@
+{
+    "hits": [
+        {
+            "candidate_name": "Advent International",
+            "candidate_ticker": null,
+            "candidate_cik": null,
+            "candidate_domain": "adventinternational.com",
+            "buyer_type": "financial",
+            "retriever_name": "PEDealActivityRetriever",
+            "source_path": [
+                "pe_deal_activity_llm_web_search"
+            ],
+            "data_source": [
+                "llm_web_search"
+            ],
+            "fit_reason": "Completed 2 adjacent-sector PE deal signal(s) since 2021-05-05.",
+            "evidence": [
+                {
+                    "claim": "Advent International had a acquisition signal involving bareMinerals; BUXOM; Laura Mercier (acquired via Orveon from Shiseido Americas) with adjacent target-industry relevance.",
+                    "source_type": "transaction_signal",
+                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_strength": "C",
+                    "url": "http://www.prnewswire.com/news-releases/advent-international-announces-launch-of-orveon-closing-of-agreement-with-shiseido-americas-301437334.html",
+                    "filing_accession": null,
+                    "retrieved_at": "2026-05-05T12:52:07.893921Z",
+                    "quote_or_snippet": "Advent announced (via a newly formed affiliate) it would acquire cosmetics brands bareMinerals, BUXOM, and Laura Mercier from Shiseido Americas, with the acquisition closing on Dec. 6, 2021 (agreement announced Aug. 25, 2021). These are cosmetics/color cosmetics/beauty products b",
+                    "verified_fact": false
+                },
+                {
+                    "claim": "Advent International had a investment signal involving Skala Cosméticos with adjacent target-industry relevance.",
+                    "source_type": "transaction_signal",
+                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_strength": "C",
+                    "url": "https://www.adventinternational.com/news/advent-international-announces-strategic-investment-in-skala-cosmeticos/",
+                    "filing_accession": null,
+                    "retrieved_at": "2026-05-05T12:52:07.894146Z",
+                    "quote_or_snippet": "Advent announced it acquired a controlling stake in Skala Cosméticos, a vegan hair care/beauty brand, aimed at expanding brand presence. While Skala is hair care (not strictly cosmetics of the listed terms), it is within beauty/personal care adjacent to SIC 2844.",
+                    "verified_fact": false
+                }
+            ],
+            "confidence": 0.58,
+            "pending_verification": true,
+            "retrieval_metadata": {
+                "lookback_start": "2021-05-05",
+                "matched_seed_firm": "Advent International",
+                "matched_aliases": [
+                    "Advent International"
+                ],
+                "raw_acquirers": [
+                    "Advent International"
+                ],
+                "query_terms": [],
+                "deal_events": [
+                    {
+                        "buyer": "Advent International",
+                        "target_acquired": "bareMinerals; BUXOM; Laura Mercier (acquired via Orveon from Shiseido Americas)",
+                        "deal_date": "2021-12-06",
+                        "deal_type": "acquisition",
+                        "sector_match": "adjacent",
+                        "source_type": "transaction_signal",
+                        "url": "http://www.prnewswire.com/news-releases/advent-international-announces-launch-of-orveon-closing-of-agreement-with-shiseido-americas-301437334.html",
+                        "filing_accession": null,
+                        "quote_or_snippet": "Advent announced (via a newly formed affiliate) it would acquire cosmetics brands bareMinerals, BUXOM, and Laura Mercier from Shiseido Americas, with the acquisition closing on Dec. 6, 2021 (agreement announced Aug. 25, 2021). These are cosmetics/color cosmetics/beauty products b"
+                    },
+                    {
+                        "buyer": "Advent International",
+                        "target_acquired": "Skala Cosméticos",
+                        "deal_date": "2024-02-28",
+                        "deal_type": "investment",
+                        "sector_match": "adjacent",
+                        "source_type": "transaction_signal",
+                        "url": "https://www.adventinternational.com/news/advent-international-announces-strategic-investment-in-skala-cosmeticos/",
+                        "filing_accession": null,
+                        "quote_or_snippet": "Advent announced it acquired a controlling stake in Skala Cosméticos, a vegan hair care/beauty brand, aimed at expanding brand presence. While Skala is hair care (not strictly cosmetics of the listed terms), it is within beauty/personal care adjacent to SIC 2844."
+                    }
+                ],
+                "same_sector_event_count": 0,
+                "adjacent_sector_event_count": 2,
+                "llm_web_search_event_count": 2
+            }
+        },
+        {
+            "candidate_name": "CVC Capital Partners",
+            "candidate_ticker": null,
+            "candidate_cik": null,
+            "candidate_domain": "cvc.com",
+            "buyer_type": "financial",
+            "retriever_name": "PEDealActivityRetriever",
+            "source_path": [
+                "pe_deal_activity_llm_web_search"
+            ],
+            "data_source": [
+                "llm_web_search"
+            ],
+            "fit_reason": "Completed 1 adjacent-sector PE deal signal(s) since 2021-05-05.",
+            "evidence": [
+                {
+                    "claim": "CVC Capital Partners had a acquisition signal involving Shiseido Personal Care business (brands incl. SENKA and TSUBAKI) via Fine Today Shiseido / KK Asian Personal Care Holding with adjacent target-industry relevance.",
+                    "source_type": "transaction_signal",
+                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_strength": "C",
+                    "url": "https://www.cvc.com/media/news/2021/2021-02-03-cvc-capital-partners-agrees-to-joint-venture-with-shiseido-in-personal-care-business/",
+                    "filing_accession": null,
+                    "retrieved_at": "2026-05-05T12:52:07.895873Z",
+                    "quote_or_snippet": "CVC Capital Partners agreed (and later completed transfer) to acquire Shiseido’s personal care business via a joint venture that included skincare and haircare brands such as SENKA and TSUBAKI. This aligns with perfumes/cosmetics/beauty and skin/hair care products (SIC 2844 adjac",
+                    "verified_fact": false
+                }
+            ],
+            "confidence": 0.58,
+            "pending_verification": true,
+            "retrieval_metadata": {
+                "lookback_start": "2021-05-05",
+                "matched_seed_firm": "CVC Capital Partners",
+                "matched_aliases": [
+                    "CVC Capital Partners"
+                ],
+                "raw_acquirers": [
+                    "CVC Capital Partners"
+                ],
+                "query_terms": [],
+                "deal_events": [
+                    {
+                        "buyer": "CVC Capital Partners",
+                        "target_acquired": "Shiseido Personal Care business (brands incl. SENKA and TSUBAKI) via Fine Today Shiseido / KK Asian Personal Care Holding",
+                        "deal_date": "2021-07-01",
+                        "deal_type": "acquisition",
+                        "sector_match": "adjacent",
+                        "source_type": "transaction_signal",
+                        "url": "https://www.cvc.com/media/news/2021/2021-02-03-cvc-capital-partners-agrees-to-joint-venture-with-shiseido-in-personal-care-business/",
+                        "filing_accession": null,
+                        "quote_or_snippet": "CVC Capital Partners agreed (and later completed transfer) to acquire Shiseido’s personal care business via a joint venture that included skincare and haircare brands such as SENKA and TSUBAKI. This aligns with perfumes/cosmetics/beauty and skin/hair care products (SIC 2844 adjac"
+                    }
+                ],
+                "same_sector_event_count": 0,
+                "adjacent_sector_event_count": 1,
+                "llm_web_search_event_count": 1
+            }
+        },
+        {
+            "candidate_name": "Gryphon Investors",
+            "candidate_ticker": null,
+            "candidate_cik": null,
+            "candidate_domain": "gryphon-inv.com",
+            "buyer_type": "financial",
+            "retriever_name": "PEDealActivityRetriever",
+            "source_path": [
+                "pe_deal_activity_llm_web_search"
+            ],
+            "data_source": [
+                "llm_web_search"
+            ],
+            "fit_reason": "Completed 1 adjacent-sector PE deal signal(s) since 2021-05-05.",
+            "evidence": [
+                {
+                    "claim": "Gryphon Investors had a acquisition signal involving Revision Skincare and Goodier Cosmetics (Revision Goodier) with adjacent target-industry relevance.",
+                    "source_type": "transaction_signal",
+                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_strength": "C",
+                    "url": "https://www.gryphon-inv.com/news/gryphon-investors-announces-acquisition-of-revision-goodier/",
+                    "filing_accession": null,
+                    "retrieved_at": "2026-05-05T12:52:07.896027Z",
+                    "quote_or_snippet": "Gryphon signed a definitive agreement to acquire Revision Skincare and Goodier Cosmetics (Revision Goodier), described as clinically-proven skincare products and a topical skincare CDMO/manufacturer. Terms undisclosed; expected close in Q4 2021.",
+                    "verified_fact": false
+                }
+            ],
+            "confidence": 0.58,
+            "pending_verification": true,
+            "retrieval_metadata": {
+                "lookback_start": "2021-05-05",
+                "matched_seed_firm": "Gryphon Investors",
+                "matched_aliases": [
+                    "Gryphon Investors"
+                ],
+                "raw_acquirers": [
+                    "Gryphon Investors"
+                ],
+                "query_terms": [],
+                "deal_events": [
+                    {
+                        "buyer": "Gryphon Investors",
+                        "target_acquired": "Revision Skincare and Goodier Cosmetics (Revision Goodier)",
+                        "deal_date": "2021-11-01",
+                        "deal_type": "acquisition",
+                        "sector_match": "adjacent",
+                        "source_type": "transaction_signal",
+                        "url": "https://www.gryphon-inv.com/news/gryphon-investors-announces-acquisition-of-revision-goodier/",
+                        "filing_accession": null,
+                        "quote_or_snippet": "Gryphon signed a definitive agreement to acquire Revision Skincare and Goodier Cosmetics (Revision Goodier), described as clinically-proven skincare products and a topical skincare CDMO/manufacturer. Terms undisclosed; expected close in Q4 2021."
+                    }
+                ],
+                "same_sector_event_count": 0,
+                "adjacent_sector_event_count": 1,
+                "llm_web_search_event_count": 1
+            }
+        },
+        {
+            "candidate_name": "HGGC",
+            "candidate_ticker": null,
+            "candidate_cik": null,
+            "candidate_domain": "hggc.com",
+            "buyer_type": "financial",
+            "retriever_name": "PEDealActivityRetriever",
+            "source_path": [
+                "pe_deal_activity_llm_web_search"
+            ],
+            "data_source": [
+                "llm_web_search"
+            ],
+            "fit_reason": "Completed 1 adjacent-sector PE deal signal(s) since 2021-05-05.",
+            "evidence": [
+                {
+                    "claim": "HGGC had a investment signal involving Beauty Industry Group with adjacent target-industry relevance.",
+                    "source_type": "transaction_signal",
+                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_strength": "C",
+                    "url": "https://www.prnewswire.com/news-releases/beauty-industry-group-announces-investment-from-l-catterton-301353548.html",
+                    "filing_accession": null,
+                    "retrieved_at": "2026-05-05T12:52:07.896066Z",
+                    "quote_or_snippet": "HGGC was an existing shareholder in Beauty Industry Group, and L Catterton acquired a majority stake in Beauty Industry Group (hair extensions and other beauty products). Deal announced Aug 11, 2021; the transaction includes beauty products exposure.",
+                    "verified_fact": false
+                }
+            ],
+            "confidence": 0.58,
+            "pending_verification": true,
+            "retrieval_metadata": {
+                "lookback_start": "2021-05-05",
+                "matched_seed_firm": "HGGC",
+                "matched_aliases": [
+                    "HGGC"
+                ],
+                "raw_acquirers": [
+                    "HGGC"
+                ],
+                "query_terms": [],
+                "deal_events": [
+                    {
+                        "buyer": "HGGC",
+                        "target_acquired": "Beauty Industry Group",
+                        "deal_date": "2021-08-11",
+                        "deal_type": "investment",
+                        "sector_match": "adjacent",
+                        "source_type": "transaction_signal",
+                        "url": "https://www.prnewswire.com/news-releases/beauty-industry-group-announces-investment-from-l-catterton-301353548.html",
+                        "filing_accession": null,
+                        "quote_or_snippet": "HGGC was an existing shareholder in Beauty Industry Group, and L Catterton acquired a majority stake in Beauty Industry Group (hair extensions and other beauty products). Deal announced Aug 11, 2021; the transaction includes beauty products exposure."
+                    }
+                ],
+                "same_sector_event_count": 0,
+                "adjacent_sector_event_count": 1,
+                "llm_web_search_event_count": 1
+            }
+        },
+        {
+            "candidate_name": "KKR",
+            "candidate_ticker": null,
+            "candidate_cik": null,
+            "candidate_domain": "kkr.com",
+            "buyer_type": "financial",
+            "retriever_name": "PEDealActivityRetriever",
+            "source_path": [
+                "pe_deal_activity_llm_web_search"
+            ],
+            "data_source": [
+                "llm_web_search"
+            ],
+            "fit_reason": "Completed 1 adjacent-sector PE deal signal(s) since 2021-05-05.",
+            "evidence": [
+                {
+                    "claim": "KKR had a Acquisition (majority stake buyout) signal involving Vini Cosmetics with adjacent target-industry relevance.",
+                    "source_type": "transaction_signal",
+                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_strength": "C",
+                    "url": "https://www.businesswire.com/news/home/20210620005269/en/KKR-Invests-US%24625-Million-for-Controlling-Stake-in-Vini-Cosmetics",
+                    "filing_accession": null,
+                    "retrieved_at": "2026-05-05T12:52:07.894299Z",
+                    "quote_or_snippet": "KKR agreed to buy a majority stake in Vini Cosmetics, a branded personal care and beauty products company that manufactures branded deodorants, cosmetics, and toiletries (FOGG and other brands).",
+                    "verified_fact": false
+                }
+            ],
+            "confidence": 0.58,
+            "pending_verification": true,
+            "retrieval_metadata": {
+                "lookback_start": "2021-05-05",
+                "matched_seed_firm": "KKR",
+                "matched_aliases": [
+                    "KKR"
+                ],
+                "raw_acquirers": [
+                    "KKR"
+                ],
+                "query_terms": [],
+                "deal_events": [
+                    {
+                        "buyer": "KKR",
+                        "target_acquired": "Vini Cosmetics",
+                        "deal_date": "2021-06-20",
+                        "deal_type": "Acquisition (majority stake buyout)",
+                        "sector_match": "adjacent",
+                        "source_type": "transaction_signal",
+                        "url": "https://www.businesswire.com/news/home/20210620005269/en/KKR-Invests-US%24625-Million-for-Controlling-Stake-in-Vini-Cosmetics",
+                        "filing_accession": null,
+                        "quote_or_snippet": "KKR agreed to buy a majority stake in Vini Cosmetics, a branded personal care and beauty products company that manufactures branded deodorants, cosmetics, and toiletries (FOGG and other brands)."
+                    }
+                ],
+                "same_sector_event_count": 0,
+                "adjacent_sector_event_count": 1,
+                "llm_web_search_event_count": 1
+            }
+        },
+        {
+            "candidate_name": "Linden Capital Partners",
+            "candidate_ticker": null,
+            "candidate_cik": null,
+            "candidate_domain": "lindenlp.com",
+            "buyer_type": "financial",
+            "retriever_name": "PEDealActivityRetriever",
+            "source_path": [
+                "pe_deal_activity_llm_web_search"
+            ],
+            "data_source": [
+                "llm_web_search"
+            ],
+            "fit_reason": "Completed 1 adjacent-sector PE deal signal(s) since 2021-05-05.",
+            "evidence": [
+                {
+                    "claim": "Linden Capital Partners had a investment signal involving Formulated Solutions, LLC with adjacent target-industry relevance.",
+                    "source_type": "transaction_signal",
+                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_strength": "C",
+                    "url": "https://www.linden.com/news/2021/09/linden-invests-in-formulated-solutions/",
+                    "filing_accession": null,
+                    "retrieved_at": "2026-05-05T12:52:07.896103Z",
+                    "quote_or_snippet": "Linden invested in Formulated Solutions, a contract development and manufacturing services provider for OTC/Rx healthcare products with focus on complex topical formulations (i.e., topical consumer/personal care formulations).",
+                    "verified_fact": false
+                }
+            ],
+            "confidence": 0.58,
+            "pending_verification": true,
+            "retrieval_metadata": {
+                "lookback_start": "2021-05-05",
+                "matched_seed_firm": "Linden Capital Partners",
+                "matched_aliases": [
+                    "Linden Capital Partners"
+                ],
+                "raw_acquirers": [
+                    "Linden Capital Partners"
+                ],
+                "query_terms": [],
+                "deal_events": [
+                    {
+                        "buyer": "Linden Capital Partners",
+                        "target_acquired": "Formulated Solutions, LLC",
+                        "deal_date": "2021-09-28",
+                        "deal_type": "investment",
+                        "sector_match": "adjacent",
+                        "source_type": "transaction_signal",
+                        "url": "https://www.linden.com/news/2021/09/linden-invests-in-formulated-solutions/",
+                        "filing_accession": null,
+                        "quote_or_snippet": "Linden invested in Formulated Solutions, a contract development and manufacturing services provider for OTC/Rx healthcare products with focus on complex topical formulations (i.e., topical consumer/personal care formulations)."
+                    }
+                ],
+                "same_sector_event_count": 0,
+                "adjacent_sector_event_count": 1,
+                "llm_web_search_event_count": 1
+            }
+        },
+        {
+            "candidate_name": "TA Associates",
+            "candidate_ticker": null,
+            "candidate_cik": null,
+            "candidate_domain": "ta.com",
+            "buyer_type": "financial",
+            "retriever_name": "PEDealActivityRetriever",
+            "source_path": [
+                "pe_deal_activity_llm_web_search"
+            ],
+            "data_source": [
+                "llm_web_search"
+            ],
+            "fit_reason": "Completed 1 adjacent-sector PE deal signal(s) since 2021-05-05.",
+            "evidence": [
+                {
+                    "claim": "TA Associates had a Investment/exit (TA sells to strategic a signal involving Paula’s Choice with adjacent target-industry relevance.",
+                    "source_type": "transaction_signal",
+                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_strength": "C",
+                    "url": "https://www.ta.com/news/unilever-to-acquire-paulas-choice-from-ta-associates/",
+                    "filing_accession": null,
+                    "retrieved_at": "2026-05-05T12:52:07.895792Z",
+                    "quote_or_snippet": "TA Associates announced it entered into a definitive agreement to sell Paula’s Choice (digital-led skin care brand offering skincare products) to Unilever. Source indicates the seller is TA Associates.",
+                    "verified_fact": false
+                }
+            ],
+            "confidence": 0.58,
+            "pending_verification": true,
+            "retrieval_metadata": {
+                "lookback_start": "2021-05-05",
+                "matched_seed_firm": "TA Associates",
+                "matched_aliases": [
+                    "TA Associates"
+                ],
+                "raw_acquirers": [
+                    "TA Associates"
+                ],
+                "query_terms": [],
+                "deal_events": [
+                    {
+                        "buyer": "TA Associates",
+                        "target_acquired": "Paula’s Choice",
+                        "deal_date": "2021-06-14",
+                        "deal_type": "Investment/exit (TA sells to strategic a",
+                        "sector_match": "adjacent",
+                        "source_type": "transaction_signal",
+                        "url": "https://www.ta.com/news/unilever-to-acquire-paulas-choice-from-ta-associates/",
+                        "filing_accession": null,
+                        "quote_or_snippet": "TA Associates announced it entered into a definitive agreement to sell Paula’s Choice (digital-led skin care brand offering skincare products) to Unilever. Source indicates the seller is TA Associates."
+                    }
+                ],
+                "same_sector_event_count": 0,
+                "adjacent_sector_event_count": 1,
+                "llm_web_search_event_count": 1
+            }
+        }
+    ],
+    "warnings": [
+        "PEDealActivityRetriever LLM web search failed for batch Partners Group, Neuberger Berman, Ares Management, General Atlantic, Golden Gate Capital, Harvest Partners, New Mountain Capital, Onex, Veritas Capital, Vestar Capital Partners: ValidationError: 3 validation errors for _PEDealWebSearchOutput\nsic\n  Input should be a valid string [type=string_type, input_value=2844, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\nfirms.2.deals.0.evidence_summary\n  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\nfirms.5.deals.0.evidence_summary\n  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type",
+        "PEDealActivityRetriever LLM web search failed for batch Astorg, BC Partners, Bridgepoint, Cinven, HgCapital, J.W. Childs Associates, Kelso & Company, Nordic Capital, Providence Equity Partners, Searchlight Capital Partners: ValidationError: 1 validation error for _PEDealWebSearchOutput\nsic\n  Input should be a valid string [type=string_type, input_value=2844, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type",
+        "PEDealActivityRetriever LLM web search failed for batch Oaktree Capital Management, Bain Capital Double Impact, Charlesbank Capital Partners, GTCR, H.I.G. Capital, KPS Capital Partners, Littlejohn & Co., Madison Dearborn Partners, MidOcean Partners, One Equity Partners: ValidationError: 7 validation errors for _PEDealWebSearchOutput\nfirms.2.deals.0.evidence_summary\n  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\nfirms.3.deals.0.evidence_summary\n  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\nfirms.5.deals.0.evidence_summary\n  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\nfirms.6.deals.0.evidence_summary\n  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\nfirms.7.deals.0.evidence_summary\n  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\nfirms.8.deals.0.evidence_summary\n  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\nfirms.9.deals.0.evidence_summary\n  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type",
+        "PEDealActivityRetriever LLM web search failed for batch Palladium Equity Partners, Platinum Equity, Siris Capital Group, Stone Point Capital, TowerBrook Capital Partners, Trilantic Capital Partners, TSG Consumer Partners, Vector Capital, Waterland Private Equity, Wind Point Partners: ValidationError: 1 validation error for _PEDealWebSearchOutput\nfirms.0.deals.0.has_relevant_deal\n  Input should be a valid boolean [type=bool_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.13/v/bool_type",
+        "PEDealActivityRetriever LLM web search failed for batch Audax Private Equity, Gridiron Capital, Huron Capital, Luminate Capital Partners, Monomoy Capital Partners, Nautic Partners, ParkerGale Capital, Riverside Company, Shore Capital Partners, Sun Capital Partners: ValidationError: 1 validation error for _PEDealWebSearchOutput\nfirms.0.deals.1.evidence_summary\n  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type",
+        "PEDealActivityRetriever skipped 2 FMP deal(s) older than 2021-05-05",
+        "PEDealActivityRetriever skipped 1 FMP deal(s) without a parseable transaction date"
+    ],
+    "metadata": {
+        "retrievers": [
+            {
+                "name": "PEDealActivityRetriever",
+                "status": "completed",
+                "hit_count": 7,
+                "metadata": {
+                    "retriever": "PEDealActivityRetriever",
+                    "source_use_case": "buyer_recall_financial_sponsors",
+                    "source_roles": {
+                        "deal_activity_source": "fmp",
+                        "llm_web_search_source": "llm_web_search"
+                    },
+                    "source_priority": [
+                        "fmp",
+                        "llm_web_search"
+                    ],
+                    "source": "fmp",
+                    "lookback_start": "2021-05-05",
+                    "lookback_end": "2026-05-05",
+                    "query_terms": [
+                        "Perfumes, cosmetics, and other toilet preparations",
+                        "cosmetics",
+                        "beauty products",
+                        "personal care",
+                        "toiletries"
+                    ],
+                    "same_industry_terms": [
+                        "Perfumes, cosmetics, and other toilet preparations",
+                        "cosmetics",
+                        "beauty products",
+                        "personal care",
+                        "toiletries",
+                        "e.l.f. Cosmetics cosmetics (inclusive, accessible, clean, vegan, cruelty free)",
+                        "e.l.f. SKIN skin care (clean + kind; dermatologist-developed; vegan; cruelty free)",
+                        "Naturium skin care (natural botanicals and powerful actives; innovative technology)",
+                        "Well People beauty (plant-powered, high-performance beauty; “clean” and planet minded)",
+                        "Keys Soulcare premium-quality skin care (clean, cruelty free; Fair Trade Certified™ facility)",
+                        "beauty tools and accessories",
+                        "eye, lip and face makeup",
+                        "skin care products",
+                        "omni-channel distribution strategy",
+                        "retailers in the United States",
+                        "e-commerce (own direct e-commerce and mobile applications)",
+                        "other e-commerce websites (e.g., Amazon)",
+                        "international retailers",
+                        "mass cosmetics",
+                        "clean beauty",
+                        "multi-brand beauty company",
+                        "cruelty free",
+                        "skin care",
+                        "dermatologist-developed formulas",
+                        "Fair Trade Certified",
+                        "direct-to-consumer e-commerce",
+                        "Beauty Squad loyalty program",
+                        "powerhouse innovation",
+                        "disruptive marketing engine",
+                        "omni-channel distribution",
+                        "China-based sourcing"
+                    ],
+                    "adjacent_industry_terms": [
+                        "beauty tools and accessories",
+                        "cosmetics (eye, lip, face makeup)",
+                        "mass cosmetics",
+                        "prestige-inspired cosmetics at accessible price points",
+                        "clean beauty",
+                        "vegan/cruelty-free cosmetics",
+                        "skin care products",
+                        "consumers seeking inclusive, accessible, clean beauty; vegan and cruelty free",
+                        "retail customers (mass, drug store, food, dollar, specialty; leading retailers)",
+                        "domestic retail shoppers via mass/drug/food/dollar/specialty channels",
+                        "international retail shoppers",
+                        "omni-channel distribution strategy",
+                        "retailers in the United States",
+                        "e-commerce (own direct e-commerce and mobile applications)",
+                        "other e-commerce websites (e.g., Amazon)",
+                        "international retailers"
+                    ],
+                    "seed_firm_count": 90,
+                    "seed_firms_checked": 90,
+                    "llm_web_search_batch_size": 10,
+                    "llm_web_search_batches_checked": 9,
+                    "fmp_documents_checked": 0,
+                    "llm_web_search_documents_checked": 11,
+                    "llm_web_search_deal_count": 11,
+                    "llm_web_search_error_count": 5,
+                    "llm_web_search_no_deal_firm_count": 31,
+                    "documents_available_before_cap": 11,
+                    "documents_truncated": 0,
+                    "documents_checked": 11,
+                    "skip_reasons": {
+                        "older_than_lookback": 2,
+                        "future_dated": 0,
+                        "missing_date": 1,
+                        "missing_acquirer": 0,
+                        "non_seed_acquirer": 0,
+                        "unrelated_sector": 0,
+                        "no_transaction_language": 0
+                    },
+                    "hit_count": 7
+                }
+            }
+        ],
+        "hit_count": 7
+    }
+}
