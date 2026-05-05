@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     llm_max_input_chars: int = Field(default=120_000, ge=1_000)
     target_profile_extractor_version: str = "target-profile-v1"
     target_profile_cache_ttl_hours: int = Field(default=24, ge=0)
+    buyer_recall_cache_ttl_hours: int = Field(default=24, ge=0)
+    buyer_recall_cache_version: str = "buyer-recall-v1"
     enable_ir_page_discovery: bool = True
     ir_discovery_max_candidates: int = Field(default=5, ge=1, le=10)
     ir_discovery_search_engine: str = "auto"

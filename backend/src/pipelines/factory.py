@@ -9,6 +9,7 @@ from src.llm import LLMClient, OpenRouterProvider
 from src.pipelines.source_ingestion import SourceIngestionService
 from src.pipelines.target_profile_extraction import TargetProfileExtractor
 from src.pipelines.target_resolution import TargetResolver
+from src.repositories.buyer_recall_cache import BuyerRecallCache
 from src.repositories.data_source_audit_log import DataSourceAuditLog
 from src.repositories.llm_interaction_log import LLMInteractionLog
 from src.repositories.source_cache import SourceCache
@@ -110,7 +111,10 @@ def build_strategic_buyer_candidate_retriever(settings: Settings, session: Sessi
             ),
             StrategicAcquisitionIntentRetriever(strategy, web_search_client=llm_provider),
             SupplyChainRetriever(strategy),
-        ]
+        ],
+        cache=BuyerRecallCache(session),
+        cache_ttl_hours=settings.buyer_recall_cache_ttl_hours,
+        stage_version=settings.buyer_recall_cache_version,
     )
 
 
@@ -128,5 +132,8 @@ def build_financial_buyer_candidate_retriever(settings: Settings, session: Sessi
                 fmp_client=registry.fmp(),
                 web_search_client=llm_provider,
             ),
-        ]
+        ],
+        cache=BuyerRecallCache(session),
+        cache_ttl_hours=settings.buyer_recall_cache_ttl_hours,
+        stage_version=settings.buyer_recall_cache_version,
     )

@@ -9,6 +9,8 @@ from fastapi.testclient import TestClient
 from src.api.main import create_app
 from src.config import Settings
 from src.domain import BuyerType, CandidateHit, Evidence, SourceDocument, SourceStrength, SourceType, StrategicRetrievalResult, TargetProfile
+from src.repositories.buyer_recall_cache import BuyerRecallCache
+from src.repositories.database import create_session_factory, init_db
 from src.retrievers import FinancialBuyerCandidateRetriever, PEDealActivityRetriever
 from src.retrievers.financial.seed_universe import PESeedFirm, PESeedUniverse
 from src.sources.strategy import DataSourceStrategy
@@ -271,6 +273,37 @@ def test_financial_buyer_candidate_retriever_fanout_preserves_financial_hits() -
     assert result.metadata["retrievers"][0]["name"] == "PEDealActivityRetriever"
 
 
+def test_financial_buyer_candidate_retriever_caches_stage_result_for_same_seller(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path)
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
+    retriever = CountingRetriever("PEDealActivityRetriever", [financial_hit()])
+
+    with session_factory() as session:
+        fanout = FinancialBuyerCandidateRetriever(
+            [retriever],
+            cache=BuyerRecallCache(session),
+            cache_ttl_hours=24,
+            stage_version="test-buyer-recall-cache",
+        )
+        first = fanout.retrieve(sample_profile())
+
+    with session_factory() as session:
+        fanout = FinancialBuyerCandidateRetriever(
+            [retriever],
+            cache=BuyerRecallCache(session),
+            cache_ttl_hours=24,
+            stage_version="test-buyer-recall-cache",
+        )
+        second = fanout.retrieve(sample_profile())
+
+    assert retriever.calls == 1
+    assert [hit.candidate_name for hit in second.hits] == ["Bain Capital"]
+    assert first.metadata["cache"]["status"] == "miss"
+    assert second.metadata["cache"]["status"] == "hit"
+    assert second.metadata["cache"]["stage_name"] == "financial_buyer_recall"
+
+
 def test_financial_candidates_api_returns_target_profile_and_hits(tmp_path: Path, monkeypatch) -> None:
     hit = financial_hit()
     monkeypatch.setattr("src.api.main.build_target_profile_extractor", lambda _settings, _session: FakeProfileService())
@@ -480,6 +513,16 @@ class StaticRetriever:
         self.hits = hits
 
     def retrieve(self, _target_profile: TargetProfile) -> StrategicRetrievalResult:
+        return StrategicRetrievalResult(hits=self.hits, metadata={"retriever": self.name})
+
+
+class CountingRetriever(StaticRetriever):
+    def __init__(self, name: str, hits: list[CandidateHit]) -> None:
+        super().__init__(name, hits)
+        self.calls = 0
+
+    def retrieve(self, _target_profile: TargetProfile) -> StrategicRetrievalResult:
+        self.calls += 1
         return StrategicRetrievalResult(hits=self.hits, metadata={"retriever": self.name})
 
 

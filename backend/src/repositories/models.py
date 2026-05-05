@@ -135,6 +135,22 @@ class TargetProfileCacheRecord(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class BuyerRecallCacheRecord(Base):
+    """Cached buyer-recall stage output keyed by seller profile and stage version."""
+
+    __tablename__ = "buyer_recall_cache"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    target_cik: Mapped[str] = mapped_column(String(32), index=True)
+    target_ticker: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    stage_name: Mapped[str] = mapped_column(String(128), index=True)
+    stage_version: Mapped[str] = mapped_column(String(64), index=True)
+    target_profile_fingerprint: Mapped[str] = mapped_column(String(128), index=True)
+    payload_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class LLMInteractionRecord(Base):
     """Provider-level LLM request/response audit trail for prompt review and optimization."""
 

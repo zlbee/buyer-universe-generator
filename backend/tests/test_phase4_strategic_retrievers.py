@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import httpx
 
 from fastapi.testclient import TestClient
+from sqlalchemy import update
 
 from src.api.main import create_app
 from src.config import Settings
@@ -21,6 +22,9 @@ from src.domain import (
     TargetProfile,
 )
 from src.pipelines.orchestrator import PipelineOrchestrator
+from src.repositories.buyer_recall_cache import BuyerRecallCache
+from src.repositories.database import create_session_factory, init_db
+from src.repositories.models import BuyerRecallCacheRecord
 from src.retrievers import BuyerCandidateRetriever, MAHistoryRetriever, SameSicRetriever, StrategicAcquisitionIntentRetriever
 from src.sources.sec import SecEdgarClient
 from src.sources.strategy import DataSourceStrategy
@@ -809,6 +813,88 @@ def test_buyer_candidate_retriever_fanout_uses_or_recall_without_dedupe(tmp_path
     assert result.metadata["hit_count"] == 2
 
 
+def test_buyer_candidate_retriever_caches_stage_result_for_same_seller(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path)
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
+    hit = CandidateHit(
+        candidate_name="Beauty Buyer Inc.",
+        buyer_type=BuyerType.strategic,
+        retriever_name="CountingRetriever",
+        source_path=["same_sic"],
+        fit_reason="Shares target SIC 2844.",
+        evidence=[sample_evidence()],
+        confidence=0.72,
+    )
+    retriever = CountingRetriever("CountingRetriever", [hit])
+
+    with session_factory() as session:
+        fanout = BuyerCandidateRetriever(
+            [retriever],
+            cache=BuyerRecallCache(session),
+            cache_ttl_hours=24,
+            stage_version="test-buyer-recall-cache",
+        )
+        first = fanout.retrieve(sample_profile())
+
+    with session_factory() as session:
+        fanout = BuyerCandidateRetriever(
+            [retriever],
+            cache=BuyerRecallCache(session),
+            cache_ttl_hours=24,
+            stage_version="test-buyer-recall-cache",
+        )
+        second = fanout.retrieve(sample_profile())
+
+    assert retriever.calls == 1
+    assert [hit.candidate_name for hit in second.hits] == ["Beauty Buyer Inc."]
+    assert first.metadata["cache"]["status"] == "miss"
+    assert first.metadata["cache"]["target_ticker"] == "ELF"
+    assert second.metadata["cache"]["status"] == "hit"
+    assert second.metadata["cache"]["stage_name"] == "strategic_buyer_recall"
+
+
+def test_buyer_candidate_retriever_recomputes_after_cache_ttl_expiry(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path)
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
+    hit = CandidateHit(
+        candidate_name="Beauty Buyer Inc.",
+        buyer_type=BuyerType.strategic,
+        retriever_name="CountingRetriever",
+        source_path=["same_sic"],
+        fit_reason="Shares target SIC 2844.",
+        evidence=[sample_evidence()],
+        confidence=0.72,
+    )
+    retriever = CountingRetriever("CountingRetriever", [hit])
+
+    with session_factory() as session:
+        fanout = BuyerCandidateRetriever(
+            [retriever],
+            cache=BuyerRecallCache(session),
+            cache_ttl_hours=24,
+            stage_version="test-buyer-recall-cache-expiry",
+        )
+        fanout.retrieve(sample_profile())
+
+    with session_factory() as session:
+        session.execute(update(BuyerRecallCacheRecord).values(expires_at=datetime.now(UTC) - timedelta(seconds=1)))
+        session.commit()
+
+    with session_factory() as session:
+        fanout = BuyerCandidateRetriever(
+            [retriever],
+            cache=BuyerRecallCache(session),
+            cache_ttl_hours=24,
+            stage_version="test-buyer-recall-cache-expiry",
+        )
+        result = fanout.retrieve(sample_profile())
+
+    assert retriever.calls == 2
+    assert result.metadata["cache"]["status"] == "miss"
+
+
 def test_strategic_candidates_api_returns_target_profile_and_hits(
     tmp_path: Path,
     monkeypatch,
@@ -1208,6 +1294,16 @@ class StaticRetriever:
         return StrategicRetrievalResult(hits=self.hits, metadata={"retriever": self.name})
 
     def retrieve(self, _target_profile: TargetProfile) -> StrategicRetrievalResult:
+        return StrategicRetrievalResult(hits=self.hits, metadata={"retriever": self.name})
+
+
+class CountingRetriever(StaticRetriever):
+    def __init__(self, name: str, hits: list[CandidateHit]) -> None:
+        super().__init__(name, hits)
+        self.calls = 0
+
+    def retrieve_with_context(self, _target_profile: TargetProfile) -> StrategicRetrievalResult:
+        self.calls += 1
         return StrategicRetrievalResult(hits=self.hits, metadata={"retriever": self.name})
 
 
