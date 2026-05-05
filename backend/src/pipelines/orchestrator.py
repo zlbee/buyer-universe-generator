@@ -10,9 +10,14 @@ from src.domain import CandidateHit, StrategicRetrievalResult, TargetProfile
 class PipelineOrchestrator:
     """Coordinates target extraction and first-pass candidate retrieval phases."""
 
-    def __init__(self, strategic_candidate_retriever: Any | None = None) -> None:
-        self.phase = "strategic_candidate_retrieval"
+    def __init__(
+        self,
+        strategic_candidate_retriever: Any | None = None,
+        financial_candidate_retriever: Any | None = None,
+    ) -> None:
+        self.phase = "candidate_retrieval"
         self.strategic_candidate_retriever = strategic_candidate_retriever
+        self.financial_candidate_retriever = financial_candidate_retriever
 
     def retrieve_strategic_candidates(self, target_profile: TargetProfile) -> StrategicRetrievalResult:
         """Run multi-path strategic buyer recall without dedupe, filtering, or scoring."""
@@ -23,6 +28,16 @@ class PipelineOrchestrator:
         if isinstance(result, StrategicRetrievalResult):
             return result
         # This keeps the orchestrator tolerant of simple CandidateRetriever-style fan-outs in tests.
+        return StrategicRetrievalResult(hits=_coerce_hits(result))
+
+    def retrieve_financial_candidates(self, target_profile: TargetProfile) -> StrategicRetrievalResult:
+        """Run multi-path financial buyer recall without dedupe, filtering, or scoring."""
+
+        if not self.financial_candidate_retriever:
+            return StrategicRetrievalResult(metadata={"status": "no_financial_retriever_configured"})
+        result = self.financial_candidate_retriever.retrieve(target_profile)
+        if isinstance(result, StrategicRetrievalResult):
+            return result
         return StrategicRetrievalResult(hits=_coerce_hits(result))
 
 

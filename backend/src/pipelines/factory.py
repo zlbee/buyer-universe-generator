@@ -17,8 +17,10 @@ from src.retrievers import (
     AdjacentIndustryRetriever,
     BusinessSimilarityRetriever,
     BuyerCandidateRetriever,
+    FinancialBuyerCandidateRetriever,
     MAHistoryRetriever,
     PeerCompanyRetriever,
+    PEDealActivityRetriever,
     ProductCustomerChannelRetriever,
     SameSicRetriever,
     SupplyChainRetriever,
@@ -106,5 +108,21 @@ def build_strategic_buyer_candidate_retriever(settings: Settings, session: Sessi
                 llm_client=llm_provider,
             ),
             SupplyChainRetriever(strategy),
+        ]
+    )
+
+
+def build_financial_buyer_candidate_retriever(settings: Settings, session: Session) -> FinancialBuyerCandidateRetriever:
+    """Build the Phase 5 financial first-pass retriever fan-out."""
+
+    strategy = DataSourceStrategy.from_settings(settings)
+    request_recorder = DataSourceAuditLog(session)
+    registry = SourceRegistry(settings, strategy=strategy, request_recorder=request_recorder)
+    return FinancialBuyerCandidateRetriever(
+        [
+            PEDealActivityRetriever(
+                strategy,
+                fmp_client=registry.fmp(),
+            ),
         ]
     )

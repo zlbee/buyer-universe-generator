@@ -34,7 +34,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.command == "show-config":
-        print(settings.model_dump_json(indent=2, exclude={"openrouter_api_key", "polygon_api_key", "news_api_key"}))
+        print(settings.model_dump_json(indent=2, exclude={"openrouter_api_key", "polygon_api_key", "news_api_key", "fmp_api_key"}))
         return 0
 
     if args.command == "resolve-target":

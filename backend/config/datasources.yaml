@@ -181,6 +181,16 @@ sources:
           - filing_links
         rationale: FMP structured M&A endpoints can supplement EDGAR and news transaction discovery, with final evidence validation deferred.
 
+      buyer_long_list_recall.financial_sponsor_activity:
+        source_strength: B
+        field_coverage:
+          - acquiring_company
+          - target_company
+          - transaction_date
+          - filing_links
+          - sponsor_deal_activity
+        rationale: FMP structured M&A records can provide public recent-deal evidence for configured PE sponsor candidates.
+
   company_pages:
     provider: official_investor_relations_pages
     enabled: true
@@ -339,6 +349,29 @@ retrievers:
       - merger
       - add-on
 
+  PEDealActivityRetriever:
+    use_case: buyer_recall_financial_sponsors
+    source_roles:
+      deal_activity_source: fmp
+    source_priority:
+      - fmp
+    lookback_years: 5
+    max_documents: 100
+    max_queries: 5
+    page_size: 20
+    max_candidates: 100
+    eligible_sector_matches:
+      - same
+      - adjacent
+    transaction_terms:
+      - acquisition
+      - acquired
+      - acquires
+      - buyout
+      - add-on
+      - investment
+      - recapitalization
+
 use_cases:
   target_resolution:
     - source_id: edgar
@@ -411,5 +444,7 @@ use_cases:
       dimension: buyer_long_list_recall.transaction_news
 
   buyer_recall_financial_sponsors:
+    - source_id: fmp
+      dimension: buyer_long_list_recall.financial_sponsor_activity
     - source_id: newsapi
       dimension: buyer_long_list_recall.financial_sponsor_activity

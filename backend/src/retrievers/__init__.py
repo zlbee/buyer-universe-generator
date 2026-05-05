@@ -1,6 +1,7 @@
 """Buyer candidate retriever package."""
 
 from src.retrievers.base import CandidateRetriever
+from src.retrievers.financial import FinancialBuyerCandidateRetriever, PEDealActivityRetriever
 from src.retrievers.strategic import (
     AdjacentIndustryRetriever,
     BusinessSimilarityRetriever,
@@ -17,8 +18,10 @@ __all__ = [
     "BusinessSimilarityRetriever",
     "BuyerCandidateRetriever",
     "CandidateRetriever",
+    "FinancialBuyerCandidateRetriever",
     "MAHistoryRetriever",
     "PeerCompanyRetriever",
+    "PEDealActivityRetriever",
     "ProductCustomerChannelRetriever",
     "SameSicRetriever",
     "SupplyChainRetriever",

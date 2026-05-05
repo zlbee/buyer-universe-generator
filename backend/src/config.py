@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     cache_dir: Path = Path("./data/cache")
     datasource_policy_path: Path = Path("./config/datasources.yaml")
     keyword_taxonomy_path: Path = Path("./config/keyword_taxonomy.yaml")
+    pe_seed_universe_path: Path = Path("./config/pe_seed_universe.yaml")
 
     edgar_identity: str = Field(
         default="buyer-universe-generator/0.1 contact@example.com",
