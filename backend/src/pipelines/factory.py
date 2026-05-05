@@ -118,11 +118,13 @@ def build_financial_buyer_candidate_retriever(settings: Settings, session: Sessi
     strategy = DataSourceStrategy.from_settings(settings)
     request_recorder = DataSourceAuditLog(session)
     registry = SourceRegistry(settings, strategy=strategy, request_recorder=request_recorder)
+    llm_provider = OpenRouterProvider(settings, interaction_recorder=LLMInteractionLog(session))
     return FinancialBuyerCandidateRetriever(
         [
             PEDealActivityRetriever(
                 strategy,
                 fmp_client=registry.fmp(),
+                web_search_client=llm_provider,
             ),
         ]
     )

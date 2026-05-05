@@ -49,7 +49,13 @@ Build a TargetProfile through the API:
 GET /targets/profile?query=ELF
 ```
 
-Retrieve first-pass financial buyer candidates through the API:
+Retrieve combined strategic and financial first-pass buyer candidates through the API:
+
+```text
+GET /buyers/candidates?query=ELF
+```
+
+Retrieve first-pass financial buyer candidates only through the API:
 
 ```text
 GET /buyers/financial-candidates?query=ELF
@@ -72,4 +78,4 @@ $env:BUG_NEWS_API_KEY = "..."
 $env:BUG_LOG_LEVEL = "INFO"
 ```
 
-Phase 5 PE deal activity uses `config/pe_seed_universe.yaml` to recognize configured PE sponsors in FMP M&A records. The seed list is only an identity filter; candidates still require recent target-industry deal evidence from FMP before a `CandidateHit` is emitted.
+Phase 5 PE deal activity uses `config/pe_seed_universe.yaml` to recognize configured PE sponsors in FMP M&A records and optional OpenRouter web-search results. The seed list is only an identity filter; candidates still require recent target-industry deal evidence before a `CandidateHit` is emitted. Web-search-only PE hits are marked pending verification because the claim is LLM-extracted from cited pages rather than independently fetched and parsed.

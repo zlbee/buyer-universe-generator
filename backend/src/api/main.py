@@ -154,6 +154,57 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
         }
 
+    @app.get("/buyers/candidates", tags=["buyers"])
+    def retrieve_buyer_candidates(request: Request, query: str = Query(min_length=1)) -> dict:
+        session_factory = create_session_factory(request.app.state.engine)
+        with session_factory() as session:
+            profile_service = build_target_profile_extractor(active_settings, session)
+            strategic_retriever = build_strategic_buyer_candidate_retriever(active_settings, session)
+            financial_retriever = build_financial_buyer_candidate_retriever(active_settings, session)
+            try:
+                profile_result = profile_service.build_profile(query)
+                strategic_result = strategic_retriever.retrieve(profile_result.target_profile)
+                financial_result = financial_retriever.retrieve(profile_result.target_profile)
+            except AmbiguousTargetError as error:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "message": str(error),
+                        "error_code": "ambiguous_target",
+                        "candidates": [candidate.model_dump(mode="json") for candidate in error.candidates],
+                    },
+                ) from error
+            except TargetNotFoundError as error:
+                raise HTTPException(status_code=404, detail={"message": str(error), "error_code": "target_not_found"}) from error
+            except TargetProfileExtractionError as error:
+                logger.warning(
+                    "Buyer candidate retrieval failed during profile extraction: query=%s status_code=%s error_code=%s details=%s",
+                    query,
+                    error.status_code,
+                    error.error_code,
+                    error.details,
+                )
+                raise HTTPException(
+                    status_code=error.status_code,
+                    detail={"message": error.message, "error_code": error.error_code, **error.details},
+                ) from error
+
+        hits = [*strategic_result.hits, *financial_result.hits]
+        return {
+            "target_profile": profile_result.target_profile.model_dump(mode="json"),
+            "hits": [hit.model_dump(mode="json") for hit in hits],
+            "warnings": [*profile_result.warnings, *strategic_result.warnings, *financial_result.warnings],
+            "metadata": {
+                "profile": profile_result.extraction_metadata,
+                "retrieval": {
+                    "retriever": "BuyerCandidateRetriever",
+                    "hit_count": len(hits),
+                    "strategic": strategic_result.metadata,
+                    "financial": financial_result.metadata,
+                },
+            },
+        }
+
     @app.get("/buyers/financial-candidates", tags=["buyers"])
     def retrieve_financial_candidates(request: Request, query: str = Query(min_length=1)) -> dict:
         session_factory = create_session_factory(request.app.state.engine)

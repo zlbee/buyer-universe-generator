@@ -94,7 +94,7 @@ type CandidateHit = {
   retrieval_metadata: Record<string, unknown>;
 };
 
-type StrategicCandidateRetrievalResult = {
+type CandidateRetrievalResultData = {
   target_profile: TargetProfile;
   hits: CandidateHit[];
   warnings: string[];
@@ -110,7 +110,7 @@ type TargetProfileDebugState =
 type CandidateRetrievalState =
   | { status: "idle" }
   | { status: "loading"; query: string }
-  | { status: "success"; query: string; data: StrategicCandidateRetrievalResult }
+  | { status: "success"; query: string; data: CandidateRetrievalResultData }
   | { status: "error"; query: string; message: string; errorCode?: string; candidates?: ResolvedTarget[] };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -201,13 +201,13 @@ function App() {
     setCandidateState({ status: "loading", query: trimmedTarget });
 
     try {
-      const response = await fetch(`${API_BASE_URL}/buyers/strategic-candidates?query=${encodeURIComponent(trimmedTarget)}`);
+      const response = await fetch(`${API_BASE_URL}/buyers/candidates?query=${encodeURIComponent(trimmedTarget)}`);
 
       if (!response.ok) {
         throw await readDebugError(response);
       }
 
-      const data = (await response.json()) as StrategicCandidateRetrievalResult;
+      const data = (await response.json()) as CandidateRetrievalResultData;
       setCandidateState({ status: "success", query: trimmedTarget, data });
     } catch (error) {
       if (isDebugError(error)) {
@@ -250,7 +250,7 @@ function App() {
 
         <section className="status-grid" aria-label="Implementation status">
           <StatusTile label="Target Feature Extractor" value="Phase 2 Ready" tone="ready" />
-          <StatusTile label="Buyer Candidate Retriever" value="Phase 4 Ready" tone="ready" />
+          <StatusTile label="Buyer Candidate Retriever" value="Phase 5 Ready" tone="ready" />
           <StatusTile label="Evidence Store" value="Profile Cache Ready" tone="ready" />
           <StatusTile label="API Health" value={health.status === "online" ? "Online" : "Checking"} tone="ready" />
         </section>
@@ -283,7 +283,7 @@ function App() {
 
           <PageCard
             id="buyer-recall-card"
-            eyebrow="Phase 4"
+            eyebrow="Phase 4/5"
             title="Potential Buyer Recaller"
             status={candidateState.status}
           >
@@ -407,11 +407,11 @@ function TargetProfileDebugPanel({ state }: { state: TargetProfileDebugState }) 
 function CandidateRetrievalPanel({ state }: { state: CandidateRetrievalState }) {
   return (
     <div className="debug-panel">
-      {state.status === "idle" && <div className="debug-empty">Run strategic first-pass recall from the target input above.</div>}
+      {state.status === "idle" && <div className="debug-empty">Run strategic and financial first-pass recall from the target input above.</div>}
 
       {state.status === "loading" && (
         <div className="debug-empty">
-          Building the target profile and running strategic candidate retrievers for {state.query}.
+          Building the target profile and running strategic and financial candidate retrievers for {state.query}.
         </div>
       )}
 
@@ -629,13 +629,14 @@ function CandidateRetrievalResult({
       <div className="debug-section">
         <h3>Candidate Hits</h3>
         {data.hits.length === 0 ? (
-          <div className="debug-empty">No strategic candidate hits returned.</div>
+          <div className="debug-empty">No buyer candidate hits returned.</div>
         ) : (
           <div className="debug-table-wrap">
             <table>
               <thead>
                 <tr>
                   <th>Candidate</th>
+                  <th>Type</th>
                   <th>Retriever</th>
                   <th>Path</th>
                   <th>Confidence</th>
@@ -652,6 +653,7 @@ function CandidateRetrievalResult({
                         {[hit.candidate_ticker, hit.candidate_cik].filter(Boolean).join(" · ") || "No ticker/CIK"}
                       </span>
                     </td>
+                    <td>{hit.buyer_type}</td>
                     <td>{hit.retriever_name}</td>
                     <td>{hit.source_path.join(", ") || "N/A"}</td>
                     <td>{formatConfidence(hit.confidence)}</td>

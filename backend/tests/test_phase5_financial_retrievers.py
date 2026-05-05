@@ -36,16 +36,21 @@ def test_data_source_policy_configures_pe_deal_activity_retriever(tmp_path: Path
     strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path))
 
     sponsor_source = strategy.selected_source("buyer_recall_financial_sponsors", "fmp", include_disabled=True)
+    llm_sponsor_source = strategy.selected_source("buyer_recall_financial_sponsors", "openrouter_web_search", include_disabled=True)
     policy = strategy.retriever_config("PEDealActivityRetriever")
 
     assert sponsor_source is not None
+    assert llm_sponsor_source is not None
     assert sponsor_source.dimension_id == "buyer_long_list_recall.financial_sponsor_activity"
     assert sponsor_source.source_strength == SourceStrength.B
+    assert llm_sponsor_source.source_strength == SourceStrength.C
     assert policy is not None
     assert policy.use_case == "buyer_recall_financial_sponsors"
     assert policy.source_roles["deal_activity_source"] == "fmp"
-    assert policy.source_priority == ["fmp"]
+    assert policy.source_roles["llm_web_search_source"] == "openrouter_web_search"
+    assert policy.source_priority == ["fmp", "openrouter_web_search"]
     assert policy.lookback_years == 5
+    assert policy.max_companies is None
     assert policy.max_queries == 5
     assert policy.eligible_sector_matches == ["same", "adjacent"]
 
@@ -101,6 +106,138 @@ def test_pe_deal_activity_retriever_recalls_seeded_pe_with_recent_industry_deals
     assert any("unrelated FMP deal" in warning for warning in result.warnings)
 
 
+def test_pe_deal_activity_retriever_adds_llm_web_search_deal_signals(tmp_path: Path) -> None:
+    strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path, fmp_api_key=None))
+    web_search = FakeWebSearchJSONClient(
+        {
+            "pe_firm": "Advent International",
+            "sic": "2844",
+            "acquisitions": [
+                {
+                    "has_relevant_deal": True,
+                    "evidence": "Advent International announced the acquisition of Beauty Labs, a cosmetics company.",
+                    "deal_date": "March 2025",
+                    "target": "Beauty Labs",
+                    "sector_relevance": "Same-industry: cosmetics / color cosmetics / prestige beauty products",
+                    "source_links": [
+                        {
+                            "url": "https://www.adventinternational.com/beauty-labs",
+                            "title": "Advent International acquires Beauty Labs",
+                        }
+                    ],
+                    "type": "acquisition",
+                }
+            ],
+        }
+    )
+    retriever = PEDealActivityRetriever(
+        strategy,
+        fmp_client=FakeFmpDealSource({}),
+        web_search_client=web_search,
+        seed_universe=PESeedUniverse(
+            firms=[
+                PESeedFirm(canonical_name="Advent International", aliases=["Advent"], domain="adventinternational.com"),
+            ]
+        ),
+        as_of_date=date(2026, 5, 4),
+    )
+
+    result = retriever.retrieve_with_context(sample_profile())
+
+    assert [hit.candidate_name for hit in result.hits] == ["Advent International"]
+    hit = result.hits[0]
+    assert hit.buyer_type == BuyerType.financial
+    assert hit.source_path == ["pe_deal_activity_llm_web_search"]
+    assert hit.pending_verification is True
+    assert hit.confidence == 0.58
+    assert hit.evidence[0].verified_fact is False
+    assert hit.evidence[0].url == "https://www.adventinternational.com/beauty-labs"
+    assert hit.evidence[0].quote_or_snippet == "Advent International announced the acquisition of Beauty Labs, a cosmetics company."
+    assert hit.retrieval_metadata["deal_events"][0]["deal_date"] == "2025-03-01"
+    assert hit.retrieval_metadata["deal_events"][0]["target_acquired"] == "Beauty Labs"
+    assert hit.retrieval_metadata["deal_events"][0]["sector_match"] == "same"
+    assert hit.retrieval_metadata["llm_web_search_event_count"] == 1
+    assert result.metadata["llm_web_search_documents_checked"] == 1
+    assert result.metadata["llm_web_search_deal_count"] == 1
+    assert web_search.source_business_types == ["financial_buyer_pe_deal_activity_web_search"]
+    assert "Use web search" in web_search.prompts[0]
+    assert "Advent International" in web_search.prompts[0]
+    assert "SIC=2844" in web_search.prompts[0]
+    assert "2021-05-04" in web_search.prompts[0]
+    assert "e.l.f. Beauty, Inc." not in web_search.prompts[0]
+    assert "same-industry terms" in web_search.prompts[0]
+    assert "Adjacent-industry terms" in web_search.prompts[0]
+
+
+def test_pe_deal_activity_retriever_checks_all_seed_firms_with_llm_by_default(tmp_path: Path) -> None:
+    strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path, fmp_api_key=None))
+    web_search = FakeWebSearchJSONClient({"pe_firm": None, "sic": "2844", "deals": []})
+    retriever = PEDealActivityRetriever(
+        strategy,
+        web_search_client=web_search,
+        seed_universe=PESeedUniverse(
+            firms=[
+                PESeedFirm(canonical_name="Advent International"),
+                PESeedFirm(canonical_name="Bain Capital"),
+                PESeedFirm(canonical_name="KKR"),
+            ]
+        ),
+        as_of_date=date(2026, 5, 4),
+    )
+
+    result = retriever.retrieve_with_context(sample_profile())
+
+    assert result.hits == []
+    assert len(web_search.prompts) == 3
+    assert "Advent International" in web_search.prompts[0]
+    assert "Bain Capital" in web_search.prompts[1]
+    assert "KKR" in web_search.prompts[2]
+    assert result.metadata["seed_firm_count"] == 3
+    assert result.metadata["seed_firms_checked"] == 3
+    assert result.metadata["llm_web_search_no_deal_firm_count"] == 3
+
+
+def test_pe_deal_activity_retriever_preserves_llm_hits_under_document_cap(tmp_path: Path) -> None:
+    strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path))
+    web_search = FakeWebSearchJSONClient(
+        {
+            "pe_firm": "Advent International",
+            "sic": "2844",
+            "deals": [
+                {
+                    "evidence": "Advent International announced the acquisition of Beauty Labs, a cosmetics company.",
+                    "deal_date": "2025",
+                    "target": "Beauty Labs",
+                    "url": "https://www.adventinternational.com/beauty-labs",
+                    "type": "acquisition",
+                }
+            ],
+        }
+    )
+    fmp_source = FakeFmpDealSource(
+        {
+            "Perfumes, cosmetics, and other toilet preparations": [
+                [fmp_deal(f"fmp-{index}", "Strategic Corp", f"Cosmetics Labs {index}", "2025-06-01") for index in range(100)]
+            ]
+        }
+    )
+    retriever = PEDealActivityRetriever(
+        strategy,
+        fmp_client=fmp_source,
+        web_search_client=web_search,
+        seed_universe=PESeedUniverse(firms=[PESeedFirm(canonical_name="Advent International")]),
+        as_of_date=date(2026, 5, 4),
+    )
+
+    result = retriever.retrieve_with_context(sample_profile())
+
+    assert [hit.candidate_name for hit in result.hits] == ["Advent International"]
+    assert result.hits[0].source_path == ["pe_deal_activity_llm_web_search"]
+    assert result.metadata["documents_available_before_cap"] == 101
+    assert result.metadata["documents_truncated"] == 1
+    assert result.metadata["documents_checked"] == 100
+
+
 def test_pe_deal_activity_retriever_skips_disabled_fmp_without_calling_source(tmp_path: Path) -> None:
     strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path, fmp_api_key=None))
     fmp_source = FakeFmpDealSource({"cosmetics": [[fmp_deal("deal-1", "Bain Capital", "Cosmetics Labs", "2025-06-01")]]})
@@ -147,6 +284,47 @@ def test_financial_candidates_api_returns_target_profile_and_hits(tmp_path: Path
     assert payload["hits"][0]["candidate_name"] == "Bain Capital"
     assert payload["hits"][0]["buyer_type"] == "financial"
     assert payload["metadata"]["retrieval"]["retriever"] == "FinancialBuyerCandidateRetriever"
+
+
+def test_combined_candidates_api_runs_strategic_and_financial_retrievers(tmp_path: Path, monkeypatch) -> None:
+    strategic_hit = CandidateHit(
+        candidate_name="Beauty Buyer Inc.",
+        buyer_type=BuyerType.strategic,
+        retriever_name="SameSicRetriever",
+        source_path=["same_sic"],
+        fit_reason="Shares target SIC.",
+        evidence=[
+            Evidence(
+                claim="Beauty Buyer shares a public-company industry signal.",
+                source_type="sec_company_mapping",
+                source_strength=SourceStrength.B,
+                url="https://www.sec.gov/files/company_tickers_exchange.json",
+            )
+        ],
+        confidence=0.72,
+    )
+    financial = financial_hit()
+    monkeypatch.setattr("src.api.main.build_target_profile_extractor", lambda _settings, _session: FakeProfileService())
+    monkeypatch.setattr(
+        "src.api.main.build_strategic_buyer_candidate_retriever",
+        lambda _settings, _session: StaticRetriever("StrategicBuyerCandidateRetriever", [strategic_hit]),
+    )
+    monkeypatch.setattr(
+        "src.api.main.build_financial_buyer_candidate_retriever",
+        lambda _settings, _session: StaticRetriever("FinancialBuyerCandidateRetriever", [financial]),
+    )
+    app = create_app(settings_for_tests(tmp_path))
+
+    with TestClient(app) as client:
+        response = client.get("/buyers/candidates?query=ELF")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [hit["candidate_name"] for hit in payload["hits"]] == ["Beauty Buyer Inc.", "Bain Capital"]
+    assert [hit["buyer_type"] for hit in payload["hits"]] == ["strategic", "financial"]
+    assert payload["metadata"]["retrieval"]["hit_count"] == 2
+    assert payload["metadata"]["retrieval"]["strategic"]["retriever"] == "StrategicBuyerCandidateRetriever"
+    assert payload["metadata"]["retrieval"]["financial"]["retriever"] == "FinancialBuyerCandidateRetriever"
 
 
 def sample_profile() -> TargetProfile:
@@ -245,6 +423,40 @@ class FakeFmpDealSource:
             )
             for document in pages[page]
         ]
+
+
+class FakeWebSearchJSONClient:
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self.payload = payload
+        self.prompts: list[str] = []
+        self.source_business_types: list[str] = []
+        self.calls: list[dict[str, Any]] = []
+
+    def generate_json_with_web_search(
+        self,
+        prompt: str,
+        _schema_name: str,
+        json_schema: dict[str, Any] | None = None,
+        system_prompt: str | None = None,
+        max_results: int = 5,
+        max_total_results: int = 5,
+        search_engine: str = "auto",
+        search_context_size: str = "low",
+        source_business_type: str = "unspecified",
+    ) -> dict[str, Any]:
+        self.prompts.append(prompt)
+        self.source_business_types.append(source_business_type)
+        self.calls.append(
+            {
+                "json_schema": json_schema,
+                "system_prompt": system_prompt,
+                "max_results": max_results,
+                "max_total_results": max_total_results,
+                "search_engine": search_engine,
+                "search_context_size": search_context_size,
+            }
+        )
+        return self.payload
 
 
 class StaticRetriever:

@@ -188,6 +188,10 @@ class DataSourceRetrievalConfig(StrictBaseModel):
 
     domains: list[str] = Field(default_factory=list)
     max_lookback_days: int | None = Field(default=None, ge=1)
+    web_search_max_results: int = Field(default=5, ge=1)
+    web_search_max_total_results: int = Field(default=5, ge=1)
+    web_search_engine: str = "auto"
+    web_search_context_size: str = "low"
     rss_language: str | None = None
     rss_country: str | None = None
     rss_edition: str | None = None
