@@ -23,6 +23,7 @@ from src.retrievers import (
     PEDealActivityRetriever,
     ProductCustomerChannelRetriever,
     SameSicRetriever,
+    StrategicAcquisitionIntentRetriever,
     SupplyChainRetriever,
 )
 from src.sources.investor_relations import InvestorRelationsPageDiscovery
@@ -107,6 +108,7 @@ def build_strategic_buyer_candidate_retriever(settings: Settings, session: Sessi
                 buyer_identity_resolver=edgar_client,
                 llm_client=llm_provider,
             ),
+            StrategicAcquisitionIntentRetriever(strategy, web_search_client=llm_provider),
             SupplyChainRetriever(strategy),
         ]
     )

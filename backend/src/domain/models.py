@@ -238,6 +238,7 @@ class DataSourceRetrieverConfig(StrictBaseModel):
     max_candidates: int | None = Field(default=None, ge=1)
     max_companies: int | None = Field(default=None, ge=1)
     max_documents: int | None = Field(default=None, ge=1)
+    max_evidence_per_candidate: int | None = Field(default=None, ge=1)
     lookback_years: int | None = Field(default=None, ge=1)
     max_queries: int | None = Field(default=None, ge=1)
     page_size: int | None = Field(default=None, ge=1)

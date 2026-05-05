@@ -8,134 +8,134 @@ firms:
       - Advent
       - Advent International Corporation
     domain: adventinternational.com
-  - canonical_name: Apollo Global Management
-    aliases:
-      - Apollo
-      - Apollo Funds
-    domain: apollo.com
-  - canonical_name: Bain Capital
-    aliases:
-      - Bain Capital Private Equity
-      - Bain Capital, LP
-    domain: baincapital.com
-  - canonical_name: Blackstone
-    aliases:
-      - Blackstone Inc.
-      - Blackstone Group
-      - Blackstone Funds
-    domain: blackstone.com
-  - canonical_name: Carlyle
-    aliases:
-      - The Carlyle Group
-      - Carlyle Group
-    domain: carlyle.com
-  - canonical_name: Centerbridge Partners
-    aliases:
-      - Centerbridge
-    domain: centerbridge.com
-  - canonical_name: Clayton, Dubilier & Rice
-    aliases:
-      - CD&R
-      - Clayton Dubilier Rice
-    domain: cdr-inc.com
-  - canonical_name: EQT
-    aliases:
-      - EQT Private Capital
-      - EQT Partners
-    domain: eqtgroup.com
-  - canonical_name: Francisco Partners
-    aliases:
-      - Francisco Partners Management
-    domain: franciscopartners.com
-  - canonical_name: Genstar Capital
-    aliases:
-      - Genstar
-    domain: gencap.com
-  - canonical_name: GTCR
-    aliases:
-      - GTCR LLC
-    domain: gtcr.com
-  - canonical_name: Hellman & Friedman
-    aliases:
-      - H&F
-      - Hellman Friedman
-    domain: hf.com
-  - canonical_name: KKR
-    aliases:
-      - Kohlberg Kravis Roberts
-      - KKR Funds
-    domain: kkr.com
-  - canonical_name: Leonard Green & Partners
-    aliases:
-      - Leonard Green
-      - LGP
-    domain: leonardgreen.com
-  - canonical_name: Silver Lake
-    aliases:
-      - Silver Lake Partners
-    domain: silverlake.com
-  - canonical_name: TA Associates
-    aliases:
-      - TA
-    domain: ta.com
-  - canonical_name: Thoma Bravo
-    aliases:
-      - Thoma Bravo Funds
-    domain: thomabravo.com
-  - canonical_name: TPG
-    aliases:
-      - TPG Capital
-      - Texas Pacific Group
-    domain: tpg.com
-  - canonical_name: Vista Equity Partners
-    aliases:
-      - Vista Equity
-      - Vista
-    domain: vistaequitypartners.com
-  - canonical_name: Warburg Pincus
-    aliases:
-      - Warburg Pincus LLC
-    domain: warburgpincus.com
-  - canonical_name: CVC Capital Partners
-    aliases:
-      - CVC
-      - CVC Capital
-    domain: cvc.com
-  - canonical_name: Hillhouse Investment
-    aliases:
-      - Hillhouse Capital
-      - 高瓴资本
-      - Hillhouse
-    domain: hillhouseinvestment.com
-  - canonical_name: Permira
-    aliases:
-      - Permira Advisers
-      - Permira Funds
-    domain: permira.com
-  - canonical_name: Insight Partners
-    aliases:
-      - Insight
-      - Insight Venture Partners
-    domain: insightpartners.com
-  - canonical_name: Brookfield Asset Management
-    aliases:
-      - Brookfield
-      - Brookfield Private Equity
-    domain: brookfield.com
-  - canonical_name: Summit Partners
-    aliases:
-      - Summit
-      - Summit Partners, L.P.
-    domain: summitpartners.com
-  - canonical_name: Roark Capital Group
-    aliases:
-      - Roark Capital
-      - Roark
-    domain: roarkcapital.com
-  - canonical_name: American Securities
-    aliases:
-      - American Securities LLC
-    domain: american-securities.com
+  # - canonical_name: Apollo Global Management
+  #   aliases:
+  #     - Apollo
+  #     - Apollo Funds
+  #   domain: apollo.com
+  # - canonical_name: Bain Capital
+  #   aliases:
+  #     - Bain Capital Private Equity
+  #     - Bain Capital, LP
+  #   domain: baincapital.com
+  # - canonical_name: Blackstone
+  #   aliases:
+  #     - Blackstone Inc.
+  #     - Blackstone Group
+  #     - Blackstone Funds
+  #   domain: blackstone.com
+  # - canonical_name: Carlyle
+  #   aliases:
+  #     - The Carlyle Group
+  #     - Carlyle Group
+  #   domain: carlyle.com
+  # - canonical_name: Centerbridge Partners
+  #   aliases:
+  #     - Centerbridge
+  #   domain: centerbridge.com
+  # - canonical_name: Clayton, Dubilier & Rice
+  #   aliases:
+  #     - CD&R
+  #     - Clayton Dubilier Rice
+  #   domain: cdr-inc.com
+  # - canonical_name: EQT
+  #   aliases:
+  #     - EQT Private Capital
+  #     - EQT Partners
+  #   domain: eqtgroup.com
+  # - canonical_name: Francisco Partners
+  #   aliases:
+  #     - Francisco Partners Management
+  #   domain: franciscopartners.com
+  # - canonical_name: Genstar Capital
+  #   aliases:
+  #     - Genstar
+  #   domain: gencap.com
+  # - canonical_name: GTCR
+  #   aliases:
+  #     - GTCR LLC
+  #   domain: gtcr.com
+  # - canonical_name: Hellman & Friedman
+  #   aliases:
+  #     - H&F
+  #     - Hellman Friedman
+  #   domain: hf.com
+  # - canonical_name: KKR
+  #   aliases:
+  #     - Kohlberg Kravis Roberts
+  #     - KKR Funds
+  #   domain: kkr.com
+  # - canonical_name: Leonard Green & Partners
+  #   aliases:
+  #     - Leonard Green
+  #     - LGP
+  #   domain: leonardgreen.com
+  # - canonical_name: Silver Lake
+  #   aliases:
+  #     - Silver Lake Partners
+  #   domain: silverlake.com
+  # - canonical_name: TA Associates
+  #   aliases:
+  #     - TA
+  #   domain: ta.com
+  # - canonical_name: Thoma Bravo
+  #   aliases:
+  #     - Thoma Bravo Funds
+  #   domain: thomabravo.com
+  # - canonical_name: TPG
+  #   aliases:
+  #     - TPG Capital
+  #     - Texas Pacific Group
+  #   domain: tpg.com
+  # - canonical_name: Vista Equity Partners
+  #   aliases:
+  #     - Vista Equity
+  #     - Vista
+  #   domain: vistaequitypartners.com
+  # - canonical_name: Warburg Pincus
+  #   aliases:
+  #     - Warburg Pincus LLC
+  #   domain: warburgpincus.com
+  # - canonical_name: CVC Capital Partners
+  #   aliases:
+  #     - CVC
+  #     - CVC Capital
+  #   domain: cvc.com
+  # - canonical_name: Hillhouse Investment
+  #   aliases:
+  #     - Hillhouse Capital
+  #     - 高瓴资本
+  #     - Hillhouse
+  #   domain: hillhouseinvestment.com
+  # - canonical_name: Permira
+  #   aliases:
+  #     - Permira Advisers
+  #     - Permira Funds
+  #   domain: permira.com
+  # - canonical_name: Insight Partners
+  #   aliases:
+  #     - Insight
+  #     - Insight Venture Partners
+  #   domain: insightpartners.com
+  # - canonical_name: Brookfield Asset Management
+  #   aliases:
+  #     - Brookfield
+  #     - Brookfield Private Equity
+  #   domain: brookfield.com
+  # - canonical_name: Summit Partners
+  #   aliases:
+  #     - Summit
+  #     - Summit Partners, L.P.
+  #   domain: summitpartners.com
+  # - canonical_name: Roark Capital Group
+  #   aliases:
+  #     - Roark Capital
+  #     - Roark
+  #   domain: roarkcapital.com
+  # - canonical_name: American Securities
+  #   aliases:
+  #     - American Securities LLC
+  #   domain: american-securities.com
   # - canonical_name: Madison Dearborn Partners
   #   aliases:
   #     - MDP

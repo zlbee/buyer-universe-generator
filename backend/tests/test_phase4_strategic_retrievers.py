@@ -21,7 +21,7 @@ from src.domain import (
     TargetProfile,
 )
 from src.pipelines.orchestrator import PipelineOrchestrator
-from src.retrievers import BuyerCandidateRetriever, MAHistoryRetriever, SameSicRetriever
+from src.retrievers import BuyerCandidateRetriever, MAHistoryRetriever, SameSicRetriever, StrategicAcquisitionIntentRetriever
 from src.sources.sec import SecEdgarClient
 from src.sources.strategy import DataSourceStrategy
 
@@ -527,6 +527,192 @@ def test_ma_history_retriever_handles_disabled_newsapi_without_throwing(tmp_path
     assert any("newsapi disabled" in warning for warning in result.warnings)
 
 
+def test_strategic_acquisition_intent_retriever_recalls_llm_web_search_intent_with_evidence_cap(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path)
+    strategy = DataSourceStrategy.from_settings(settings)
+    web_search = FakeStrategicWebSearchJSONClient(
+        {
+            "target_company": "e.l.f. Beauty, Inc.",
+            "target_sic": "2844",
+            "potential_buyers": [
+                {
+                    "company_name": "e.l.f. Beauty, Inc.",
+                    "ticker": "ELF",
+                    "sector_relevance": "same",
+                    "evidence": [
+                        {
+                            "evidence_summary": "The seller itself discussed strategic acquisitions.",
+                            "source_url": "https://investor.elfbeauty.com/self",
+                            "sector_relevance": "same",
+                        }
+                    ],
+                },
+                {
+                    "company_name": "Ulta Beauty, Inc.",
+                    "ticker": "ULTA",
+                    "cik": "0001403568",
+                    "domain": "https://www.ulta.com/",
+                    "sector_relevance": "Same-industry: beauty retail and cosmetics",
+                    "fit_reason": "Ulta has sourced strategic acquisition appetite in beauty and personal care.",
+                    "evidence": [
+                        {
+                            "evidence_summary": "Ulta said acquisitions are part of its beauty growth strategy.",
+                            "source_url": "https://example.com/ulta-strategy",
+                            "source_title": "Ulta outlines acquisition strategy",
+                            "quote_or_snippet": "Acquisitions are part of Ulta's beauty growth strategy.",
+                            "intent_type": "strategic_acquisitions",
+                            "sector_relevance": "same",
+                        },
+                        {
+                            "evidence_summary": "Ulta corporate development page highlights acquisition opportunities.",
+                            "source_url": "https://example.com/ulta-corp-dev",
+                            "source_title": "Corporate development",
+                            "intent_type": "corporate_development",
+                            "sector_relevance": "same",
+                        },
+                        {
+                            "evidence_summary": "An investor presentation mentions tuck-in acquisitions.",
+                            "source_url": "https://example.com/ulta-investor-day",
+                            "source_title": "Investor day",
+                            "intent_type": "tuck_in_acquisitions",
+                            "sector_relevance": "same",
+                        },
+                    ],
+                },
+                {
+                    "company_name": "Industrial Buyer Co.",
+                    "sector_relevance": "unrelated",
+                    "evidence": [
+                        {
+                            "evidence_summary": "Industrial Buyer wants equipment acquisitions.",
+                            "source_url": "https://example.com/industrial",
+                            "sector_relevance": "unrelated",
+                        }
+                    ],
+                },
+                {
+                    "company_name": "No Evidence Buyer",
+                    "sector_relevance": "same",
+                    "evidence": [{"evidence_summary": "No URL is available.", "sector_relevance": "same"}],
+                },
+            ],
+        }
+    )
+    retriever = StrategicAcquisitionIntentRetriever(strategy, web_search_client=web_search, as_of_date=date(2026, 5, 4))
+
+    result = retriever.retrieve_with_context(sample_profile())
+
+    assert [hit.candidate_name for hit in result.hits] == ["Ulta Beauty, Inc."]
+    hit = result.hits[0]
+    assert hit.buyer_type == BuyerType.strategic
+    assert hit.candidate_ticker == "ULTA"
+    assert hit.candidate_cik == "0001403568"
+    assert hit.candidate_domain == "www.ulta.com"
+    assert hit.source_path == ["strategic_acquisition_intent_llm_web_search"]
+    assert hit.pending_verification is True
+    assert hit.confidence == 0.57
+    assert len(hit.evidence) == 2
+    assert all(evidence.verified_fact is False for evidence in hit.evidence)
+    assert hit.evidence[0].source_dimension == "buyer_long_list_recall.strategic_acquisition_intent"
+    assert hit.evidence[0].source_type == "llm_web_search"
+    assert hit.retrieval_metadata["sector_relevance"] == "same"
+    assert hit.retrieval_metadata["llm_web_search_evidence_count"] == 2
+    assert result.metadata["candidate_records_available_before_cap"] == 1
+    assert result.metadata["evidence_available_before_cap"] == 3
+    assert result.metadata["evidence_truncated"] == 1
+    assert result.metadata["skip_reasons"]["self_candidate"] == 1
+    assert result.metadata["skip_reasons"]["unrelated_sector"] == 1
+    assert result.metadata["skip_reasons"]["missing_evidence"] == 1
+    assert web_search.source_business_types == ["strategic_buyer_acquisition_intent_web_search"]
+    assert web_search.calls[0]["max_results"] == 10
+    assert web_search.calls[0]["max_total_results"] == 10
+    assert web_search.calls[0]["search_context_size"] == "medium"
+    assert web_search.calls[0]["json_schema"]["properties"]["candidates"]["maxItems"] == 25
+    assert web_search.calls[0]["json_schema"]["properties"]["candidates"]["items"]["properties"]["evidence"]["maxItems"] == 2
+    assert "Use web search" in web_search.prompts[0]
+    assert "e.l.f. Beauty, Inc." not in web_search.prompts[0]
+    assert "e.l.f. Cosmetics" not in web_search.prompts[0]
+    assert "Same-industry terms" not in web_search.prompts[0]
+    assert "SIC=2844" in web_search.prompts[0]
+    assert "from 2025-05-04 through 2026-05-04" in web_search.prompts[0]
+    assert "Adjacent-industry terms" in web_search.prompts[0]
+    assert "at most 25 companies" in web_search.prompts[0]
+    assert "at most 2 evidence" in web_search.prompts[0]
+
+
+def test_strategic_acquisition_intent_retriever_tolerates_llm_type_drift(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path)
+    strategy = DataSourceStrategy.from_settings(settings)
+    web_search = FakeStrategicWebSearchJSONClient(
+        {
+            "target_company": "e.l.f. Beauty, Inc.",
+            "target_sic": 2844,
+            "candidates": [
+                {
+                    "company_name": "Beauty Strategy Co.",
+                    "ticker": "BSC",
+                    "sector_relevance": "same",
+                    "fit_reason": "The company has sourced acquisition appetite in beauty.",
+                    "has_strategic_intent": None,
+                    "evidence": [
+                        {
+                            "evidence_summary": "Beauty Strategy Co. is pursuing acquisitions in cosmetics.",
+                            "source_url": "https://example.com/beauty-strategy-acquisitions",
+                            "sector_relevance": "same",
+                            "intent_type": "strategic_acquisitions",
+                            "is_relevant": None,
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+    retriever = StrategicAcquisitionIntentRetriever(strategy, web_search_client=web_search, as_of_date=date(2026, 5, 4))
+
+    result = retriever.retrieve_with_context(sample_profile())
+
+    assert [hit.candidate_name for hit in result.hits] == ["Beauty Strategy Co."]
+    assert result.metadata["target_sic"] == "2844"
+    assert result.metadata["llm_web_search_candidates_checked"] == 1
+    assert not any("LLM web search failed" in warning for warning in result.warnings)
+
+
+def test_strategic_acquisition_intent_retriever_enforces_candidate_cap(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path)
+    strategy = DataSourceStrategy.from_settings(settings)
+    web_search = FakeStrategicWebSearchJSONClient(
+        {
+            "target_company": "e.l.f. Beauty, Inc.",
+            "target_sic": "2844",
+            "candidates": [
+                {
+                    "company_name": f"Strategic Buyer {index:02d}",
+                    "sector_relevance": "same",
+                    "fit_reason": "The company has relevant strategic acquisition intent.",
+                    "evidence": [
+                        {
+                            "evidence_summary": f"Strategic Buyer {index:02d} is seeking cosmetics acquisitions.",
+                            "source_url": f"https://example.com/buyer-{index:02d}",
+                            "sector_relevance": "same",
+                            "intent_type": "strategic_acquisitions",
+                        }
+                    ],
+                }
+                for index in range(30)
+            ],
+        }
+    )
+    retriever = StrategicAcquisitionIntentRetriever(strategy, web_search_client=web_search, as_of_date=date(2026, 5, 4))
+
+    result = retriever.retrieve_with_context(sample_profile())
+
+    assert len(result.hits) == 25
+    assert result.metadata["candidate_records_available_before_cap"] == 30
+    assert result.metadata["candidate_records_truncated"] == 5
+    assert result.metadata["evidence_used"] == 25
+    assert len(web_search.prompts) == 1
+
+
 def test_buyer_candidate_retriever_fanout_uses_or_recall_without_dedupe(tmp_path: Path) -> None:
     profile = sample_profile()
     evidence = sample_evidence()
@@ -884,6 +1070,40 @@ class FakeMnaLlmClient:
             "confidence": 0.0,
             "rationale": "No fixture matched.",
         }
+
+
+class FakeStrategicWebSearchJSONClient:
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self.payload = payload
+        self.prompts: list[str] = []
+        self.source_business_types: list[str] = []
+        self.calls: list[dict[str, Any]] = []
+
+    def generate_json_with_web_search(
+        self,
+        prompt: str,
+        _schema_name: str,
+        json_schema: dict[str, Any] | None = None,
+        system_prompt: str | None = None,
+        max_results: int = 5,
+        max_total_results: int = 5,
+        search_engine: str = "auto",
+        search_context_size: str = "low",
+        source_business_type: str = "unspecified",
+    ) -> dict[str, Any]:
+        self.prompts.append(prompt)
+        self.source_business_types.append(source_business_type)
+        self.calls.append(
+            {
+                "json_schema": json_schema,
+                "system_prompt": system_prompt,
+                "max_results": max_results,
+                "max_total_results": max_total_results,
+                "search_engine": search_engine,
+                "search_context_size": search_context_size,
+            }
+        )
+        return self.payload
 
 
 class FakeBuyerIdentityResolver:

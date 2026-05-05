@@ -119,6 +119,7 @@ def test_data_source_policy_scopes_strength_by_dimension(tmp_path: Path) -> None
     google_transaction_source = strategy.selected_source("buyer_recall_transaction_signals", "google_news_rss", include_disabled=True)
     fmp_transaction_source = strategy.selected_source("buyer_recall_transaction_signals", "fmp", include_disabled=True)
     sponsor_source = strategy.selected_source("buyer_recall_financial_sponsors", "newsapi", include_disabled=True)
+    strategic_intent_source = strategy.selected_source("buyer_recall_strategic_intent", "llm_web_search", include_disabled=True)
 
     assert identity_source is not None
     assert transaction_source is not None
@@ -126,12 +127,14 @@ def test_data_source_policy_scopes_strength_by_dimension(tmp_path: Path) -> None
     assert google_transaction_source is not None
     assert fmp_transaction_source is not None
     assert sponsor_source is not None
+    assert strategic_intent_source is not None
     assert identity_source.source_strength == SourceStrength.A
     assert transaction_source.source_strength == SourceStrength.C
     assert news_context_source.source_strength == SourceStrength.B
     assert google_transaction_source.source_strength == SourceStrength.C
     assert fmp_transaction_source.source_strength == SourceStrength.B
     assert sponsor_source.source_strength == SourceStrength.C
+    assert strategic_intent_source.source_strength == SourceStrength.C
 
 
 def test_data_source_policy_configures_strategic_retriever_strategy(tmp_path: Path) -> None:
@@ -139,9 +142,11 @@ def test_data_source_policy_configures_strategic_retriever_strategy(tmp_path: Pa
 
     same_sic_policy = strategy.retriever_config("SameSicRetriever")
     ma_policy = strategy.retriever_config("MAHistoryRetriever")
+    strategic_intent_policy = strategy.retriever_config("StrategicAcquisitionIntentRetriever")
 
     assert same_sic_policy is not None
     assert ma_policy is not None
+    assert strategic_intent_policy is not None
     assert same_sic_policy.use_case == "buyer_recall_strategic_public_companies"
     assert same_sic_policy.source_roles["public_company_metadata"] == "edgar"
     assert same_sic_policy.max_candidates == 150
@@ -157,6 +162,13 @@ def test_data_source_policy_configures_strategic_retriever_strategy(tmp_path: Pa
     assert ma_policy.rss_use_llm_extraction is True
     assert ma_policy.rss_require_llm_extraction is True
     assert ma_policy.eligible_sector_matches == ["same", "adjacent"]
+    assert strategic_intent_policy.use_case == "buyer_recall_strategic_intent"
+    assert strategic_intent_policy.source_roles["llm_web_search_source"] == "llm_web_search"
+    assert strategic_intent_policy.source_priority == ["llm_web_search"]
+    assert strategic_intent_policy.lookback_years == 1
+    assert strategic_intent_policy.max_candidates == 25
+    assert strategic_intent_policy.max_evidence_per_candidate == 2
+    assert strategic_intent_policy.eligible_sector_matches == ["same", "adjacent"]
 
 
 def test_sec_client_resolves_mapping_and_recent_filings(tmp_path: Path) -> None:
