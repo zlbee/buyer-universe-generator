@@ -540,7 +540,7 @@ function DebugResult({
 
   return (
     <div className="debug-result">
-      {data.warnings.length > 0 && (
+      {showRawResponse && data.warnings.length > 0 && (
         <div className="debug-warning-list" aria-label="Source warnings">
           {data.warnings.map((warning) => (
             <span key={warning}>{warning}</span>
@@ -677,10 +677,14 @@ function CandidateRetrievalResult({
 }) {
   const { data } = state;
   const profile = data.target_profile;
+  const retrieverCounts = data.hits.reduce<Record<string, number>>((counts, hit) => {
+    counts[hit.retriever_name] = (counts[hit.retriever_name] ?? 0) + 1;
+    return counts;
+  }, {});
 
   return (
     <div className="debug-result">
-      {data.warnings.length > 0 && (
+      {showRawResponse && data.warnings.length > 0 && (
         <div className="debug-warning-list" aria-label="Retrieval warnings">
           {data.warnings.map((warning) => (
             <span key={warning}>{warning}</span>
@@ -693,8 +697,18 @@ function CandidateRetrievalResult({
         <dl className="debug-metrics">
           <DebugMetric label="Target" value={profile.ticker} />
           <DebugMetric label="SIC" value={profile.sic ?? "N/A"} />
-          <DebugMetric label="Raw Hits" value={String(data.hits.length)} />
+          <DebugMetric label="TOTAL HITS" value={String(data.hits.length)} />
         </dl>
+        {Object.entries(retrieverCounts).length > 0 && (
+          <div className="retriever-counts" aria-label="Retriever hit counts">
+            {Object.entries(retrieverCounts).map(([retrieverName, count]) => (
+              <div key={retrieverName}>
+                <span>{formatRetrieverName(retrieverName)} Hits</span>
+                <strong>{count}</strong>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="debug-section">
@@ -710,7 +724,7 @@ function CandidateRetrievalResult({
                   <th>Type</th>
                   <th>Retriever</th>
                   <th>Data Source</th>
-                  <th>Confidence</th>
+                  {showRawResponse && <th>Confidence</th>}
                   <th>Evidence</th>
                   <th>Reason</th>
                 </tr>
@@ -727,7 +741,7 @@ function CandidateRetrievalResult({
                     <td>{hit.buyer_type}</td>
                     <td>{hit.retriever_name}</td>
                     <td>{hit.data_source.join(", ") || "N/A"}</td>
-                    <td>{formatConfidence(hit.confidence)}</td>
+                    {showRawResponse && <td>{formatConfidence(hit.confidence)}</td>}
                     <td>{hit.evidence.length}</td>
                     <td>{hit.fit_reason}</td>
                   </tr>
@@ -772,6 +786,39 @@ function formatCardStatus(status: TargetProfileDebugState["status"] | CandidateR
   }
 
   return status;
+}
+
+function formatRetrieverName(value: string) {
+  const knownRetrieverLabels: Record<string, string> = {
+    mahistoryretriever: "M&A History Retriever",
+    ma_history_retriever: "M&A History Retriever",
+    pedealactivityretriever: "PE Deal Activity Retriever",
+    pe_deal_activity_retriever: "PE Deal Activity Retriever",
+    samesicretriever: "Same SIC Retriever",
+    same_sic_retriever: "Same SIC Retriever",
+    strategicacquisitionintentretriever: "Strategic Acquisition Intent Retriever",
+    strategic_acquisition_intent_retriever: "Strategic Acquisition Intent Retriever"
+  };
+  const normalizedKey = value.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  const exactKey = value.toLowerCase();
+
+  if (knownRetrieverLabels[exactKey] ?? knownRetrieverLabels[normalizedKey]) {
+    return knownRetrieverLabels[exactKey] ?? knownRetrieverLabels[normalizedKey];
+  }
+
+  const words = value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .split(/[_\-\s]+/)
+    .map((word) => word.trim())
+    .filter(Boolean);
+
+  if (words.length === 0) {
+    return value;
+  }
+
+  return words
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 async function readDebugError(

@@ -438,6 +438,37 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.retriever-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #cfd6de;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.retriever-counts div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid #dce3ea;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.retriever-counts span {
+  color: #5d6b7a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.retriever-counts strong {
+  color: #17202a;
+}
+
 .debug-json-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(180px, 0.36fr);
