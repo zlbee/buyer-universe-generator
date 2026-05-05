@@ -433,6 +433,7 @@ def _mna_hit_from_events(
         buyer_type=BuyerType.strategic,
         retriever_name=retriever_name,
         source_path=[source_path],
+        data_source=unique_terms([document.source_id for document in documents]),
         fit_reason=fit_reason,
         evidence=evidence,
         confidence=confidence,

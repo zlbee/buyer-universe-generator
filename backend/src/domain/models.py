@@ -366,6 +366,7 @@ class CandidateHit(StrictBaseModel):
     buyer_type: BuyerType
     retriever_name: str = Field(min_length=1)
     source_path: list[str] = Field(default_factory=list)
+    data_source: list[str] = Field(default_factory=list)
     fit_reason: str = Field(min_length=1)
     evidence: list[Evidence] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)

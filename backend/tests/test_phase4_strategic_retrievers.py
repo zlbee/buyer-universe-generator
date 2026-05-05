@@ -55,6 +55,7 @@ def test_same_sic_retriever_recalls_only_traceable_non_self_same_sic(tmp_path: P
     assert hit.candidate_ticker == "BBY"
     assert hit.candidate_cik == "0000002000"
     assert hit.source_path == ["same_sic"]
+    assert hit.data_source == ["edgar"]
     assert hit.retrieval_metadata["target_sic"] == "2844"
     assert hit.retrieval_metadata["candidate_sic"] == "2844"
     assert hit.evidence[0].source_dimension == "buyer_long_list_recall.public_company_peer_discovery"
@@ -331,6 +332,8 @@ def test_ma_history_retriever_recalls_same_and_adjacent_recent_deals(tmp_path: P
     by_name = {hit.candidate_name: hit for hit in result.hits}
     assert by_name["BeautyCo"].candidate_ticker == "BTY"
     assert by_name["BeautyCo"].candidate_cik == "0000002000"
+    assert by_name["BeautyCo"].data_source == ["edgar", "newsapi"]
+    assert by_name["Retail Corp"].data_source == ["newsapi"]
     beauty_events = by_name["BeautyCo"].retrieval_metadata["deal_events"]
     retail_events = by_name["Retail Corp"].retrieval_metadata["deal_events"]
     assert beauty_events[0]["target_acquired"] == "SkinCare Labs"
@@ -472,6 +475,7 @@ def test_ma_history_retriever_recalls_google_rss_resolved_and_pending_buyers(tmp
     assert by_name["Private Buyer"].candidate_cik is None
     assert by_name["Private Buyer"].pending_verification is True
     assert by_name["Private Buyer"].confidence == 0.52
+    assert by_name["Ulta Beauty, Inc."].data_source == ["google_news_rss"]
     assert by_name["Private Buyer"].retrieval_metadata["identity_resolution"][0]["status"] == "unresolved"
     assert by_name["Ulta Beauty, Inc."].retrieval_metadata["deal_events"][0]["target_acquired"] == "Clean Cosmetics Lab"
     assert result.metadata["rss_topic"] == "BUSINESS"
@@ -609,6 +613,7 @@ def test_strategic_acquisition_intent_retriever_recalls_llm_web_search_intent_wi
     assert hit.candidate_cik == "0001403568"
     assert hit.candidate_domain == "www.ulta.com"
     assert hit.source_path == ["strategic_acquisition_intent_llm_web_search"]
+    assert hit.data_source == ["llm_web_search"]
     assert hit.pending_verification is True
     assert hit.confidence == 0.57
     assert len(hit.evidence) == 2
@@ -755,6 +760,7 @@ def test_strategic_candidates_api_returns_target_profile_and_hits(
         buyer_type=BuyerType.strategic,
         retriever_name="SameSicRetriever",
         source_path=["same_sic"],
+        data_source=["edgar"],
         fit_reason="Shares target SIC 2844.",
         evidence=[evidence],
         confidence=0.72,
@@ -773,6 +779,7 @@ def test_strategic_candidates_api_returns_target_profile_and_hits(
     payload = response.json()
     assert payload["target_profile"]["ticker"] == "ELF"
     assert payload["hits"][0]["candidate_name"] == "Beauty Buyer Inc."
+    assert payload["hits"][0]["data_source"] == ["edgar"]
     assert payload["metadata"]["retrieval"]["retriever"] == "BuyerCandidateRetriever"
 
 

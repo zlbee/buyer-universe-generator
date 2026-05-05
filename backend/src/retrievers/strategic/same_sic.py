@@ -206,6 +206,7 @@ def _same_sic_hit_from_document(
         buyer_type=BuyerType.strategic,
         retriever_name=retriever_name,
         source_path=[source_path],
+        data_source=[document.source_id],
         fit_reason=f"Shares target SIC {target_sic}.",
         evidence=[evidence],
         confidence=confidence_from_strength(document.source_strength),

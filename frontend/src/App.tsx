@@ -87,6 +87,7 @@ type CandidateHit = {
   buyer_type: "strategic" | "financial";
   retriever_name: string;
   source_path: string[];
+  data_source: string[];
   fit_reason: string;
   evidence: Evidence[];
   confidence: number;
@@ -659,7 +660,7 @@ function CandidateRetrievalResult({
                   <th>Candidate</th>
                   <th>Type</th>
                   <th>Retriever</th>
-                  <th>Path</th>
+                  <th>Data Source</th>
                   <th>Confidence</th>
                   <th>Evidence</th>
                   <th>Reason</th>
@@ -676,7 +677,7 @@ function CandidateRetrievalResult({
                     </td>
                     <td>{hit.buyer_type}</td>
                     <td>{hit.retriever_name}</td>
-                    <td>{hit.source_path.join(", ") || "N/A"}</td>
+                    <td>{hit.data_source.join(", ") || "N/A"}</td>
                     <td>{formatConfidence(hit.confidence)}</td>
                     <td>{hit.evidence.length}</td>
                     <td>{hit.fit_reason}</td>

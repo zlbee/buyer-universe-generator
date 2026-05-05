@@ -86,6 +86,7 @@ def test_pe_deal_activity_retriever_recalls_seeded_pe_with_recent_industry_deals
     assert bain.buyer_type == BuyerType.financial
     assert bain.candidate_domain == "baincapital.com"
     assert bain.source_path == ["pe_deal_activity"]
+    assert bain.data_source == ["fmp"]
     assert bain.confidence == 0.76
     assert bain.evidence[0].source_dimension == "buyer_long_list_recall.financial_sponsor_activity"
     assert bain.evidence[0].source_strength == SourceStrength.B
@@ -148,6 +149,7 @@ def test_pe_deal_activity_retriever_adds_llm_web_search_deal_signals(tmp_path: P
     hit = result.hits[0]
     assert hit.buyer_type == BuyerType.financial
     assert hit.source_path == ["pe_deal_activity_llm_web_search"]
+    assert hit.data_source == ["llm_web_search"]
     assert hit.pending_verification is True
     assert hit.confidence == 0.58
     assert hit.evidence[0].verified_fact is False
@@ -283,6 +285,7 @@ def test_financial_candidates_api_returns_target_profile_and_hits(tmp_path: Path
     assert payload["target_profile"]["ticker"] == "ELF"
     assert payload["hits"][0]["candidate_name"] == "Bain Capital"
     assert payload["hits"][0]["buyer_type"] == "financial"
+    assert payload["hits"][0]["data_source"] == ["fmp"]
     assert payload["metadata"]["retrieval"]["retriever"] == "FinancialBuyerCandidateRetriever"
 
 
@@ -292,6 +295,7 @@ def test_combined_candidates_api_runs_strategic_and_financial_retrievers(tmp_pat
         buyer_type=BuyerType.strategic,
         retriever_name="SameSicRetriever",
         source_path=["same_sic"],
+        data_source=["edgar"],
         fit_reason="Shares target SIC.",
         evidence=[
             Evidence(
@@ -322,6 +326,7 @@ def test_combined_candidates_api_runs_strategic_and_financial_retrievers(tmp_pat
     payload = response.json()
     assert [hit["candidate_name"] for hit in payload["hits"]] == ["Beauty Buyer Inc.", "Bain Capital"]
     assert [hit["buyer_type"] for hit in payload["hits"]] == ["strategic", "financial"]
+    assert [hit["data_source"] for hit in payload["hits"]] == [["edgar"], ["fmp"]]
     assert payload["metadata"]["retrieval"]["hit_count"] == 2
     assert payload["metadata"]["retrieval"]["strategic"]["retriever"] == "StrategicBuyerCandidateRetriever"
     assert payload["metadata"]["retrieval"]["financial"]["retriever"] == "FinancialBuyerCandidateRetriever"
@@ -388,6 +393,7 @@ def financial_hit() -> CandidateHit:
         buyer_type=BuyerType.financial,
         retriever_name="PEDealActivityRetriever",
         source_path=["pe_deal_activity"],
+        data_source=["fmp"],
         fit_reason="Completed one same-sector PE deal signal.",
         evidence=[
             Evidence(

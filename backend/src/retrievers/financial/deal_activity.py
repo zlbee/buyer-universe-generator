@@ -419,6 +419,7 @@ def _hit_from_signals(signals: list[_PEDealSignal], retriever_name: str, since: 
         buyer_type=BuyerType.financial,
         retriever_name=retriever_name,
         source_path=unique_terms([signal.source_path for signal in signals]),
+        data_source=unique_terms([signal.document.source_id for signal in signals]),
         fit_reason=_financial_fit_reason(same_count, adjacent_count, since),
         evidence=evidence,
         confidence=confidence,

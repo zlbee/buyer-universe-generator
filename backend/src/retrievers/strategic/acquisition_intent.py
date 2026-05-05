@@ -214,6 +214,7 @@ class StrategicAcquisitionIntentRetriever:
                 selected_items,
                 target_profile,
                 retriever_name=self.name,
+                source_id=web_search_source.source_id,
                 source_dimension=web_search_source.dimension_id,
                 source_strength=web_search_source.source_strength,
             )
@@ -303,6 +304,7 @@ def _hit_from_record(
     target_profile: TargetProfile,
     *,
     retriever_name: str,
+    source_id: str,
     source_dimension: str | None,
     source_strength: SourceStrength,
 ) -> CandidateHit | None:
@@ -322,6 +324,7 @@ def _hit_from_record(
         buyer_type=BuyerType.strategic,
         retriever_name=retriever_name,
         source_path=[_WEB_SEARCH_SOURCE_PATH],
+        data_source=[source_id],
         fit_reason=_fit_reason(record, target_profile),
         evidence=evidence,
         confidence=_confidence(record.sector_relevance, len(evidence)),
