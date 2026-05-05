@@ -190,6 +190,9 @@ class StrategicAcquisitionIntentRetriever:
                 max_total_results=web_search_source.config.retrieval.web_search_max_total_results,
                 search_engine=web_search_source.config.retrieval.web_search_engine,
                 search_context_size=web_search_source.config.retrieval.web_search_context_size,
+                fetch_engine=web_search_source.config.retrieval.web_fetch_engine,
+                fetch_max_uses=web_search_source.config.retrieval.web_fetch_max_uses,
+                fetch_max_content_tokens=web_search_source.config.retrieval.web_fetch_max_content_tokens,
                 source_business_type=_STRATEGIC_INTENT_BUSINESS_TYPE,
             )
             output = _StrategicIntentOutput.model_validate(_normalize_web_search_payload(payload))
@@ -388,10 +391,17 @@ def _candidate_sector_relevance(candidate: _StrategicIntentCandidate) -> str:
     relevance = _normalize_sector_relevance(candidate.sector_relevance)
     if relevance:
         return relevance
+    relevance = _normalize_sector_relevance(candidate.fit_reason)
+    if relevance:
+        return relevance
     for item in candidate.evidence:
         relevance = _normalize_sector_relevance(item.sector_relevance)
         if relevance:
             return relevance
+        for text in (item.evidence_summary, item.quote_or_snippet):
+            relevance = _normalize_sector_relevance(text)
+            if relevance:
+                return relevance
     return "unrelated"
 
 
@@ -558,6 +568,7 @@ def _strategic_intent_web_search_prompt(
         f"Industry context only: SIC={sic}. "
         f"Adjacent-industry terms: {adjacent_text}. "
         f"Strategic intent terms: {intent_text}. "
+        "Prioritize SEC filings, investor-relations press releases, official acquisition pages, and official investor presentations. "
         "Do not search by or mention a specific seller company name, and do not infer a seller-specific transaction rumor. "
         "Accept evidence such as official strategy pages, investor presentations, earnings-call statements, corporate-development "
         "hiring pages, press releases, or reputable news saying the company plans, seeks, prioritizes, or actively pursues "
@@ -573,7 +584,9 @@ def _strategic_intent_web_search_system_prompt() -> str:
         "The JSON object must contain target_sic and candidates. Each candidate must include company_name, "
         "ticker, cik, domain, sector_relevance, fit_reason, has_strategic_intent, and evidence. Each evidence item must include "
         "evidence_summary, source_url, source_title, published_date, quote_or_snippet, intent_type, sector_relevance, and "
-        "is_relevant. Use null for unknown optional values and an empty candidates array when no sourced relevant buyer is found."
+        "is_relevant. For every sector_relevance field, use exactly same, adjacent, or unrelated; do not use High, Medium, "
+        "Low, or numeric relevance scores. Use null for unknown optional values and an empty candidates array when no sourced "
+        "relevant buyer is found."
     )
 
 
@@ -607,7 +620,7 @@ def _strategic_intent_json_schema(max_candidates: int, max_evidence_per_candidat
                         "domain": {"type": ["string", "null"]},
                         "sector_relevance": {
                             "type": "string",
-                            "description": "Industry relevance. Prefer same, adjacent, or unrelated.",
+                            "description": "Industry relevance. Use exactly same, adjacent, or unrelated.",
                         },
                         "fit_reason": {"type": "string"},
                         "has_strategic_intent": {"type": "boolean"},
@@ -634,7 +647,10 @@ def _strategic_intent_json_schema(max_candidates: int, max_evidence_per_candidat
                                     "published_date": {"type": ["string", "null"]},
                                     "quote_or_snippet": {"type": ["string", "null"]},
                                     "intent_type": {"type": ["string", "null"]},
-                                    "sector_relevance": {"type": "string"},
+                                    "sector_relevance": {
+                                        "type": "string",
+                                        "description": "Industry relevance. Use exactly same, adjacent, or unrelated.",
+                                    },
                                     "is_relevant": {"type": "boolean"},
                                 },
                             },

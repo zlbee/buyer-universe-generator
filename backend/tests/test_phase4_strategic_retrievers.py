@@ -340,11 +340,11 @@ def test_ma_history_retriever_recalls_same_and_adjacent_recent_deals(tmp_path: P
     assert beauty_events[0]["sector_match"] == "same"
     assert retail_events[0]["sector_match"] == "adjacent"
     assert edgar_source.calls[0]["since"] == date(2021, 5, 4)
-    assert len(news_source.queries) == 5
+    assert len(news_source.queries) == 1
     assert result.metadata["primary_source"] == "edgar_8k"
     assert result.metadata["secondary_source"] == "newsapi"
     assert result.metadata["edgar_documents_checked"] == 1
-    assert result.metadata["news_documents_checked"] == 25
+    assert result.metadata["news_documents_checked"] == 5
     assert result.metadata["news_lookback_start"] == "2026-04-04"
     assert news_source.calls[0]["kwargs"]["from_date"] == "2026-04-04"
     assert result.metadata["skip_reasons"]["no_transaction_language"] == 0
@@ -465,7 +465,7 @@ def test_ma_history_retriever_recalls_google_rss_resolved_and_pending_buyers(tmp
     by_name = {hit.candidate_name: hit for hit in result.hits}
     assert set(by_name) == {"L'Oreal S.A.", "Private Buyer", "Ulta Beauty, Inc."}
     assert google_source.topic_calls == ["BUSINESS"]
-    assert len(google_source.search_queries) == 5
+    assert len(google_source.search_queries) == 1
     assert google_source.search_queries[0].startswith('"Perfumes, cosmetics, and other toilet preparations"')
     assert "acquisition OR acquired" in google_source.search_queries[0]
     assert by_name["Ulta Beauty, Inc."].candidate_ticker == "ULTA"
@@ -479,7 +479,7 @@ def test_ma_history_retriever_recalls_google_rss_resolved_and_pending_buyers(tmp
     assert by_name["Private Buyer"].retrieval_metadata["identity_resolution"][0]["status"] == "unresolved"
     assert by_name["Ulta Beauty, Inc."].retrieval_metadata["deal_events"][0]["target_acquired"] == "Clean Cosmetics Lab"
     assert result.metadata["rss_topic"] == "BUSINESS"
-    assert result.metadata["rss_search_documents_checked"] == 15
+    assert result.metadata["rss_search_documents_checked"] == 3
     assert result.metadata["rss_topic_documents_checked"] == 1
     assert result.metadata["rss_topic_documents_filtered"] == 1
     assert result.metadata["rss_llm_mna_count"] == 3
@@ -629,9 +629,12 @@ def test_strategic_acquisition_intent_retriever_recalls_llm_web_search_intent_wi
     assert result.metadata["skip_reasons"]["unrelated_sector"] == 1
     assert result.metadata["skip_reasons"]["missing_evidence"] == 1
     assert web_search.source_business_types == ["strategic_buyer_acquisition_intent_web_search"]
-    assert web_search.calls[0]["max_results"] == 10
-    assert web_search.calls[0]["max_total_results"] == 10
-    assert web_search.calls[0]["search_context_size"] == "medium"
+    assert web_search.calls[0]["max_results"] == 25
+    assert web_search.calls[0]["max_total_results"] == 100
+    assert web_search.calls[0]["search_context_size"] == "low"
+    assert web_search.calls[0]["fetch_max_uses"] == 20
+    assert web_search.calls[0]["fetch_max_content_tokens"] == 50000
+    assert "use exactly same, adjacent, or unrelated" in web_search.calls[0]["system_prompt"]
     assert web_search.calls[0]["json_schema"]["properties"]["candidates"]["maxItems"] == 25
     assert web_search.calls[0]["json_schema"]["properties"]["candidates"]["items"]["properties"]["evidence"]["maxItems"] == 2
     assert "Use web search" in web_search.prompts[0]
@@ -641,6 +644,7 @@ def test_strategic_acquisition_intent_retriever_recalls_llm_web_search_intent_wi
     assert "SIC=2844" in web_search.prompts[0]
     assert "from 2025-05-04 through 2026-05-04" in web_search.prompts[0]
     assert "Adjacent-industry terms" in web_search.prompts[0]
+    assert "Prioritize SEC filings, investor-relations press releases, official acquisition pages" in web_search.prompts[0]
     assert "at most 25 companies" in web_search.prompts[0]
     assert "at most 2 evidence" in web_search.prompts[0]
 
@@ -680,6 +684,62 @@ def test_strategic_acquisition_intent_retriever_tolerates_llm_type_drift(tmp_pat
     assert result.metadata["target_sic"] == "2844"
     assert result.metadata["llm_web_search_candidates_checked"] == 1
     assert not any("LLM web search failed" in warning for warning in result.warnings)
+
+
+def test_strategic_acquisition_intent_retriever_infers_relevance_from_reason_when_llm_uses_scores(tmp_path: Path) -> None:
+    settings = settings_for_tests(tmp_path)
+    strategy = DataSourceStrategy.from_settings(settings)
+    web_search = FakeStrategicWebSearchJSONClient(
+        {
+            "target_company": "e.l.f. Beauty, Inc.",
+            "target_sic": 2844,
+            "candidates": [
+                {
+                    "company_name": "L'Oreal S.A.",
+                    "ticker": "OR.PA",
+                    "sector_relevance": "High",
+                    "fit_reason": (
+                        "Acquiring a premium skincare brand directly adjacent to SIC 2844 personal care "
+                        "and beauty accessories."
+                    ),
+                    "has_strategic_intent": True,
+                    "evidence": [
+                        {
+                            "evidence_summary": "L'Oreal announced an agreement to acquire a premium skincare brand.",
+                            "source_url": "https://www.loreal-finance.com/eng/press-release/loreal-groupe-acquire-majority-stake-medik8",
+                            "sector_relevance": "High",
+                            "intent_type": "acquire",
+                            "is_relevant": True,
+                        }
+                    ],
+                },
+                {
+                    "company_name": "e.l.f. Beauty, Inc.",
+                    "ticker": "ELF",
+                    "sector_relevance": "High",
+                    "fit_reason": "Strategic acquisition of a skin-focused beauty brand adjacent to personal care.",
+                    "has_strategic_intent": True,
+                    "evidence": [
+                        {
+                            "evidence_summary": "e.l.f. Beauty announced an acquisition.",
+                            "source_url": "https://www.nasdaq.com/press-release/elf-beauty-announces-definitive-agreement-acquire-rhode",
+                            "sector_relevance": "High",
+                            "intent_type": "acquisition",
+                            "is_relevant": True,
+                        }
+                    ],
+                },
+            ],
+        }
+    )
+    retriever = StrategicAcquisitionIntentRetriever(strategy, web_search_client=web_search, as_of_date=date(2026, 5, 4))
+
+    result = retriever.retrieve_with_context(sample_profile())
+
+    assert [hit.candidate_name for hit in result.hits] == ["L'Oreal S.A."]
+    assert result.hits[0].retrieval_metadata["sector_relevance"] == "adjacent"
+    assert result.metadata["skip_reasons"]["self_candidate"] == 1
+    assert "unrelated_sector" not in result.metadata["skip_reasons"]
 
 
 def test_strategic_acquisition_intent_retriever_enforces_candidate_cap(tmp_path: Path) -> None:
@@ -1096,6 +1156,9 @@ class FakeStrategicWebSearchJSONClient:
         max_total_results: int = 5,
         search_engine: str = "auto",
         search_context_size: str = "low",
+        fetch_engine: str = "auto",
+        fetch_max_uses: int | None = None,
+        fetch_max_content_tokens: int | None = None,
         source_business_type: str = "unspecified",
     ) -> dict[str, Any]:
         self.prompts.append(prompt)
@@ -1108,6 +1171,9 @@ class FakeStrategicWebSearchJSONClient:
                 "max_total_results": max_total_results,
                 "search_engine": search_engine,
                 "search_context_size": search_context_size,
+                "fetch_engine": fetch_engine,
+                "fetch_max_uses": fetch_max_uses,
+                "fetch_max_content_tokens": fetch_max_content_tokens,
             }
         )
         return self.payload

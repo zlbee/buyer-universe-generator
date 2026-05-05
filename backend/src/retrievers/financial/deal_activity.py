@@ -538,6 +538,9 @@ def _web_search_documents_for_firm(
         max_total_results=retrieval_config.web_search_max_total_results,
         search_engine=retrieval_config.web_search_engine,
         search_context_size=retrieval_config.web_search_context_size,
+        fetch_engine=retrieval_config.web_fetch_engine,
+        fetch_max_uses=retrieval_config.web_fetch_max_uses,
+        fetch_max_content_tokens=retrieval_config.web_fetch_max_content_tokens,
         source_business_type=_PE_DEAL_WEB_SEARCH_BUSINESS_TYPE,
     )
     output = _PEDealWebSearchOutput.model_validate(_normalize_web_search_payload(payload))
@@ -660,9 +663,8 @@ def _pe_deal_web_search_prompt(
         "Use web search. "
         f"Find whether {pe_firm} has acquisition, buyout, add-on, or investment records in the past five years "
         f"for SIC={sic}, from {since.isoformat()} through {as_of_date.isoformat()}. "
-        f"Industry context only: same-industry terms: {same_text}. "
         f"Adjacent-industry terms: {adjacent_text}. "
-        "Use only the SIC and industry terms as search guidance; do not use a specific seller company name. "
+        "Use only the SIC and industry terms as search guidance."
         "The source page does not need to literally mention the SIC code. "
         "Return deals where the source page supports the PE firm, acquired company, approximate acquisition date, "
         "source URL, and relevance to the same or adjacent industry. Prefer official PE announcements, portfolio pages, "

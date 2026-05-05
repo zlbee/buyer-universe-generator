@@ -135,6 +135,8 @@ def test_data_source_policy_scopes_strength_by_dimension(tmp_path: Path) -> None
     assert fmp_transaction_source.source_strength == SourceStrength.B
     assert sponsor_source.source_strength == SourceStrength.C
     assert strategic_intent_source.source_strength == SourceStrength.C
+    assert strategic_intent_source.config.retrieval.web_fetch_max_uses == 20
+    assert strategic_intent_source.config.retrieval.web_fetch_max_content_tokens == 50000
 
 
 def test_data_source_policy_configures_strategic_retriever_strategy(tmp_path: Path) -> None:

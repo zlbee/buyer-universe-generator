@@ -192,6 +192,9 @@ class DataSourceRetrievalConfig(StrictBaseModel):
     web_search_max_total_results: int = Field(default=5, ge=1)
     web_search_engine: str = "auto"
     web_search_context_size: str = "low"
+    web_fetch_max_uses: int | None = Field(default=None, ge=1)
+    web_fetch_max_content_tokens: int | None = Field(default=None, ge=1)
+    web_fetch_engine: str = "auto"
     rss_language: str | None = None
     rss_country: str | None = None
     rss_edition: str | None = None

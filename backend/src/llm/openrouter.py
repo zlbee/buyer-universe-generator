@@ -87,6 +87,9 @@ class OpenRouterProvider:
         max_total_results: int = 5,
         search_engine: str = "auto",
         search_context_size: str = "low",
+        fetch_engine: str = "auto",
+        fetch_max_uses: int | None = None,
+        fetch_max_content_tokens: int | None = None,
         source_business_type: str = "unspecified",
     ) -> dict[str, Any]:
         """Generate structured JSON while letting OpenRouter run its web-search server tool."""
@@ -99,6 +102,14 @@ class OpenRouterProvider:
             "max_total_results": max_total_results,
             "search_context_size": search_context_size,
         }
+        tools: list[dict[str, Any]] = [{"type": "openrouter:web_search", "parameters": tool_parameters}]
+        if fetch_max_uses is not None or fetch_max_content_tokens is not None:
+            fetch_parameters: dict[str, Any] = {"engine": fetch_engine}
+            if fetch_max_uses is not None:
+                fetch_parameters["max_uses"] = fetch_max_uses
+            if fetch_max_content_tokens is not None:
+                fetch_parameters["max_content_tokens"] = fetch_max_content_tokens
+            tools.append({"type": "openrouter:web_fetch", "parameters": fetch_parameters})
         active_system_prompt = system_prompt or _default_json_system_prompt(schema_name)
         payload: dict[str, Any] = {
             "model": self.settings.llm_model,
@@ -112,7 +123,7 @@ class OpenRouterProvider:
                 },
                 {"role": "user", "content": prompt},
             ],
-            "tools": [{"type": "openrouter:web_search", "parameters": tool_parameters}],
+            "tools": tools,
         }
 
         return self._send_structured_request(

@@ -308,10 +308,12 @@ sources:
     api_key_env: BUG_OPENROUTER_API_KEY
     cache_ttl_hours: 0
     retrieval:
-      web_search_max_results: 10
-      web_search_max_total_results: 10
+      web_search_max_results: 25
+      web_search_max_total_results: 100
       web_search_engine: auto
-      web_search_context_size: medium
+      web_search_context_size: low
+      web_fetch_max_uses: 20
+      web_fetch_max_content_tokens: 50000
     dimensions:
       buyer_long_list_recall.financial_sponsor_activity:
         source_strength: C
@@ -352,9 +354,9 @@ retrievers:
       - newsapi
       - google_news_rss
     lookback_years: 5
-    max_companies: 150
-    max_documents: 50
-    max_queries: 5
+    max_companies: 5 # TODO
+    max_documents: 5 # TODO
+    max_queries: 1 # TODO
     page_size: 10
     edgar_form_type: 8-K
     # SEC 8-K Item 2.01 is the primary completed-acquisition signal. Item 1.01 is retained only as support.

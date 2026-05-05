@@ -44,6 +44,8 @@ def test_data_source_policy_configures_pe_deal_activity_retriever(tmp_path: Path
     assert sponsor_source.dimension_id == "buyer_long_list_recall.financial_sponsor_activity"
     assert sponsor_source.source_strength == SourceStrength.B
     assert llm_sponsor_source.source_strength == SourceStrength.C
+    assert llm_sponsor_source.config.retrieval.web_fetch_max_uses == 20
+    assert llm_sponsor_source.config.retrieval.web_fetch_max_content_tokens == 50000
     assert policy is not None
     assert policy.use_case == "buyer_recall_financial_sponsors"
     assert policy.source_roles["deal_activity_source"] == "fmp"
@@ -162,12 +164,13 @@ def test_pe_deal_activity_retriever_adds_llm_web_search_deal_signals(tmp_path: P
     assert result.metadata["llm_web_search_documents_checked"] == 1
     assert result.metadata["llm_web_search_deal_count"] == 1
     assert web_search.source_business_types == ["financial_buyer_pe_deal_activity_web_search"]
+    assert web_search.calls[0]["fetch_max_uses"] == 20
+    assert web_search.calls[0]["fetch_max_content_tokens"] == 50000
     assert "Use web search" in web_search.prompts[0]
     assert "Advent International" in web_search.prompts[0]
     assert "SIC=2844" in web_search.prompts[0]
     assert "2021-05-04" in web_search.prompts[0]
     assert "e.l.f. Beauty, Inc." not in web_search.prompts[0]
-    assert "same-industry terms" in web_search.prompts[0]
     assert "Adjacent-industry terms" in web_search.prompts[0]
 
 
@@ -448,6 +451,9 @@ class FakeWebSearchJSONClient:
         max_total_results: int = 5,
         search_engine: str = "auto",
         search_context_size: str = "low",
+        fetch_engine: str = "auto",
+        fetch_max_uses: int | None = None,
+        fetch_max_content_tokens: int | None = None,
         source_business_type: str = "unspecified",
     ) -> dict[str, Any]:
         self.prompts.append(prompt)
@@ -460,6 +466,9 @@ class FakeWebSearchJSONClient:
                 "max_total_results": max_total_results,
                 "search_engine": search_engine,
                 "search_context_size": search_context_size,
+                "fetch_engine": fetch_engine,
+                "fetch_max_uses": fetch_max_uses,
+                "fetch_max_content_tokens": fetch_max_content_tokens,
             }
         )
         return self.payload

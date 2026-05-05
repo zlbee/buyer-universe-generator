@@ -355,6 +355,8 @@ def test_openrouter_provider_sends_web_search_server_tool_request(tmp_path: Path
         max_results=3,
         max_total_results=3,
         search_engine="exa",
+        fetch_max_uses=20,
+        fetch_max_content_tokens=50000,
     )
 
     assert result == {"candidates": []}
@@ -368,7 +370,15 @@ def test_openrouter_provider_sends_web_search_server_tool_request(tmp_path: Path
                 "max_total_results": 3,
                 "search_context_size": "low",
             },
-        }
+        },
+        {
+            "type": "openrouter:web_fetch",
+            "parameters": {
+                "engine": "auto",
+                "max_uses": 20,
+                "max_content_tokens": 50000,
+            },
+        },
     ]
     assert "provider" not in captured["payload"]
 
@@ -1048,6 +1058,9 @@ class FakeWebSearchJSONClient:
         max_total_results: int = 5,
         search_engine: str = "auto",
         search_context_size: str = "low",
+        fetch_engine: str = "auto",
+        fetch_max_uses: int | None = None,
+        fetch_max_content_tokens: int | None = None,
         source_business_type: str = "unspecified",
     ) -> dict[str, Any]:
         self.prompts.append(prompt)

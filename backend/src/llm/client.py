@@ -55,6 +55,9 @@ class WebSearchJSONClient(Protocol):
         max_total_results: int = 5,
         search_engine: str = "auto",
         search_context_size: str = "low",
+        fetch_engine: str = "auto",
+        fetch_max_uses: int | None = None,
+        fetch_max_content_tokens: int | None = None,
         source_business_type: str = "unspecified",
     ) -> dict[str, Any]:
         ...
