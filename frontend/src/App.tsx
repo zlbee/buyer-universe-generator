@@ -121,7 +121,8 @@ function App() {
   const [health, setHealth] = useState<HealthState>({ status: "checking" });
   const [debugState, setDebugState] = useState<TargetProfileDebugState>({ status: "idle" });
   const [candidateState, setCandidateState] = useState<CandidateRetrievalState>({ status: "idle" });
-  const [isDebugEnabled, setIsDebugEnabled] = useState(false);
+  const [isTargetDebugEnabled, setIsTargetDebugEnabled] = useState(false);
+  const [isBuyerRecallDebugEnabled, setIsBuyerRecallDebugEnabled] = useState(false);
 
   const trimmedTarget = useMemo(() => targetInput.trim(), [targetInput]);
 
@@ -236,7 +237,6 @@ function App() {
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Long-list MVP</p>
             <h1>Buyer Universe Generator</h1>
           </div>
           <div className="topbar-actions">
@@ -251,17 +251,17 @@ function App() {
         </header>
 
         <section className="status-grid" aria-label="Implementation status">
-          <StatusTile label="Target Feature Extractor" value="Phase 2 Ready" tone="ready" />
-          <StatusTile label="Buyer Candidate Retriever" value="Phase 5 Ready" tone="ready" />
-          <StatusTile label="Evidence Store" value="Profile Cache Ready" tone="ready" />
+          <StatusTile label="Target Feature Extractor" value="Ready" tone="ready" />
+          <StatusTile label="Buyer Candidate Retriever" value="Ready" tone="ready" />
           <StatusTile label="API Health" value={health.status === "online" ? "Online" : "Checking"} tone="ready" />
         </section>
 
-        <section className="page-card-grid" aria-label="Phase tools">
+        <section className="page-card-grid" aria-label="Workflow tools">
           <PageCard
             id="target-profile-card"
-            eyebrow="Phase 2"
+            eyebrow="Target Profile"
             title="TargetProfile Builder"
+            description="Resolve the target company and extract the structured profile used by downstream buyer recall."
             status={debugState.status}
           >
             <form className="target-form" onSubmit={handleTargetProfileDebug}>
@@ -283,39 +283,69 @@ function App() {
                 <input
                   id="target-debug-toggle"
                   type="checkbox"
-                  checked={isDebugEnabled}
-                  onChange={(event) => setIsDebugEnabled(event.target.checked)}
+                  checked={isTargetDebugEnabled}
+                  onChange={(event) => setIsTargetDebugEnabled(event.target.checked)}
                 />
                 <span className="debug-toggle__control" aria-hidden="true" />
-                <span>是否打开 Debug</span>
+                <span>Debug</span>
               </label>
             </form>
-            <TargetProfileDebugPanel state={debugState} showFeatureEvidence={isDebugEnabled} />
+            <TargetProfileDebugPanel
+              state={debugState}
+              showFeatureEvidence={isTargetDebugEnabled}
+              showRawResponse={isTargetDebugEnabled}
+            />
           </PageCard>
 
           <PageCard
             id="buyer-recall-card"
-            eyebrow="Phase 4/5"
+            eyebrow="Buyer Recall"
             title="Potential Buyer Recaller"
+            description="Use the built target profile to recall strategic and financial buyer candidates."
             status={candidateState.status}
           >
             <form className="target-form" onSubmit={handleCandidateRetrieval}>
-              <label htmlFor="buyer-target-input">Target ticker or company name</label>
-              <div className="input-row">
-                <input
-                  id="buyer-target-input"
-                  name="buyer-target"
-                  value={targetInput}
-                  onChange={(event) => setTargetInput(event.target.value)}
-                  placeholder="e.g. ELF or e.l.f. Beauty"
-                  autoComplete="off"
-                />
+              <div className="target-readout" aria-labelledby="buyer-target-label">
+                <span id="buyer-target-label">Target ticker or company name</span>
+                <strong>{trimmedTarget || "Enter a target in TargetProfile Builder"}</strong>
+              </div>
+              <div className="input-row input-row--action-only">
                 <button type="submit" disabled={!trimmedTarget || candidateState.status === "loading"}>
                   {candidateState.status === "loading" ? "Recalling" : "Recall Buyers"}
                 </button>
               </div>
+              <label className="debug-toggle" htmlFor="buyer-recall-debug-toggle">
+                <input
+                  id="buyer-recall-debug-toggle"
+                  type="checkbox"
+                  checked={isBuyerRecallDebugEnabled}
+                  onChange={(event) => setIsBuyerRecallDebugEnabled(event.target.checked)}
+                />
+                <span className="debug-toggle__control" aria-hidden="true" />
+                <span>Debug</span>
+              </label>
             </form>
-            <CandidateRetrievalPanel state={candidateState} />
+            <CandidateRetrievalPanel state={candidateState} showRawResponse={isBuyerRecallDebugEnabled} />
+          </PageCard>
+
+          <PageCard
+            id="buyer-hard-filter-card"
+            eyebrow="Buyer Filtering"
+            title="Potential Buyer Hard Filter"
+            description="Filter potential buyers against hard constraints such as financial capacity relative to the seller, scale thresholds, and baseline feasibility."
+            status="to-be-defined"
+          >
+            <div className="debug-empty">To Be Defined</div>
+          </PageCard>
+
+          <PageCard
+            id="buyer-analysis-filter-card"
+            eyebrow="Buyer Universe"
+            title="Potential Buyer Analysis Filter"
+            description="Build potential buyer profiles, then use rules and LLM analysis to assess acquisition likelihood across the hard-filtered candidate set and produce the final buyer universe."
+            status="to-be-defined"
+          >
+            <div className="debug-empty">To Be Defined</div>
           </PageCard>
         </section>
       </section>
@@ -356,13 +386,15 @@ function PageCard({
   id,
   eyebrow,
   title,
+  description,
   status,
   children
 }: {
   id: string;
   eyebrow: string;
   title: string;
-  status: TargetProfileDebugState["status"] | CandidateRetrievalState["status"];
+  description: string;
+  status: TargetProfileDebugState["status"] | CandidateRetrievalState["status"] | "to-be-defined";
   children: ReactNode;
 }) {
   return (
@@ -371,8 +403,9 @@ function PageCard({
         <div>
           <p className="eyebrow">{eyebrow}</p>
           <h2 id={`${id}-title`}>{title}</h2>
+          <p className="page-card__description">{description}</p>
         </div>
-        <span className={`debug-state debug-state--${status}`}>{status}</span>
+        <span className={`debug-state debug-state--${status}`}>{formatCardStatus(status)}</span>
       </div>
       <div className="page-card__body">{children}</div>
     </section>
@@ -398,10 +431,12 @@ function StatusTile({
 
 function TargetProfileDebugPanel({
   state,
-  showFeatureEvidence
+  showFeatureEvidence,
+  showRawResponse
 }: {
   state: TargetProfileDebugState;
   showFeatureEvidence: boolean;
+  showRawResponse: boolean;
 }) {
   return (
     <div className="debug-panel">
@@ -417,12 +452,20 @@ function TargetProfileDebugPanel({
         <DebugError message={state.message} errorCode={state.errorCode} candidates={state.candidates} />
       )}
 
-      {state.status === "success" && <DebugResult state={state} showFeatureEvidence={showFeatureEvidence} />}
+      {state.status === "success" && (
+        <DebugResult state={state} showFeatureEvidence={showFeatureEvidence} showRawResponse={showRawResponse} />
+      )}
     </div>
   );
 }
 
-function CandidateRetrievalPanel({ state }: { state: CandidateRetrievalState }) {
+function CandidateRetrievalPanel({
+  state,
+  showRawResponse
+}: {
+  state: CandidateRetrievalState;
+  showRawResponse: boolean;
+}) {
   return (
     <div className="debug-panel">
       {state.status === "idle" && <div className="debug-empty">Run strategic and financial first-pass recall from the target input above.</div>}
@@ -437,7 +480,7 @@ function CandidateRetrievalPanel({ state }: { state: CandidateRetrievalState }) 
         <DebugError message={state.message} errorCode={state.errorCode} candidates={state.candidates} />
       )}
 
-      {state.status === "success" && <CandidateRetrievalResult state={state} />}
+      {state.status === "success" && <CandidateRetrievalResult state={state} showRawResponse={showRawResponse} />}
     </div>
   );
 }
@@ -485,10 +528,12 @@ function DebugError({
 
 function DebugResult({
   state,
-  showFeatureEvidence
+  showFeatureEvidence,
+  showRawResponse
 }: {
   state: Extract<TargetProfileDebugState, { status: "success" }>;
   showFeatureEvidence: boolean;
+  showRawResponse: boolean;
 }) {
   const { data } = state;
   const profile = data.target_profile;
@@ -613,18 +658,22 @@ function DebugResult({
         <pre>{JSON.stringify(data.extraction_metadata, null, 2)}</pre>
       </details>
 
-      <details className="debug-raw">
-        <summary>Raw API response</summary>
-        <pre>{JSON.stringify(data, null, 2)}</pre>
-      </details>
+      {showRawResponse && (
+        <details className="debug-raw">
+          <summary>Raw API response</summary>
+          <pre>{JSON.stringify(data, null, 2)}</pre>
+        </details>
+      )}
     </div>
   );
 }
 
 function CandidateRetrievalResult({
-  state
+  state,
+  showRawResponse
 }: {
   state: Extract<CandidateRetrievalState, { status: "success" }>;
+  showRawResponse: boolean;
 }) {
   const { data } = state;
   const profile = data.target_profile;
@@ -694,10 +743,12 @@ function CandidateRetrievalResult({
         <pre>{JSON.stringify(data.metadata, null, 2)}</pre>
       </details>
 
-      <details className="debug-raw">
-        <summary>Raw API response</summary>
-        <pre>{JSON.stringify(data, null, 2)}</pre>
-      </details>
+      {showRawResponse && (
+        <details className="debug-raw">
+          <summary>Raw API response</summary>
+          <pre>{JSON.stringify(data, null, 2)}</pre>
+        </details>
+      )}
     </div>
   );
 }
@@ -713,6 +764,14 @@ function DebugMetric({ label, value }: { label: string; value: string }) {
 
 function formatConfidence(value: number) {
   return `${Math.round(value * 100)}%`;
+}
+
+function formatCardStatus(status: TargetProfileDebugState["status"] | CandidateRetrievalState["status"] | "to-be-defined") {
+  if (status === "to-be-defined") {
+    return "To Be Defined";
+  }
+
+  return status;
 }
 
 async function readDebugError(

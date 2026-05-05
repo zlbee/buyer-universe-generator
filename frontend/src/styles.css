@@ -142,6 +142,11 @@ h2 {
   gap: 10px;
 }
 
+.input-row--action-only {
+  grid-template-columns: auto;
+  justify-content: start;
+}
+
 .input-row input {
   min-width: 0;
   height: 44px;
@@ -172,6 +177,26 @@ h2 {
   color: #667382;
   background: #d7dde4;
   cursor: not-allowed;
+}
+
+.target-readout {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid #cfd6de;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.target-readout span {
+  color: #344252;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.target-readout strong {
+  color: #17202a;
+  overflow-wrap: anywhere;
 }
 
 .debug-toggle {
@@ -286,6 +311,13 @@ h2 {
   gap: 18px;
 }
 
+.page-card__description {
+  max-width: 680px;
+  margin-bottom: 0;
+  color: #5d6b7a;
+  line-height: 1.45;
+}
+
 .debug-panel {
   display: grid;
   gap: 18px;
@@ -320,6 +352,13 @@ h2 {
   border-color: #8fb6dc;
   color: #244f7a;
   background: #eef6ff;
+}
+
+.debug-state--to-be-defined {
+  min-width: 132px;
+  border-color: #c08721;
+  color: #7a4b00;
+  background: #fff4d6;
 }
 
 .debug-empty,
