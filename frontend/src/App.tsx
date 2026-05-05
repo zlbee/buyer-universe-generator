@@ -120,6 +120,7 @@ function App() {
   const [health, setHealth] = useState<HealthState>({ status: "checking" });
   const [debugState, setDebugState] = useState<TargetProfileDebugState>({ status: "idle" });
   const [candidateState, setCandidateState] = useState<CandidateRetrievalState>({ status: "idle" });
+  const [isDebugEnabled, setIsDebugEnabled] = useState(false);
 
   const trimmedTarget = useMemo(() => targetInput.trim(), [targetInput]);
 
@@ -277,8 +278,18 @@ function App() {
                   {debugState.status === "loading" ? "Building" : "Build Profile"}
                 </button>
               </div>
+              <label className="debug-toggle" htmlFor="target-debug-toggle">
+                <input
+                  id="target-debug-toggle"
+                  type="checkbox"
+                  checked={isDebugEnabled}
+                  onChange={(event) => setIsDebugEnabled(event.target.checked)}
+                />
+                <span className="debug-toggle__control" aria-hidden="true" />
+                <span>是否打开 Debug</span>
+              </label>
             </form>
-            <TargetProfileDebugPanel state={debugState} />
+            <TargetProfileDebugPanel state={debugState} showFeatureEvidence={isDebugEnabled} />
           </PageCard>
 
           <PageCard
@@ -384,7 +395,13 @@ function StatusTile({
   );
 }
 
-function TargetProfileDebugPanel({ state }: { state: TargetProfileDebugState }) {
+function TargetProfileDebugPanel({
+  state,
+  showFeatureEvidence
+}: {
+  state: TargetProfileDebugState;
+  showFeatureEvidence: boolean;
+}) {
   return (
     <div className="debug-panel">
       {state.status === "idle" && <div className="debug-empty">Build a profile from the target input above.</div>}
@@ -399,7 +416,7 @@ function TargetProfileDebugPanel({ state }: { state: TargetProfileDebugState }) 
         <DebugError message={state.message} errorCode={state.errorCode} candidates={state.candidates} />
       )}
 
-      {state.status === "success" && <DebugResult state={state} />}
+      {state.status === "success" && <DebugResult state={state} showFeatureEvidence={showFeatureEvidence} />}
     </div>
   );
 }
@@ -466,9 +483,11 @@ function DebugError({
 }
 
 function DebugResult({
-  state
+  state,
+  showFeatureEvidence
 }: {
   state: Extract<TargetProfileDebugState, { status: "success" }>;
+  showFeatureEvidence: boolean;
 }) {
   const { data } = state;
   const profile = data.target_profile;
@@ -510,43 +529,45 @@ function DebugResult({
         </div>
       </div>
 
-      <div className="debug-section">
-        <h3>Feature Evidence</h3>
-        <div className="debug-table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Field</th>
-                <th>Strength</th>
-                <th>Dimension</th>
-                <th>Claim</th>
-                <th>Reference</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(profile.feature_evidence).flatMap(([field, evidenceItems]) =>
-                evidenceItems.map((evidence, index) => (
-                  <tr key={`${field}-${index}-${evidence.filing_accession ?? evidence.url}`}>
-                    <td>{field}</td>
-                    <td>{evidence.source_strength}</td>
-                    <td>{evidence.source_dimension ?? "N/A"}</td>
-                    <td>{evidence.claim}</td>
-                    <td>
-                      {evidence.url ? (
-                        <a href={evidence.url} target="_blank" rel="noreferrer">
-                          Open
-                        </a>
-                      ) : (
-                        evidence.filing_accession ?? "N/A"
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {showFeatureEvidence && (
+        <div className="debug-section">
+          <h3>Feature Evidence</h3>
+          <div className="debug-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Strength</th>
+                  <th>Dimension</th>
+                  <th>Claim</th>
+                  <th>Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(profile.feature_evidence).flatMap(([field, evidenceItems]) =>
+                  evidenceItems.map((evidence, index) => (
+                    <tr key={`${field}-${index}-${evidence.filing_accession ?? evidence.url}`}>
+                      <td>{field}</td>
+                      <td>{evidence.source_strength}</td>
+                      <td>{evidence.source_dimension ?? "N/A"}</td>
+                      <td>{evidence.claim}</td>
+                      <td>
+                        {evidence.url ? (
+                          <a href={evidence.url} target="_blank" rel="noreferrer">
+                            Open
+                          </a>
+                        ) : (
+                          evidence.filing_accession ?? "N/A"
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="debug-section">
         <h3>Source Documents</h3>
