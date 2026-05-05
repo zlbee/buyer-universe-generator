@@ -84,7 +84,7 @@ class SourceRegistry:
 
     def _retrieval(self, source_id: str):
         if not self.strategy:
-            from src.domain import DataSourceRetrievalConfig
+            from src.domain import RetrievalProviderOptions
 
-            return DataSourceRetrievalConfig()
+            return RetrievalProviderOptions()
         return self.strategy.source(source_id).retrieval

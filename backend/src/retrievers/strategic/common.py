@@ -6,7 +6,7 @@ import re
 from datetime import UTC, date, datetime
 from typing import Any
 
-from src.domain import DataSourceRetrieverConfig, SourceDocument, SourceStrength, SourceType, TargetProfile
+from src.domain import RetrievalRetrieverConfig, SourceDocument, SourceStrength, SourceType, TargetProfile
 from src.sources.strategy import DataSourceStrategy, SelectedDataSource
 
 
@@ -22,7 +22,7 @@ def selected_source(
     selected = strategy.selected_source(use_case, source_id, include_disabled=True)
     if not selected:
         if required:
-            warnings.append(f"{retriever_name} skipped {source_id}: no datasource policy for {use_case}")
+            warnings.append(f"{retriever_name} skipped {source_id}: no retrieval rules for {use_case}")
         return None
     if not selected.enabled:
         warnings.append(f"{retriever_name} {source_id} disabled: {selected.disabled_reason}")
@@ -34,15 +34,15 @@ def retriever_config(
     strategy: DataSourceStrategy,
     retriever_name: str,
     warnings: list[str],
-) -> DataSourceRetrieverConfig | None:
+) -> RetrievalRetrieverConfig | None:
     config = strategy.retriever_config(retriever_name)
     if config is None:
-        warnings.append(f"{retriever_name} skipped: no retriever policy in datasources.yaml")
+        warnings.append(f"{retriever_name} skipped: no retriever rules in retrieval_rules.yaml")
     return config
 
 
 def required_source_role(
-    config: DataSourceRetrieverConfig,
+    config: RetrievalRetrieverConfig,
     role: str,
     retriever_name: str,
     warnings: list[str],
@@ -54,7 +54,7 @@ def required_source_role(
 
 
 def required_positive_int(
-    config: DataSourceRetrieverConfig,
+    config: RetrievalRetrieverConfig,
     field_name: str,
     retriever_name: str,
     warnings: list[str],
@@ -65,7 +65,7 @@ def required_positive_int(
     return value
 
 
-def source_execution_order(config: DataSourceRetrieverConfig) -> list[str]:
+def source_execution_order(config: RetrievalRetrieverConfig) -> list[str]:
     ordered = config.source_priority or list(config.source_roles.values())
     return unique_terms(ordered)
 

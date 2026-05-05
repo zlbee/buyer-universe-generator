@@ -13,7 +13,7 @@ Implemented:
 - Phase 2 Target Feature Extractor with SEC filing text, required OpenRouter extraction, and profile caching.
 - React 18 + TypeScript + Vite frontend shell.
 - CLI entrypoint for database initialization and config inspection.
-- Configurable data-source policy for EDGAR, Polygon.io, and NewsAPI.
+- Configurable retrieval rules for EDGAR, Polygon.io, FMP, NewsAPI, Google News RSS, and OpenRouter web search.
 - `pydantic-settings` configuration.
 - SQLAlchemy 2.0 SQLite bootstrap.
 - Docker Compose setup for backend and frontend services.
@@ -84,10 +84,10 @@ $env:BUG_NEWS_API_KEY = "..."
 $env:BUG_LOG_LEVEL = "INFO"
 ```
 
-Data-source enablement, use-case routing, and dimension-scoped source strength are configured in:
+Provider enablement, stage routing, and dimension-scoped source strength are configured in:
 
 ```text
-backend/config/datasources.yaml
+backend/config/retrieval_rules.yaml
 ```
 
 ## Run The API

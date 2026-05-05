@@ -43,7 +43,7 @@ def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:
         "environment": "test",
         "database_url": f"sqlite:///{tmp_path / 'buyer_universe.db'}",
         "cache_dir": tmp_path / "cache",
-        "datasource_policy_path": Path("config/datasources.yaml"),
+        "retrieval_rules_path": Path("config/retrieval_rules.yaml"),
         "keyword_taxonomy_path": Path("config/keyword_taxonomy.yaml"),
         "edgar_identity": "buyer-universe-generator/0.1 contact@example.com",
         "openrouter_api_key": "openrouter-test-key",

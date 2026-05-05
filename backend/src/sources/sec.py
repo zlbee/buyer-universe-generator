@@ -531,7 +531,7 @@ class SecEdgarClient(ExternalDataSourceClient):
         """Return same-industry SEC 8-K Item filings for acquisition-history recall.
 
         Phase 4 treats EDGAR 8-K Item 2.01 as the primary completed-acquisition source. The caller still decides
-        which item codes and text fetch behavior apply through datasources.yaml; this method only executes that
+        which item codes and text fetch behavior apply through retrieval_rules.yaml; this method only executes that
         configured EDGAR path.
         """
 

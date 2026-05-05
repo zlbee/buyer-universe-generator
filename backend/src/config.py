@@ -35,7 +35,15 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./data/buyer_universe.db"
     cache_dir: Path = Path("./data/cache")
-    datasource_policy_path: Path = Path("./config/datasources.yaml")
+    retrieval_rules_path: Path = Field(
+        default=Path("./config/retrieval_rules.yaml"),
+        validation_alias=AliasChoices(
+            "BUG_RETRIEVAL_RULES_PATH",
+            "BUG_DATASOURCE_POLICY_PATH",
+            "retrieval_rules_path",
+            "datasource_policy_path",
+        ),
+    )
     keyword_taxonomy_path: Path = Path("./config/keyword_taxonomy.yaml")
     pe_seed_universe_path: Path = Path("./config/pe_seed_universe.yaml")
 
@@ -113,6 +121,12 @@ class Settings(BaseSettings):
         if normalized not in {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"}:
             raise ValueError("log_level must be one of CRITICAL, ERROR, WARNING, INFO, DEBUG, or NOTSET")
         return normalized
+
+    @property
+    def datasource_policy_path(self) -> Path:
+        """Backward-compatible alias for the retrieval rules file path."""
+
+        return self.retrieval_rules_path
 
 
 @lru_cache

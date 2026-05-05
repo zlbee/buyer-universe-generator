@@ -3,7 +3,7 @@
 ## MUST FOLLOW
 - Add clear comments in English to explain non-obvious logic, key decisions, complex algorithms, or public interfaces.
 - Documentation should be written in English.
-- When implementing retrieval or processing for raw data sources, check and honor the applicable configuration in `backend/config/datasources.yaml`.
+- When implementing retrieval or processing for raw data sources, check and honor the applicable configuration in `backend/config/retrieval_rules.yaml`.
 
 ## Raw Data Source Documentation
 - SEC EDGAR APIs: https://www.sec.gov/search-filings/edgar-application-programming-interfaces

@@ -2,7 +2,7 @@
 
 This backend package contains the FastAPI application, CLI, domain contracts, SQLAlchemy persistence setup, source adapters, retriever interfaces, LLM abstraction, and exporter interfaces for the Buyer Universe Generator.
 
-Phase 1 adds target resolution and source ingestion. Phase 2 adds required-LLM TargetProfile extraction from SEC filing text and optional structured enrichers. Phase 5 adds first-pass financial buyer recall through an FMP-backed PE deal-activity retriever. SEC/EDGAR is the required primary source; Polygon.io, FMP, and NewsAPI are optional enrichers controlled by `config/datasources.yaml` and API key settings.
+Phase 1 adds target resolution and source ingestion. Phase 2 adds required-LLM TargetProfile extraction from SEC filing text and optional structured enrichers. Phase 5 adds first-pass financial buyer recall through an FMP-backed PE deal-activity retriever. SEC/EDGAR is the required primary source; optional enrichers and buyer-recall sources are controlled by `config/retrieval_rules.yaml` and API key settings.
 
 ## Local Commands
 

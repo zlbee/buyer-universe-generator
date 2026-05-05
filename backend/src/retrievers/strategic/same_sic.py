@@ -88,9 +88,6 @@ class SameSicRetriever:
         )
 
         edgar_source = selected_source(self.strategy, config.use_case, edgar_source_id, self.name, warnings)
-        screening_source_id = config.source_roles.get("public_company_screening")
-        if screening_source_id:
-            selected_source(self.strategy, config.use_case, screening_source_id, self.name, warnings, required=False)
         if not edgar_source:
             logger.warning(
                 "SameSicRetriever skipped: EDGAR source unavailable target=%s sic=%s warnings=%s",

@@ -21,7 +21,7 @@ def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:
         "environment": "test",
         "database_url": f"sqlite:///{tmp_path / 'buyer_universe.db'}",
         "cache_dir": tmp_path / "cache",
-        "datasource_policy_path": Path("config/datasources.yaml"),
+        "retrieval_rules_path": Path("config/retrieval_rules.yaml"),
         "keyword_taxonomy_path": Path("config/keyword_taxonomy.yaml"),
         "pe_seed_universe_path": Path("config/pe_seed_universe.yaml"),
         "edgar_identity": "buyer-universe-generator/0.1 contact@example.com",

@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import select
 
 from src.config import Settings
@@ -24,7 +25,7 @@ from src.sources.newsapi import NewsApiClient
 from src.sources.polygon import PolygonClient
 from src.sources.registry import SourceRegistry
 from src.sources.sec import SecEdgarClient
-from src.sources.strategy import DataSourceStrategy
+from src.sources.strategy import DataSourceStrategy, load_retrieval_rules
 
 
 def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:
@@ -32,7 +33,7 @@ def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:
         "environment": "test",
         "database_url": f"sqlite:///{tmp_path / 'buyer_universe.db'}",
         "cache_dir": tmp_path / "cache",
-        "datasource_policy_path": Path("config/datasources.yaml"),
+        "retrieval_rules_path": Path("config/retrieval_rules.yaml"),
         "edgar_identity": "buyer-universe-generator/0.1 contact@example.com",
         "polygon_api_key": None,
         "news_api_key": None,
@@ -42,7 +43,7 @@ def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:
     return Settings(**values)
 
 
-def test_data_source_policy_disables_optional_sources_without_keys(tmp_path: Path) -> None:
+def test_retrieval_rules_disable_optional_sources_without_keys(tmp_path: Path) -> None:
     strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path))
 
     target_sources = strategy.select("target_resolution", include_disabled=True)
@@ -51,16 +52,11 @@ def test_data_source_policy_disables_optional_sources_without_keys(tmp_path: Pat
     assert target_sources[0].source_strength == SourceStrength.A
     assert target_sources[0].enabled is True
 
-    polygon_source = next(source for source in target_sources if source.source_id == "polygon")
+    polygon_source = next(source for source in strategy.select("exchange_profile", include_disabled=True) if source.source_id == "polygon")
     assert polygon_source.dimension_id == "seller_profile.exchange_profile"
     assert polygon_source.source_strength == SourceStrength.B
     assert polygon_source.enabled is False
     assert polygon_source.disabled_reason == "missing BUG_POLYGON_API_KEY"
-    fmp_source = next(source for source in target_sources if source.source_id == "fmp")
-    assert fmp_source.dimension_id == "seller_profile.identity_resolution"
-    assert fmp_source.source_strength == SourceStrength.B
-    assert fmp_source.enabled is False
-    assert fmp_source.disabled_reason == "missing BUG_FMP_API_KEY"
 
     news_discovery_sources = strategy.select("news_discovery", include_disabled=True)
     news_source = next(source for source in news_discovery_sources if source.source_id == "newsapi")
@@ -70,10 +66,8 @@ def test_data_source_policy_disables_optional_sources_without_keys(tmp_path: Pat
     assert news_source.disabled_reason == "missing BUG_NEWS_API_KEY"
     assert {"bloomberg.com", "reuters.com", "wsj.com"} <= set(news_source.config.retrieval.domains)
     assert news_source.config.retrieval.max_lookback_days == 30
-    google_news_source = next(source for source in news_discovery_sources if source.source_id == "google_news_rss")
-    assert google_news_source.dimension_id == "seller_profile.recent_news_context"
-    assert google_news_source.source_strength == SourceStrength.C
-    assert google_news_source.enabled is True
+    google_news_source = strategy.selected_source("buyer_recall_transaction_signals", "google_news_rss", include_disabled=True)
+    assert google_news_source is not None
     assert google_news_source.config.retrieval.rss_language == "en-US"
     assert google_news_source.config.retrieval.rss_country == "US"
     assert google_news_source.config.retrieval.rss_edition == "US:en"
@@ -110,36 +104,33 @@ def test_source_registry_constructs_fmp_client(tmp_path: Path) -> None:
     assert client.provider == "financialmodelingprep.com"
 
 
-def test_data_source_policy_scopes_strength_by_dimension(tmp_path: Path) -> None:
+def test_retrieval_rules_scope_strength_by_dimension(tmp_path: Path) -> None:
     strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path))
 
     identity_source = strategy.selected_source("target_resolution", "edgar", include_disabled=True)
     transaction_source = strategy.selected_source("buyer_recall_transaction_signals", "edgar", include_disabled=True)
     news_context_source = strategy.selected_source("news_discovery", "newsapi", include_disabled=True)
     google_transaction_source = strategy.selected_source("buyer_recall_transaction_signals", "google_news_rss", include_disabled=True)
-    fmp_transaction_source = strategy.selected_source("buyer_recall_transaction_signals", "fmp", include_disabled=True)
-    sponsor_source = strategy.selected_source("buyer_recall_financial_sponsors", "newsapi", include_disabled=True)
+    sponsor_source = strategy.selected_source("buyer_recall_financial_sponsors", "fmp", include_disabled=True)
     strategic_intent_source = strategy.selected_source("buyer_recall_strategic_intent", "llm_web_search", include_disabled=True)
 
     assert identity_source is not None
     assert transaction_source is not None
     assert news_context_source is not None
     assert google_transaction_source is not None
-    assert fmp_transaction_source is not None
     assert sponsor_source is not None
     assert strategic_intent_source is not None
     assert identity_source.source_strength == SourceStrength.A
     assert transaction_source.source_strength == SourceStrength.C
     assert news_context_source.source_strength == SourceStrength.B
     assert google_transaction_source.source_strength == SourceStrength.C
-    assert fmp_transaction_source.source_strength == SourceStrength.B
-    assert sponsor_source.source_strength == SourceStrength.C
+    assert sponsor_source.source_strength == SourceStrength.B
     assert strategic_intent_source.source_strength == SourceStrength.C
     assert strategic_intent_source.config.retrieval.web_fetch_max_uses == 20
     assert strategic_intent_source.config.retrieval.web_fetch_max_content_tokens == 50000
 
 
-def test_data_source_policy_configures_strategic_retriever_strategy(tmp_path: Path) -> None:
+def test_retrieval_rules_configure_strategic_retriever_strategy(tmp_path: Path) -> None:
     strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path))
 
     same_sic_policy = strategy.retriever_config("SameSicRetriever")
@@ -171,6 +162,61 @@ def test_data_source_policy_configures_strategic_retriever_strategy(tmp_path: Pa
     assert strategic_intent_policy.max_candidates == 25
     assert strategic_intent_policy.max_evidence_per_candidate == 2
     assert strategic_intent_policy.eligible_sector_matches == ["same", "adjacent"]
+
+
+def test_retrieval_rules_load_from_new_path_and_exclude_unused_use_cases(tmp_path: Path) -> None:
+    strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path))
+
+    assert strategy.policy.version == 3
+    assert "seller_profile_recent_news" not in strategy.policy.use_cases
+    assert "buyer_recall_strategic_signals" not in strategy.policy.use_cases
+    assert strategy.selected_source("buyer_recall_transaction_signals", "fmp", include_disabled=True) is None
+    assert strategy.selected_source("buyer_recall_financial_sponsors", "newsapi", include_disabled=True) is None
+
+
+def test_legacy_datasource_policy_path_alias_uses_retrieval_rules(tmp_path: Path) -> None:
+    settings = Settings(
+        environment="test",
+        database_url=f"sqlite:///{tmp_path / 'buyer_universe.db'}",
+        cache_dir=tmp_path / "cache",
+        datasource_policy_path=Path("config/datasources.yaml"),
+        edgar_identity="buyer-universe-generator/0.1 contact@example.com",
+        polygon_api_key=None,
+        news_api_key=None,
+        fmp_api_key=None,
+    )
+    strategy = DataSourceStrategy.from_settings(settings)
+
+    assert settings.retrieval_rules_path == Path("config/datasources.yaml")
+    assert settings.datasource_policy_path == settings.retrieval_rules_path
+    assert strategy.policy.version == 3
+    assert strategy.source("edgar").provider == "edgartools"
+
+
+def test_retrieval_rules_validation_rejects_missing_evidence_profile(tmp_path: Path) -> None:
+    bad_rules = tmp_path / "bad_retrieval_rules.yaml"
+    bad_rules.write_text(
+        """
+version: 3
+providers:
+  edgar:
+    provider: edgartools
+evidence_profiles:
+  edgar:
+    seller_profile.identity_resolution:
+      source_strength: A
+stages:
+  target_profile_builder:
+    use_cases:
+      target_resolution:
+        - source_id: edgar
+          dimension: seller_profile.missing
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="unknown evidence profile"):
+        load_retrieval_rules(bad_rules)
 
 
 def test_sec_client_resolves_mapping_and_recent_filings(tmp_path: Path) -> None:

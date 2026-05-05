@@ -175,16 +175,14 @@ class TargetIngestionResult(StrictBaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-class DataSourceDimensionConfig(StrictBaseModel):
-    """Dimension-scoped support policy for one data source."""
+class RetrievalEvidenceProfile(StrictBaseModel):
+    """Dimension-scoped evidence policy for one retrieval provider."""
 
     source_strength: SourceStrength
-    field_coverage: list[str] = Field(default_factory=list)
-    rationale: str | None = None
 
 
-class DataSourceRetrievalConfig(StrictBaseModel):
-    """Source-level controls applied when querying raw provider APIs."""
+class RetrievalProviderOptions(StrictBaseModel):
+    """Provider-level controls applied when querying raw provider APIs."""
 
     domains: list[str] = Field(default_factory=list)
     max_lookback_days: int | None = Field(default=None, ge=1)
@@ -207,32 +205,25 @@ class DataSourceRetrievalConfig(StrictBaseModel):
         return [domain.strip().lower() for domain in value if domain.strip()]
 
 
-class DataSourceConfig(StrictBaseModel):
-    """Provider-level data-source policy that avoids dimension-specific scoring."""
+class RetrievalProviderConfig(StrictBaseModel):
+    """Provider availability and provider-specific operational settings."""
 
     provider: str = Field(min_length=1)
     enabled: bool = True
     required: bool = False
     api_key_env: str | None = None
     cache_ttl_hours: int = Field(default=24, ge=0)
-    retrieval: DataSourceRetrievalConfig = Field(default_factory=DataSourceRetrievalConfig)
-    dimensions: dict[str, DataSourceDimensionConfig] = Field(default_factory=dict)
-
-    @model_validator(mode="after")
-    def require_dimension_policies(self) -> "DataSourceConfig":
-        if not self.dimensions:
-            raise ValueError("DataSourceConfig requires at least one dimension policy")
-        return self
+    retrieval: RetrievalProviderOptions = Field(default_factory=RetrievalProviderOptions)
 
 
-class DataSourceUseCaseConfig(StrictBaseModel):
+class RetrievalSourceSelection(StrictBaseModel):
     """A concrete source selection for a specific pipeline use case."""
 
     source_id: str = Field(min_length=1)
     dimension: str = Field(min_length=1)
 
 
-class DataSourceRetrieverConfig(StrictBaseModel):
+class RetrievalRetrieverConfig(StrictBaseModel):
     """Retriever-level strategy that binds a recall path to configured source policies."""
 
     use_case: str = Field(min_length=1)
@@ -269,40 +260,83 @@ class DataSourceRetrieverConfig(StrictBaseModel):
         return [item.strip() for item in value if item.strip()]
 
 
-class DataSourcePolicy(StrictBaseModel):
-    """Validated data-source selection policy loaded from YAML."""
+class RetrievalStageConfig(StrictBaseModel):
+    """Retrieval rules grouped by pipeline stage."""
+
+    use_cases: dict[str, list[RetrievalSourceSelection]] = Field(default_factory=dict)
+    retrievers: dict[str, RetrievalRetrieverConfig] = Field(default_factory=dict)
+
+
+class RetrievalRules(StrictBaseModel):
+    """Validated retrieval source-routing rules loaded from YAML."""
 
     version: int = 1
-    sources: dict[str, DataSourceConfig]
-    use_cases: dict[str, list[DataSourceUseCaseConfig]]
-    retrievers: dict[str, DataSourceRetrieverConfig] = Field(default_factory=dict)
+    providers: dict[str, RetrievalProviderConfig]
+    evidence_profiles: dict[str, dict[str, RetrievalEvidenceProfile]]
+    stages: dict[str, RetrievalStageConfig]
+
+    @property
+    def use_cases(self) -> dict[str, list[RetrievalSourceSelection]]:
+        """Return stage-grouped use cases as one lookup map for runtime selection."""
+
+        merged: dict[str, list[RetrievalSourceSelection]] = {}
+        for stage in self.stages.values():
+            merged.update(stage.use_cases)
+        return merged
+
+    @property
+    def retrievers(self) -> dict[str, RetrievalRetrieverConfig]:
+        """Return stage-grouped retriever configs as one lookup map for runtime selection."""
+
+        merged: dict[str, RetrievalRetrieverConfig] = {}
+        for stage in self.stages.values():
+            merged.update(stage.retrievers)
+        return merged
 
     @model_validator(mode="after")
-    def validate_use_case_references(self) -> "DataSourcePolicy":
-        for use_case, selections in self.use_cases.items():
-            for selection in selections:
-                source = self.sources.get(selection.source_id)
-                if source is None:
-                    raise ValueError(f"use case {use_case} references unknown source {selection.source_id}")
-                if selection.dimension not in source.dimensions:
-                    raise ValueError(
-                        f"use case {use_case} references unknown dimension "
-                        f"{selection.source_id}.{selection.dimension}"
-                    )
-        for retriever_name, retriever in self.retrievers.items():
-            selections = self.use_cases.get(retriever.use_case)
-            if selections is None:
-                raise ValueError(f"retriever {retriever_name} references unknown use case {retriever.use_case}")
-            use_case_source_ids = {selection.source_id for selection in selections}
-            configured_source_ids = [*retriever.source_roles.values(), *retriever.source_priority]
-            for source_id in configured_source_ids:
-                if source_id not in self.sources:
-                    raise ValueError(f"retriever {retriever_name} references unknown source {source_id}")
-                if source_id not in use_case_source_ids:
-                    raise ValueError(
-                        f"retriever {retriever_name} source {source_id} is not selected by use case {retriever.use_case}"
-                    )
+    def validate_rule_references(self) -> "RetrievalRules":
+        for source_id, profiles in self.evidence_profiles.items():
+            if source_id not in self.providers:
+                raise ValueError(f"evidence profile references unknown provider {source_id}")
+            if not profiles:
+                raise ValueError(f"evidence profile {source_id} requires at least one dimension")
+
+        for stage_name, stage in self.stages.items():
+            if not stage.use_cases and not stage.retrievers:
+                raise ValueError(f"stage {stage_name} must define use_cases or retrievers")
+            for use_case, selections in stage.use_cases.items():
+                if not selections:
+                    raise ValueError(f"use case {use_case} requires at least one source selection")
+                for selection in selections:
+                    if selection.source_id not in self.providers:
+                        raise ValueError(f"use case {use_case} references unknown provider {selection.source_id}")
+                    if selection.dimension not in self.evidence_profiles.get(selection.source_id, {}):
+                        raise ValueError(
+                            f"use case {use_case} references unknown evidence profile "
+                            f"{selection.source_id}.{selection.dimension}"
+                        )
+            for retriever_name, retriever in stage.retrievers.items():
+                selections = stage.use_cases.get(retriever.use_case)
+                if selections is None:
+                    raise ValueError(f"retriever {retriever_name} references unknown use case {retriever.use_case}")
+                use_case_source_ids = {selection.source_id for selection in selections}
+                configured_source_ids = [*retriever.source_roles.values(), *retriever.source_priority]
+                for source_id in configured_source_ids:
+                    if source_id not in self.providers:
+                        raise ValueError(f"retriever {retriever_name} references unknown provider {source_id}")
+                    if source_id not in use_case_source_ids:
+                        raise ValueError(
+                            f"retriever {retriever_name} source {source_id} is not selected by use case {retriever.use_case}"
+                        )
         return self
+
+
+DataSourceDimensionConfig = RetrievalEvidenceProfile
+DataSourceRetrievalConfig = RetrievalProviderOptions
+DataSourceConfig = RetrievalProviderConfig
+DataSourceUseCaseConfig = RetrievalSourceSelection
+DataSourceRetrieverConfig = RetrievalRetrieverConfig
+DataSourcePolicy = RetrievalRules
 
 
 class Evidence(StrictBaseModel):

@@ -35,7 +35,7 @@ def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:
         "environment": "test",
         "database_url": f"sqlite:///{tmp_path / 'buyer_universe.db'}",
         "cache_dir": tmp_path / "cache",
-        "datasource_policy_path": Path("config/datasources.yaml"),
+        "retrieval_rules_path": Path("config/retrieval_rules.yaml"),
         "keyword_taxonomy_path": Path("config/keyword_taxonomy.yaml"),
         "edgar_identity": "buyer-universe-generator/0.1 contact@example.com",
         "polygon_api_key": None,
@@ -63,7 +63,7 @@ def test_same_sic_retriever_recalls_only_traceable_non_self_same_sic(tmp_path: P
     assert hit.retrieval_metadata["target_sic"] == "2844"
     assert hit.retrieval_metadata["candidate_sic"] == "2844"
     assert hit.evidence[0].source_dimension == "buyer_long_list_recall.public_company_peer_discovery"
-    assert any("polygon disabled" in warning for warning in result.warnings)
+    assert all("polygon disabled" not in warning for warning in result.warnings)
     assert any("without traceable evidence" in warning for warning in result.warnings)
 
 
