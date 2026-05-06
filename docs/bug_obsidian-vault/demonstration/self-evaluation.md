@@ -20,12 +20,12 @@
 
 ## Other Optimization Space
 
-- Retrieval parameters and retrieval methods for each data source need tuning to improve candidate-set recall and accuracy. Current recall still has room for improvement.
-- LLM prompts throughout the system need tuning.
-- Add a real normalization and deduplication layer across CIK, ticker, domain, legal name, aliases, PE firm name, and platform-company name.
+- **Tune retrieval parameters**. Retrieval parameters and retrieval methods for each data source need tuning to improve candidate-set recall and accuracy. Current recall still has room for improvement.
+- **Tune LLM prompts**. LLM prompts throughout the system need tuning. Additional attention should be put on LLM with web search to balance the result quality and budget.
+- **Preliminary filter & aggregation**. Add a real normalization and deduplication layer across CIK, ticker, domain, legal name, aliases, PE firm name, and platform-company name. Preliminary scoring could be performed based on hit count and dimensionality.
 - Implement the hard-filter and pre-scoring stages as configuration-driven modules, with explainable exclusion reasons and score components.
-- Strengthen PE coverage with official PE portfolio pages, investment criteria pages, platform-company ownership logic, and add-on acquisition evidence.
-- Improve pipeline availability. The current system already has some graceful-degradation measures, but coverage is not yet 100%; one failed retrieval path should not cause the entire pipeline to fail.
+- **Enhance Baseline Databases**. Improve core assets like the PE seed database and sector taxonomy. Expanding their data coverage will facilitate future analysis. Key upgrades include adding official portfolio links and investment mandates to the PE database, and populating the sector taxonomy with more granular industry keywords.
+- **Improve pipeline availability**. The current system already has some graceful-degradation measures, but coverage is not yet 100%; one failed retrieval path should not cause the entire pipeline to fail.
 
 ## Overall Reflection
 
