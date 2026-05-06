@@ -101,7 +101,7 @@ This section is still primarily a design-stage component. The intended role is t
 	- buyer_debt_to_equity <= 1
 - Initial evidence score: each buyer is deduplicated and counted across retriever outputs. Candidates score higher when they appear more often, appear across more retrieval dimensions, or come from stronger-evidence sources; candidates below a configured threshold are excluded.
 
-# Potential Buyer Analysis Filter
+# Potential Buyer Analytical Filter
 This section is also mainly design-stage methodology. Its purpose is to rank retained buyers by acquisition likelihood, explain the main deal rationale, and produce the final buyer universe. It sits after raw candidate recall, normalization, deduplication, and hard filtering.
 
 1. Principles
