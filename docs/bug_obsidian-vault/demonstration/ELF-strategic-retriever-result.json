@@ -18,7 +18,7 @@
                 {
                     "claim": "ADRIEN ARPEL INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000724989&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -55,7 +55,7 @@
                 {
                     "claim": "AKI HOLDING CORP has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001067550&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -92,7 +92,7 @@
                 {
                     "claim": "Alberto-Culver CO has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001368457&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -129,7 +129,7 @@
                 {
                     "claim": "ALLURE COSMETICS LTD has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000789932&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -166,7 +166,7 @@
                 {
                     "claim": "ALOETTE COSMETICS INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000792160&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -203,7 +203,7 @@
                 {
                     "claim": "AMERICAN POWER CORP. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001436174&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -240,7 +240,7 @@
                 {
                     "claim": "Arrestage International, Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001666267&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -277,7 +277,7 @@
                 {
                     "claim": "ASCENDIA BRANDS, INC. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000843494&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -314,7 +314,7 @@
                 {
                     "claim": "AVADIM HEALTH, INC. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001614824&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -351,7 +351,7 @@
                 {
                     "claim": "AVON PRODUCTS INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000008868&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -388,7 +388,7 @@
                 {
                     "claim": "Axil Brands, Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001718500&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -425,7 +425,7 @@
                 {
                     "claim": "AZUREL LTD has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001000897&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -462,7 +462,7 @@
                 {
                     "claim": "BARE ESCENTUALS INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001295557&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -499,7 +499,7 @@
                 {
                     "claim": "BEAUTICONTROL INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000788330&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -536,7 +536,7 @@
                 {
                     "claim": "BeautyKind Holdings, Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001622221&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -573,7 +573,7 @@
                 {
                     "claim": "BLOCK DRUG CO INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000012654&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -610,7 +610,7 @@
                 {
                     "claim": "BONAMOUR, INC. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001421871&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -647,7 +647,7 @@
                 {
                     "claim": "BONK, INC. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001760903&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -684,7 +684,7 @@
                 {
                     "claim": "Caring Brands, Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0002020737&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -721,7 +721,7 @@
                 {
                     "claim": "CARSON INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001019808&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -758,7 +758,7 @@
                 {
                     "claim": "CARSON PRODUCTS CO has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001051480&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -795,7 +795,7 @@
                 {
                     "claim": "cbdMD, Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001644903&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -832,7 +832,7 @@
                 {
                     "claim": "CCA INDUSTRIES INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000721447&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -869,7 +869,7 @@
                 {
                     "claim": "CDRJ INVESTMENTS LUX S A has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001068906&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -906,7 +906,7 @@
                 {
                     "claim": "CDRJ NORTH ATLANTIC LUX S AR L has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001279409&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -943,7 +943,7 @@
                 {
                     "claim": "CHINA SHIANYUN GROUP CORP., LTD. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001388978&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -980,7 +980,7 @@
                 {
                     "claim": "COLGATE PALMOLIVE CO has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000021665&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1017,7 +1017,7 @@
                 {
                     "claim": "COOPER DEVELOPMENT CO has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000720062&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1054,7 +1054,7 @@
                 {
                     "claim": "COOPER LABORATORIES INC STOCKHOLDERS LIQUIDATING TRUST has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000024473&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1091,7 +1091,7 @@
                 {
                     "claim": "COPPERMAN HAROLD M has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001053638&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1128,7 +1128,7 @@
                 {
                     "claim": "COSCIENS Biopharma Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001113423&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1165,7 +1165,7 @@
                 {
                     "claim": "COTY INC. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001024305&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1202,7 +1202,7 @@
                 {
                     "claim": "COTY US INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000939919&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1239,7 +1239,7 @@
                 {
                     "claim": "CURTIS HELENE INDUSTRIES INC /DE/ has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000745142&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1276,7 +1276,7 @@
                 {
                     "claim": "DAVI SKIN, INC. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001059577&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1313,7 +1313,7 @@
                 {
                     "claim": "DEAN PAUL E has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001053636&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1350,7 +1350,7 @@
                 {
                     "claim": "DEL LABORATORIES INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000027751&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1387,7 +1387,7 @@
                 {
                     "claim": "DELSITE, INC. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000718007&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1424,7 +1424,7 @@
                 {
                     "claim": "Delta Entertainment Group, Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001481199&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1461,7 +1461,7 @@
                 {
                     "claim": "DEP CORP has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000728330&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1498,7 +1498,7 @@
                 {
                     "claim": "Derma Glisten, Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001733689&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1535,7 +1535,7 @@
                 {
                     "claim": "DERMAdoctor, Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001664180&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1572,7 +1572,7 @@
                 {
                     "claim": "DERMAPLUS INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001312985&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1609,7 +1609,7 @@
                 {
                     "claim": "DLI Holding Corp. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001296755&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1646,7 +1646,7 @@
                 {
                     "claim": "DS HEALTHCARE GROUP, INC. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001463959&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1683,7 +1683,7 @@
                 {
                     "claim": "DSwiss Inc has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001652561&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1720,7 +1720,7 @@
                 {
                     "claim": "EDGEWELL PERSONAL CARE Co has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001096752&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1757,7 +1757,7 @@
                 {
                     "claim": "ELIZABETH ARDEN INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000095052&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1794,7 +1794,7 @@
                 {
                     "claim": "Empowered Products, Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001483935&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1831,7 +1831,7 @@
                 {
                     "claim": "Empro Group Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0002005569&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1868,7 +1868,7 @@
                 {
                     "claim": "Enhance Skin Products Inc has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001395400&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1905,7 +1905,7 @@
                 {
                     "claim": "EOS INC. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001651958&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1942,7 +1942,7 @@
                 {
                     "claim": "EPPNER GERALD A has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001053634&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -1979,7 +1979,7 @@
                 {
                     "claim": "ESTEE LAUDER COMPANIES INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001001250&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2016,7 +2016,7 @@
                 {
                     "claim": "FLAHAVEN MICHAEL L has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001055540&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2053,7 +2053,7 @@
                 {
                     "claim": "GAIN CITIES LTD has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001630430&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2090,7 +2090,7 @@
                 {
                     "claim": "Galleria Co. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001670390&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2127,7 +2127,7 @@
                 {
                     "claim": "Global Cosmetics Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001670961&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2164,7 +2164,7 @@
                 {
                     "claim": "GLOBAL DIGITAL SOLUTIONS INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001011662&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2201,7 +2201,7 @@
                 {
                     "claim": "GUEST SUPPLY INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000722642&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2238,7 +2238,7 @@
                 {
                     "claim": "Haleon plc has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001900304&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2275,7 +2275,7 @@
                 {
                     "claim": "HEALTHRENU MEDICAL INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000791118&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2312,7 +2312,7 @@
                 {
                     "claim": "HUMAN PHEROMONE SCIENCES INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000878616&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2349,7 +2349,7 @@
                 {
                     "claim": "HYDRON TECHNOLOGIES INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000028146&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2386,7 +2386,7 @@
                 {
                     "claim": "ID Perfumes, Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001398235&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2423,7 +2423,7 @@
                 {
                     "claim": "Infusion Brands International, Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001298095&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2460,7 +2460,7 @@
                 {
                     "claim": "Instinct Bio Technical Co Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0002072186&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2497,7 +2497,7 @@
                 {
                     "claim": "INTERPARFUMS INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000822663&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2534,7 +2534,7 @@
                 {
                     "claim": "JAFRA COSMETICS INTERNATIONAL INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001069031&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2571,7 +2571,7 @@
                 {
                     "claim": "JAFRA WORLDWIDE HOLDINGS LUX SARL has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001248305&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2608,7 +2608,7 @@
                 {
                     "claim": "Karbon-X Corp. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001729637&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2645,7 +2645,7 @@
                 {
                     "claim": "Kenvue Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001944048&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2682,7 +2682,7 @@
                 {
                     "claim": "Knowlton Development Corp Inc has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001846055&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2719,7 +2719,7 @@
                 {
                     "claim": "KollagenX Corp. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001402486&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2756,7 +2756,7 @@
                 {
                     "claim": "LAMAUR CORP has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001011154&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2793,7 +2793,7 @@
                 {
                     "claim": "MacAndrews & Forbes LLC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000740740&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2830,7 +2830,7 @@
                 {
                     "claim": "MASSIMO ENTERPRISES INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001074259&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2867,7 +2867,7 @@
                 {
                     "claim": "MAYBELLINE INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000892906&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2904,7 +2904,7 @@
                 {
                     "claim": "MEM CO INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000064807&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2941,7 +2941,7 @@
                 {
                     "claim": "MILL CREEK RESEARCH INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001116773&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -2978,7 +2978,7 @@
                 {
                     "claim": "myContactCard, Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001420178&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3015,7 +3015,7 @@
                 {
                     "claim": "Natura &Co Holding S.A. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001776967&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3052,7 +3052,7 @@
                 {
                     "claim": "NetPay International Inc has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001689490&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3089,7 +3089,7 @@
                 {
                     "claim": "NEUTROGENA CORP has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000071125&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3126,7 +3126,7 @@
                 {
                     "claim": "New Millennium Products has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001436083&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3163,7 +3163,7 @@
                 {
                     "claim": "NEXTERA ENTERPRISES INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001070534&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3200,7 +3200,7 @@
                 {
                     "claim": "NOXELL CORP has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000073212&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3237,7 +3237,7 @@
                 {
                     "claim": "Oddity Tech Ltd has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001907085&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3274,7 +3274,7 @@
                 {
                     "claim": "OLAPLEX HOLDINGS, INC. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001868726&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3311,7 +3311,7 @@
                 {
                     "claim": "OLIVE TREE PEOPLE INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001852995&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3348,7 +3348,7 @@
                 {
                     "claim": "Only Natural Wellness Corp has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001682224&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3385,7 +3385,7 @@
                 {
                     "claim": "OSMOTICS CORP has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001000501&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3422,7 +3422,7 @@
                 {
                     "claim": "OUTSOURCING SERVICES GROUP INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001054211&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3459,7 +3459,7 @@
                 {
                     "claim": "PARLUX FRAGRANCES INC has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000802356&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3496,7 +3496,7 @@
                 {
                     "claim": "PHYSICIANS FORMULA HOLDINGS, INC. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001269871&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3533,7 +3533,7 @@
                 {
                     "claim": "PIFF MICHAEL has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001045206&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3570,7 +3570,7 @@
                 {
                     "claim": "Pitanium Ltd has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0002046573&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3607,7 +3607,7 @@
                 {
                     "claim": "RegalWorks Media, Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001413862&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3644,7 +3644,7 @@
                 {
                     "claim": "REIC Holdings, Inc. has public-company SIC 2844, matching target SIC 2844.",
                     "source_type": "sec_company_mapping",
-                    "source_dimension": "buyer_long_list_recall.public_company_peer_discovery",
+                    "source_dimension": "potential_buyer_discovery.public_company_peer_discovery",
                     "source_strength": "B",
                     "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001372184&owner=exclude&hidefilings=0",
                     "filing_accession": null,
@@ -3681,7 +3681,7 @@
                 {
                     "claim": "BONK, INC filed an 8-K Item 2.01 acquisition completion signal with same sector relevance.",
                     "source_type": "sec_filing",
-                    "source_dimension": "buyer_long_list_recall.transaction_signal",
+                    "source_dimension": "potential_buyer_discovery.transaction_signal",
                     "source_strength": "C",
                     "url": "https://www.sec.gov/Archives/edgar/data/1760903/000164117225016825/0001641172-25-016825-index.html",
                     "filing_accession": "0001641172-25-016825",
@@ -3692,7 +3692,7 @@
                 {
                     "claim": "BONK, INC filed an 8-K Item 2.01 acquisition completion signal with same sector relevance.",
                     "source_type": "sec_filing",
-                    "source_dimension": "buyer_long_list_recall.transaction_signal",
+                    "source_dimension": "potential_buyer_discovery.transaction_signal",
                     "source_strength": "C",
                     "url": "https://www.sec.gov/Archives/edgar/data/1760903/000149315224038004/0001493152-24-038004-index.html",
                     "filing_accession": "0001493152-24-038004",
@@ -3703,7 +3703,7 @@
                 {
                     "claim": "BONK, INC filed an 8-K Item 2.01 acquisition completion signal with same sector relevance.",
                     "source_type": "sec_filing",
-                    "source_dimension": "buyer_long_list_recall.transaction_signal",
+                    "source_dimension": "potential_buyer_discovery.transaction_signal",
                     "source_strength": "C",
                     "url": "https://www.sec.gov/Archives/edgar/data/1760903/000149315223031842/0001493152-23-031842-index.html",
                     "filing_accession": "0001493152-23-031842",
@@ -3777,7 +3777,7 @@
                 {
                     "claim": "Axil Brands, Inc filed an 8-K Item 2.01 acquisition completion signal with same sector relevance.",
                     "source_type": "sec_filing",
-                    "source_dimension": "buyer_long_list_recall.transaction_signal",
+                    "source_dimension": "potential_buyer_discovery.transaction_signal",
                     "source_strength": "C",
                     "url": "https://www.sec.gov/Archives/edgar/data/1718500/000152013822000266/0001520138-22-000266-index.html",
                     "filing_accession": "0001520138-22-000266",
@@ -3829,7 +3829,7 @@
                 {
                     "claim": "DSwiss Inc filed an 8-K Item 2.01 acquisition completion signal involving DSwiss Biotech Sdn Bhd with same sector relevance.",
                     "source_type": "sec_filing",
-                    "source_dimension": "buyer_long_list_recall.transaction_signal",
+                    "source_dimension": "potential_buyer_discovery.transaction_signal",
                     "source_strength": "C",
                     "url": "https://www.sec.gov/Archives/edgar/data/1652561/000149315223001963/0001493152-23-001963-index.html",
                     "filing_accession": "0001493152-23-001963",
@@ -3881,7 +3881,7 @@
                 {
                     "claim": "EDGEWELL PERSONAL CARE Co filed an 8-K Item 2.01 acquisition completion signal with same sector relevance.",
                     "source_type": "sec_filing",
-                    "source_dimension": "buyer_long_list_recall.transaction_signal",
+                    "source_dimension": "potential_buyer_discovery.transaction_signal",
                     "source_strength": "C",
                     "url": "https://www.sec.gov/Archives/edgar/data/1096752/000162828026006076/0001628280-26-006076-index.html",
                     "filing_accession": "0001628280-26-006076",
@@ -3933,7 +3933,7 @@
                 {
                     "claim": "Karbon-X Corp filed an 8-K Item 2.01 acquisition completion signal with same sector relevance.",
                     "source_type": "sec_filing",
-                    "source_dimension": "buyer_long_list_recall.transaction_signal",
+                    "source_dimension": "potential_buyer_discovery.transaction_signal",
                     "source_strength": "C",
                     "url": "https://www.sec.gov/Archives/edgar/data/1729637/000147793222004800/0001477932-22-004800-index.html",
                     "filing_accession": "0001477932-22-004800",
@@ -3985,7 +3985,7 @@
                 {
                     "claim": "Addus had a acquisition signal with same sector relevance.",
                     "source_type": "news_article",
-                    "source_dimension": "buyer_long_list_recall.transaction_news",
+                    "source_dimension": "potential_buyer_discovery.transaction_news",
                     "source_strength": "C",
                     "url": "https://news.google.com/rss/articles/CBMihgFBVV95cUxObzRaMXR5SzE4c1p1eU9GQXVGVllVNTg5czRQaWlSYmUzOUJ1MXhkMWFxNDR0VlRMTmNPcFlmVnZRWW9CZmphNWJFRGFDWTB4aWFTTGNJSmExNHpCa2VuMGZRZl9fQ3ZBenZUREVrNXU0Q1RzbmRPdUVpdzVtd200c2JoS0FXUQ?oc=5",
                     "filing_accession": null,
@@ -4044,7 +4044,7 @@
                 {
                     "claim": "Ares had a merger signal with same sector relevance.",
                     "source_type": "news_article",
-                    "source_dimension": "buyer_long_list_recall.transaction_news",
+                    "source_dimension": "potential_buyer_discovery.transaction_news",
                     "source_strength": "C",
                     "url": "https://news.google.com/rss/articles/CBMirAFBVV95cUxQOE5CcV9Mc0pkejI5UmVwZkpmdm5ORHJHZ19ZM3I4TEdXZ3FHSFVGUnJNQXBmZG1Ja1hfN3hlVjVPZ1NrdXVUd3A2ZkJnaExjV1BGQmZUU1JnejNsNm9qNGRheVFWUHBPNkkxOUhxR2VJcjRzYTdTU0JYTXJvM3Vkc1JXWEhjZW1FR1J4S2Z5NGVJUk1fS25FaHFSaDdsaUpROFFGSXNSSU5RYTA2?oc=5",
                     "filing_accession": null,
@@ -4103,7 +4103,7 @@
                 {
                     "claim": "Elementis had a acquisition signal involving Alchemy Ingredients with same sector relevance.",
                     "source_type": "news_article",
-                    "source_dimension": "buyer_long_list_recall.transaction_news",
+                    "source_dimension": "potential_buyer_discovery.transaction_news",
                     "source_strength": "C",
                     "url": "https://news.google.com/rss/articles/CBMijgFBVV95cUxQaGlqTmpWN1VHdHF0Q0JrWGVVZG50M2JEaDlZWmQtSHYwZ1IwbnA2TDZmREkwRjdIa3g1RmpVMktiMjN0bWpIbDVjZG1hM0FibnNqWFh6aWhuVWIySjZtbkprVVBUTE5ib3IzOHR6MDhmNVFxYWh0UEtWWHFwVllXaDM4Z094RVF2UTVpRWh3?oc=5",
                     "filing_accession": null,
@@ -4162,7 +4162,7 @@
                 {
                     "claim": "Essity had a acquisition signal involving Edgewell Personal Care's feminine care business with same sector relevance.",
                     "source_type": "news_article",
-                    "source_dimension": "buyer_long_list_recall.transaction_news",
+                    "source_dimension": "potential_buyer_discovery.transaction_news",
                     "source_strength": "C",
                     "url": "https://news.google.com/rss/articles/CBMi1AFBVV95cUxQeDJsX3pWSk92ZGR6WUxEMkdBZ21KVXFzSVdJaVhsTlVWMlA3OGFiajFySFllNUZrNVpQejBkRURPV1dTSS1PU2V1Um5FZzlpYUU2cHlwSEVqNGhZREwzY0dEclFKYUt6Vkh4elQyTVBwWXNKbjhNdmJlOENuTnZkR0xSazd6a29kSC1EbEpQRGxTVXNxbUI0WGhYSENUS0xFa3UyY3lqOFhVVWJFTHVoS2hzWTdFRm5rTk1LdUE4Y1FZZ1JSNUZDSE1Md1V5cS0tak91Wg?oc=5",
                     "filing_accession": null,
@@ -4221,7 +4221,7 @@
                 {
                     "claim": "Estée Lauder had a merger signal involving owner of Jean Paul Gaultier and Rabanne with same sector relevance.",
                     "source_type": "news_article",
-                    "source_dimension": "buyer_long_list_recall.transaction_news",
+                    "source_dimension": "potential_buyer_discovery.transaction_news",
                     "source_strength": "C",
                     "url": "https://news.google.com/rss/articles/CBMiWkFVX3lxTFBOcnYyWGFHZ1Q3YnYzTVVid1JNcVRIUzZzZUVpMEhwQzJXYl92b2xCYzBLcDVEQXU5ZDJXc3p2LWtEcWx1aHdHNWF2MS1PbnlJYTIzMGVVTFF6dw?oc=5",
                     "filing_accession": null,
@@ -4232,7 +4232,7 @@
                 {
                     "claim": "Estée Lauder had a merger signal involving Puig with same sector relevance.",
                     "source_type": "news_article",
-                    "source_dimension": "buyer_long_list_recall.transaction_news",
+                    "source_dimension": "potential_buyer_discovery.transaction_news",
                     "source_strength": "C",
                     "url": "https://news.google.com/rss/articles/CBMie0FVX3lxTE9HNWdBV3pQa20tejZTWllEdkloaWhlQkdTNEItbnNJNkpzMTFXRmtkVnQ5UHdyclhiZHpvTUFmUG9UaVpidzlUR1I0clI4UFFXeDV3Sm5vVFRhWndwbWs0QnVDNzZwWHFrUkwtWGRFYVV6d3IzYkhWR1BLSQ?oc=5",
                     "filing_accession": null,
@@ -4302,7 +4302,7 @@
                 {
                     "claim": "Estée Lauder Companies had a merger signal involving Puig with same sector relevance.",
                     "source_type": "news_article",
-                    "source_dimension": "buyer_long_list_recall.transaction_news",
+                    "source_dimension": "potential_buyer_discovery.transaction_news",
                     "source_strength": "C",
                     "url": "https://news.google.com/rss/articles/CBMigwFBVV95cUxPU0pYcC00azRLRXEtQ0NIRS11d291TzB6Z3pmS3VKNENaYWF5am53TS1RbDYxYXJIMEpJeDF6RzdsczBYVGY0UEtUYVA3ZFMzd19sYXJqdy1MNmNMQ0RhOGZKb0RycHY2SmFGSHQtNnFCU2hNQ2dCdUdfU2RkRTlFRkFKUQ?oc=5",
                     "filing_accession": null,
@@ -4361,7 +4361,7 @@
                 {
                     "claim": "Gerrard International had a acquisition signal involving Jessica Cosmetics with same sector relevance.",
                     "source_type": "news_article",
-                    "source_dimension": "buyer_long_list_recall.transaction_news",
+                    "source_dimension": "potential_buyer_discovery.transaction_news",
                     "source_strength": "C",
                     "url": "https://news.google.com/rss/articles/CBMilAFBVV95cUxNamNtcUZOWldnX3c5TUhBaGFBaXR1RkhMZ1BjSm8tMFl3YkxwTWxEV1lQQTVuZ0YtcjAxeXd1Z0Z3Zm0xSW16QTktUW5iZ2lOcjhxbTdCMmg3V01TQ25GT3BTNk1XRzNUalc2Nkh4RWtrRmhmaHNnUFNFa2pESFRXbVdTUTlVVmw3dUM5a2FZZGVyYVgy?oc=5",
                     "filing_accession": null,
@@ -4420,7 +4420,7 @@
                 {
                     "claim": "Kimberly-Clark had a acquisition signal involving Kenvue with same sector relevance.",
                     "source_type": "news_article",
-                    "source_dimension": "buyer_long_list_recall.transaction_news",
+                    "source_dimension": "potential_buyer_discovery.transaction_news",
                     "source_strength": "C",
                     "url": "https://news.google.com/rss/articles/CBMi9gFBVV95cUxQQWctaTJQcFEzbWxDX0FLWEdjTDg2a3daMmlWaG1OeWRBRUhka1dwb0dJbHBzZk9HUHpaV3B0ZXRYZFVTc3hxOEVDdkFMZTZCY2Q3WlJ5aWJLdVpZWEVjQk95T1h1UFBfTlRlZEdOWXI2UlFlejFQOFFjT0xvQW9nbEFrS042VHo2VWZJODhVWHdIbUZNVzVWY1FBNWVGVDF2VmQwcW5zS2wwa2xGbkJiTEZOeDQ1ZFFMMHZjeW1WbVdUVVpnSTdqcEFINXR3ZjZNRFZSVVJQTmhvRmNfWVVENEduRVczZWwzMGFLTTNMQVloeU8wVXc?oc=5",
                     "filing_accession": null,
@@ -4479,7 +4479,7 @@
                 {
                     "claim": "Marubeni had a acquisition signal involving ETVOS with same sector relevance.",
                     "source_type": "news_article",
-                    "source_dimension": "buyer_long_list_recall.transaction_news",
+                    "source_dimension": "potential_buyer_discovery.transaction_news",
                     "source_strength": "C",
                     "url": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTE1VWVRNRWhCZlFxX09NMEtDMGc4ZUpRMWpmV2Y0TWhNeEVZQk9LWmljZGNOOTBOb0VwQXVpV0dGTkh6YWE4SVhKbmRHRExYM0xCNlI1Zk5zUWQ0RVl2bEpqM1pfVXVfNDQ?oc=5",
                     "filing_accession": null,
@@ -4538,7 +4538,7 @@
                 {
                     "claim": "Reliance Retail had a acquisition signal involving Anomaly with same sector relevance.",
                     "source_type": "news_article",
-                    "source_dimension": "buyer_long_list_recall.transaction_news",
+                    "source_dimension": "potential_buyer_discovery.transaction_news",
                     "source_strength": "C",
                     "url": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxQSktoMVhtUXROZE14Mm1XZ0Nqc3Y5YXNLVWt2OEtSN0ZadXhVN0xEcXlKMkg3NzNfNEQzOXlYVnFDMEtseERORS0wM3NhNmtfOW9pei1yMTgwSGtZN3V2STFac25RVFJUX3Zva2FwMGlmaV8xaFdYVUh1aEMxd0k3ZFNZcTZObHZDd3lyNXlFbTNfMmxSTDJWOElUS2tMaFVyN25JMDRLUnVQQQ?oc=5",
                     "filing_accession": null,
@@ -4597,7 +4597,7 @@
                 {
                     "claim": "Safic-Alcan had a acquisition signal involving Anders with same sector relevance.",
                     "source_type": "news_article",
-                    "source_dimension": "buyer_long_list_recall.transaction_news",
+                    "source_dimension": "potential_buyer_discovery.transaction_news",
                     "source_strength": "C",
                     "url": "https://news.google.com/rss/articles/CBMi4AFBVV95cUxPd2o2R0lzZ3BSX1JuNkIwazBDaTVaVVZOUk5rRXlxOVV6WDVWcUZobW85R0xnUXpGQ2x6Vm5DdUU3aHR2N2pacE9OVHZ4Wm1zdWM3QjlNaDNES1BaSGJjd3Q3LWcxbVJiRDg2U2U3MXJOazdrN0RVLXNyMFhHYzN0MDk3OFRLWVBMUFhKNVl4VTRFTzdxSjBDa2E2NFpzcDQzbHNUSG9PT2RybVV4VThEakdyNTBVbW9CQWhrcXYzUXVPSUd3QkZQY2hMUldoV2t5WHFVeUNkNVdJY2VIN0dwcg?oc=5",
                     "filing_accession": null,
@@ -4656,7 +4656,7 @@
                 {
                     "claim": "Suave Brands had a merger signal involving Elida Beauty with same sector relevance.",
                     "source_type": "news_article",
-                    "source_dimension": "buyer_long_list_recall.transaction_news",
+                    "source_dimension": "potential_buyer_discovery.transaction_news",
                     "source_strength": "C",
                     "url": "https://news.google.com/rss/articles/CBMifEFVX3lxTE1ONm4xdm5tS2ZSSzgxWkk0amZOM0RoOUpES3RRbkZ6SG9kaUJ5MVRVa0x2UFRKT3B0S2Y1VHRrVDFUR05VMnVZbG9iMEN0RmRvdy1OSmdwdFhXQVJ4ME9FZ2ZjU3Q5cGl4dVJLRFo3dnlxVzdTN0lPTEtVU00?oc=5",
                     "filing_accession": null,
@@ -4715,7 +4715,7 @@
                 {
                     "claim": "Unilever had a acquisition signal involving Dr. Squatch with same sector relevance.",
                     "source_type": "news_article",
-                    "source_dimension": "buyer_long_list_recall.transaction_news",
+                    "source_dimension": "potential_buyer_discovery.transaction_news",
                     "source_strength": "C",
                     "url": "https://news.google.com/rss/articles/CBMivwFBVV95cUxOb01WU2dSdUdsZEktUmFhQVNMRGZ0NEJybDhRNTlicHFCMUxmWTI0Z09FeEtHalYwQWkzUTZxVG5jcXgxX0F1T3oxbWpfYm1RYWVIQzBjZTQyLUlINHh1cEpCSEhfWjFWbi02SkJuWWw2VFF0c1Zfem9NUE5IWkpzREJuTVJyZWptWEZtNEczWEM2ajQ2V2NPUWxKVVNNdURKV0JlbTNNOEI4UW9BYkh0MUdFVjgyUXI0MTJLbl94QQ?oc=5",
                     "filing_accession": null,
@@ -4774,7 +4774,7 @@
                 {
                     "claim": "Church & Dwight Co., Inc. has sourced strategic acquisition intent relevant to e.l.f. Beauty, Inc.'s industry context.",
                     "source_type": "llm_web_search",
-                    "source_dimension": "buyer_long_list_recall.strategic_acquisition_intent",
+                    "source_dimension": "potential_buyer_discovery.strategic_acquisition_intent",
                     "source_strength": "C",
                     "url": "https://investor.churchdwight.com/Investors/news/news-details/2025/Church--Dwight-to-Acquire-the-Touchland-Brand-for-700-million-Plus-Earn-out/default.aspx",
                     "filing_accession": null,
@@ -4813,7 +4813,7 @@
                 {
                     "claim": "Coty Inc. has sourced strategic acquisition intent relevant to e.l.f. Beauty, Inc.'s industry context.",
                     "source_type": "llm_web_search",
-                    "source_dimension": "buyer_long_list_recall.strategic_acquisition_intent",
+                    "source_dimension": "potential_buyer_discovery.strategic_acquisition_intent",
                     "source_strength": "C",
                     "url": "https://www.coty.com/news/coty-announces-plans-to-bolster-its-leading-position-in-fragrance-and-launches-a-strategic-review-of-its-consumer-beauty-business",
                     "filing_accession": null,
@@ -4852,7 +4852,7 @@
                 {
                     "claim": "Hindustan Unilever Limited (HUL) / Unilever Beauty & Wellbeing (via HUL) has sourced strategic acquisition intent relevant to e.l.f. Beauty, Inc.'s industry context.",
                     "source_type": "llm_web_search",
-                    "source_dimension": "buyer_long_list_recall.strategic_acquisition_intent",
+                    "source_dimension": "potential_buyer_discovery.strategic_acquisition_intent",
                     "source_strength": "C",
                     "url": "https://www.unilever.com/news/press-and-media/press-releases/2025/hul-to-acquire-premium-beauty-brand-minimalist/",
                     "filing_accession": null,
@@ -4891,7 +4891,7 @@
                 {
                     "claim": "L’Oréal Groupe has sourced strategic acquisition intent relevant to e.l.f. Beauty, Inc.'s industry context.",
                     "source_type": "llm_web_search",
-                    "source_dimension": "buyer_long_list_recall.strategic_acquisition_intent",
+                    "source_dimension": "potential_buyer_discovery.strategic_acquisition_intent",
                     "source_strength": "C",
                     "url": "https://www.loreal.com/en/press-release/group/loreal-groupe-to-acquire-a-majority-stake-in-medik8/",
                     "filing_accession": null,
@@ -4930,7 +4930,7 @@
                 {
                     "claim": "Olaplex Holdings, Inc. has sourced strategic acquisition intent relevant to e.l.f. Beauty, Inc.'s industry context.",
                     "source_type": "llm_web_search",
-                    "source_dimension": "buyer_long_list_recall.strategic_acquisition_intent",
+                    "source_dimension": "potential_buyer_discovery.strategic_acquisition_intent",
                     "source_strength": "C",
                     "url": "https://ir.olaplex.com/news/detail/61/olaplex-acquires-biotech-company-purvala",
                     "filing_accession": null,
@@ -4969,7 +4969,7 @@
                 {
                     "claim": "The Estée Lauder Companies Inc. has sourced strategic acquisition intent relevant to e.l.f. Beauty, Inc.'s industry context.",
                     "source_type": "llm_web_search",
-                    "source_dimension": "buyer_long_list_recall.strategic_acquisition_intent",
+                    "source_dimension": "potential_buyer_discovery.strategic_acquisition_intent",
                     "source_strength": "C",
                     "url": "https://elcompanies.com/en/news-and-media/newsroom/press-releases/2026/03-05-2026-054514302",
                     "filing_accession": null,
@@ -5008,7 +5008,7 @@
                 {
                     "claim": "Ulta Beauty, Inc. has sourced strategic acquisition intent relevant to e.l.f. Beauty, Inc.'s industry context.",
                     "source_type": "llm_web_search",
-                    "source_dimension": "buyer_long_list_recall.strategic_acquisition_intent",
+                    "source_dimension": "potential_buyer_discovery.strategic_acquisition_intent",
                     "source_strength": "C",
                     "url": "https://www.ulta.com/investor/news-events/press-releases/detail/208/ulta-beauty-announces-acquisition-of-leading-british-beauty",
                     "filing_accession": null,
@@ -5044,7 +5044,7 @@
                 "hit_count": 99,
                 "metadata": {
                     "retriever": "SameSicRetriever",
-                    "source_use_case": "buyer_recall_strategic_public_companies",
+                    "source_use_case": "public_company_peer_discovery",
                     "source_roles": {
                         "public_company_metadata": "edgar"
                     },
@@ -5098,7 +5098,7 @@
                 "hit_count": 18,
                 "metadata": {
                     "retriever": "MAHistoryRetriever",
-                    "source_use_case": "buyer_recall_transaction_signals",
+                    "source_use_case": "strategic_transaction_activity",
                     "source_roles": {
                         "primary_filing_source": "edgar",
                         "supplemental_news_source": "newsapi",
@@ -5189,7 +5189,7 @@
                 "hit_count": 7,
                 "metadata": {
                     "retriever": "StrategicAcquisitionIntentRetriever",
-                    "source_use_case": "buyer_recall_strategic_intent",
+                    "source_use_case": "strategic_acquisition_intent",
                     "source_roles": {
                         "llm_web_search_source": "llm_web_search"
                     },

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import textwrap
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -52,6 +53,35 @@ def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:
     }
     values.update(overrides)
     return Settings(**values)
+
+
+def write_target_profile_retrieval_rules(tmp_path: Path, retriever_overrides: str) -> Path:
+    rules_path = tmp_path / "target_profile_retrieval_rules.yaml"
+    formatted_overrides = textwrap.indent(retriever_overrides.strip(), "        ")
+    rules_path.write_text(
+        f"""
+version: 5
+providers:
+  edgar:
+    provider: edgartools
+    enabled: true
+    required: true
+    cache_ttl_hours: 24
+stages:
+  target_profile_builder:
+    use_cases:
+      business_description:
+        - source_id: edgar
+          dimension: seller_profile.business_description
+          source_strength: B
+    retrievers:
+      TargetProfileExtractor:
+        use_case: business_description
+{formatted_overrides}
+""".strip(),
+        encoding="utf-8",
+    )
+    return rules_path
 
 
 def test_sec_filing_text_document_requires_edgartools_structured_object(tmp_path: Path) -> None:
@@ -648,6 +678,63 @@ def test_target_profile_extractor_reuses_structured_sections_for_strategy(tmp_pa
     assert strategy_document.metadata["derived_from_source_dimension"] == "seller_profile.business_description"
 
 
+def test_target_profile_extractor_uses_configured_business_filing_policy(tmp_path: Path) -> None:
+    rules_path = write_target_profile_retrieval_rules(
+        tmp_path,
+        """
+business_description_forms:
+  - 10-Q
+business_description_text_scope: configured_business_scope
+""",
+    )
+    settings = settings_for_tests(tmp_path, retrieval_rules_path=rules_path)
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
+    target = sample_target()
+    ten_k = sample_filing("10-K").model_copy(
+        update={"accession_number": "0000923796-25-000010"}
+    )
+    ten_q = sample_filing("10-Q").model_copy(
+        update={"accession_number": "0000923796-25-000020"}
+    )
+    retrieved_at = datetime.now(UTC)
+    ingestion = TargetIngestionResult(
+        target=target,
+        filings=[ten_k, ten_q],
+        source_documents=[
+            SourceDocument(
+                source_id="edgar",
+                source_dimension="seller_profile.identity_resolution",
+                source_type=SourceType.sec_company_mapping,
+                source_strength=SourceStrength.A,
+                target_cik=target.cik,
+                target_ticker=target.ticker,
+                url="https://www.sec.gov/files/company_tickers_exchange.json",
+                metadata=target.model_dump(mode="json"),
+                retrieved_at=retrieved_at,
+                expires_at=retrieved_at + timedelta(hours=24),
+            )
+        ],
+    )
+    edgar_client = RecordingProfileSecClient()
+
+    with session_factory() as session:
+        extractor = build_test_extractor(
+            settings,
+            session,
+            FakeLLMClient({}),
+            edgar_client=edgar_client,
+        )
+        documents = extractor._ensure_filing_text(ingestion, list(ingestion.source_documents), [])
+
+    business_document = next(
+        document for document in documents if document.source_dimension == "seller_profile.business_description"
+    )
+    assert edgar_client.calls == [("10-Q", "configured_business_scope")]
+    assert business_document.filing_accession == ten_q.accession_number
+    assert business_document.metadata["text_scope"] == "configured_business_scope"
+
+
 def test_target_profile_extractor_normalizes_repairable_llm_shape(tmp_path: Path) -> None:
     settings = settings_for_tests(tmp_path)
     engine = init_db(settings)
@@ -853,6 +940,27 @@ def test_target_profile_extractor_retries_invalid_llm_json(tmp_path: Path) -> No
 
     assert error.value.error_code == "invalid_llm_json"
     assert fake_llm.calls == 2
+
+
+def test_target_profile_extractor_uses_configured_llm_attempts(tmp_path: Path) -> None:
+    rules_path = write_target_profile_retrieval_rules(
+        tmp_path,
+        """
+llm_max_attempts: 3
+""",
+    )
+    settings = settings_for_tests(tmp_path, retrieval_rules_path=rules_path)
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
+    fake_llm = FailingLLMClient()
+
+    with session_factory() as session:
+        extractor = build_test_extractor(settings, session, fake_llm)
+        with pytest.raises(TargetProfileExtractionError) as error:
+            extractor.build_profile("ELF")
+
+    assert error.value.error_code == "invalid_llm_json"
+    assert fake_llm.calls == 3
 
 
 def test_target_profile_api_returns_profile_result(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1349,6 +1457,33 @@ class FakeProfileSecClient:
                 expires_at=retrieved_at + timedelta(hours=ttl_hours),
             )
         raise AssertionError("text document should already be present in fixture")
+
+
+class RecordingProfileSecClient:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str | None]] = []
+
+    def fetch_filing_text_document(self, *args, **kwargs):
+        target = args[0]
+        filing = args[1]
+        ttl_hours = args[2]
+        text_scope = kwargs.get("text_scope")
+        self.calls.append((filing.form, text_scope))
+        retrieved_at = datetime.now(UTC)
+        return SourceDocument(
+            source_id="edgar",
+            source_dimension=kwargs.get("source_dimension"),
+            source_type=SourceType.sec_filing,
+            source_strength=kwargs.get("source_strength", SourceStrength.B),
+            target_cik=target.cik,
+            target_ticker=target.ticker,
+            url=filing.url,
+            filing_accession=filing.accession_number,
+            raw_text="ITEM 1. Business configured filing policy text.",
+            metadata={**filing.model_dump(mode="json"), "text_scope": text_scope},
+            retrieved_at=retrieved_at,
+            expires_at=retrieved_at + timedelta(hours=ttl_hours),
+        )
 
 
 class FailingProfileSecClient:

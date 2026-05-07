@@ -41,7 +41,7 @@ The source plan follows `backend/config/retrieval_rules.yaml`.
 3. Current retriever design and data sources
 - `SameSicRetriever`
 	- Goal: recall public strategic buyers whose SEC SIC matches the target's SIC.
-	- Method: use the `buyer_recall_strategic_public_companies` use case and EDGAR public-company metadata. The retriever performs light filtering only: it excludes the target itself, unnamed candidates, and candidates without same-SIC evidence.
+	- Method: use the `public_company_peer_discovery` use case and EDGAR public-company metadata. The retriever performs light filtering only: it excludes the target itself, unnamed candidates, and candidates without same-SIC evidence.
 	- Data source: EDGAR is the configured source. This provides strong evidence because SIC is part of the official public-company disclosure system and is more reliable than broad web classification for US-listed companies.
 
 - `MAHistoryRetriever`
@@ -67,20 +67,16 @@ The source plan follows `backend/config/retrieval_rules.yaml`.
 	- Because the system retrieves from multiple data sources, and each source has its own availability, cost, cache behavior, and reliability profile, source configuration should live in one unified place.
 
 2. Configuration method
-`backend/config/retrieval_rules.yaml` is organized into three cooperating layers.
+`backend/config/retrieval_rules.yaml` is organized into two cooperating layers.
 
 - `providers`
 	- Defines provider availability and provider-specific retrieval knobs.
 
-- `evidence_profiles`
-	- Defines the evidence-strength policy for each provider and retrieval dimension.
-	- This keeps evidence strength tied to both the provider and the use case instead of assigning one global trust level to a source.
-
 - `stages`
-	- Binds pipeline stages to use cases, and use cases to source IDs plus source dimensions.
-	- The nested `retrievers` section maps concrete retriever classes to use cases, source roles, source priority, and retrieval parameters such as lookback windows, candidate caps, query caps, eligible sector matches, transaction terms, and EDGAR form/item settings.
+	- Binds pipeline stages to use cases, and use cases to source IDs, source roles, source priority, source dimensions, and source-strength levels.
+	- The nested `retrievers` section maps concrete retriever classes to use cases and retrieval parameters such as target-profile SEC form preference, LLM extraction limits, size metric keys, lookback windows, candidate caps, query caps, eligible sector matches, transaction terms, and EDGAR form/item settings.
 
-In short, `providers` defines what sources are available and their knobs, `evidence_profiles` defines how their signals are trusted, and `stages` defines where and how the sources are used.
+In short, `providers` defines what sources are available and their knobs, while `stages` defines where sources are used and how their evidence should be trusted in that use case.
 
 Together these layers let the code ask the `DataSourceStrategy` for the selected source and retriever policy, instead of hardcoding provider switches, source strength, or retrieval parameters inside each retriever.
 

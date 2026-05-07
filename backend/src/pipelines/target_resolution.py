@@ -52,7 +52,7 @@ class TargetResolver:
             if cached:
                 return cached
 
-        edgar_selection = next((source for source in self.strategy.select("target_resolution") if source.source_id == "edgar"), None)
+        edgar_selection = next((source for source in self.strategy.select("target_identity") if source.source_id == "edgar"), None)
         if not edgar_selection or not edgar_selection.enabled:
             raise TargetNotFoundError("SEC/EDGAR source is required for target resolution but is not enabled")
 

@@ -19,6 +19,7 @@ from src.retrievers.strategic.common import (
     normalize_cik,
     normalize_entity_key,
     normalize_sic,
+    optional_source_role,
     parse_date,
     required_positive_int,
     required_source_role,
@@ -26,6 +27,7 @@ from src.retrievers.strategic.common import (
     selected_source,
     source_execution_order,
     source_label,
+    source_role_map,
     source_type_value,
     unique_terms,
 )
@@ -119,9 +121,9 @@ class MAHistoryRetriever:
         max_documents = required_positive_int(config, "max_documents", self.name, warnings)
         max_queries = required_positive_int(config, "max_queries", self.name, warnings)
         page_size = required_positive_int(config, "page_size", self.name, warnings)
-        primary_source_id = required_source_role(config, "primary_filing_source", self.name, warnings)
-        supplemental_news_source_id = config.source_roles.get("supplemental_news_source")
-        supplemental_rss_news_source_id = config.source_roles.get("supplemental_rss_news_source")
+        primary_source_id = required_source_role(self.strategy, config.use_case, "primary_filing_source", self.name, warnings)
+        supplemental_news_source_id = optional_source_role(self.strategy, config.use_case, "supplemental_news_source")
+        supplemental_rss_news_source_id = optional_source_role(self.strategy, config.use_case, "supplemental_rss_news_source")
         eligible_sector_matches = set(config.eligible_sector_matches)
         if not eligible_sector_matches:
             warnings.append(f"{self.name} skipped: retriever policy has no eligible_sector_matches")
@@ -166,7 +168,7 @@ class MAHistoryRetriever:
         rss_identity_unresolved = 0
         rss_identity_skipped = 0
 
-        for source_id in source_execution_order(config):
+        for source_id in source_execution_order(self.strategy, config.use_case):
             if source_id == primary_source_id:
                 edgar_source = selected_source(self.strategy, config.use_case, source_id, self.name, warnings, required=False)
                 if edgar_source and self.edgar_client:
@@ -358,8 +360,8 @@ class MAHistoryRetriever:
             metadata={
                 "retriever": self.name,
                 "source_use_case": config.use_case,
-                "source_roles": config.source_roles,
-                "source_priority": config.source_priority,
+                "source_roles": source_role_map(self.strategy, config.use_case),
+                "source_priority": source_execution_order(self.strategy, config.use_case),
                 "primary_source": source_label(primary_source_id, config.edgar_form_type),
                 "secondary_source": supplemental_news_source_id,
                 "rss_source": supplemental_rss_news_source_id,

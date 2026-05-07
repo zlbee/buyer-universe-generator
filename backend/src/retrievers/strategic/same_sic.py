@@ -19,6 +19,7 @@ from src.retrievers.strategic.common import (
     required_source_role,
     retriever_config,
     selected_source,
+    source_role_map,
     source_type_value,
 )
 from src.retrievers.strategic.protocols import PublicCompanySicSource
@@ -53,7 +54,8 @@ class SameSicRetriever:
             return StrategicRetrievalResult(warnings=warnings, metadata={"retriever": self.name})
 
         max_candidates = required_positive_int(config, "max_candidates", self.name, warnings)
-        edgar_source_id = required_source_role(config, "public_company_metadata", self.name, warnings)
+        source_roles = source_role_map(self.strategy, config.use_case)
+        edgar_source_id = required_source_role(self.strategy, config.use_case, "public_company_metadata", self.name, warnings)
         if max_candidates is None or not edgar_source_id:
             logger.warning(
                 "SameSicRetriever skipped: incomplete retriever policy target=%s max_candidates=%s edgar_source_id=%s",
@@ -67,7 +69,7 @@ class SameSicRetriever:
         metadata: dict[str, Any] = {
             "retriever": self.name,
             "source_use_case": config.use_case,
-            "source_roles": config.source_roles,
+            "source_roles": source_roles,
             "target_sic": target_sic,
         }
         if not target_sic:
@@ -84,7 +86,7 @@ class SameSicRetriever:
             target_sic,
             config.use_case,
             max_candidates,
-            config.source_roles,
+            source_roles,
         )
 
         edgar_source = selected_source(self.strategy, config.use_case, edgar_source_id, self.name, warnings)

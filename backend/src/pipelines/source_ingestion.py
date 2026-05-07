@@ -36,7 +36,7 @@ class SourceIngestionService:
         documents = self.cache.get_valid_documents(target.cik)
 
         if not any(document.source_type == SourceType.sec_company_mapping for document in documents):
-            mapping_source = self.strategy.selected_source("target_resolution", "edgar", include_disabled=True)
+            mapping_source = self.strategy.selected_source("target_identity", "edgar", include_disabled=True)
             mapping_document = self.edgar_client.source_document_for_mapping(
                 target,
                 self.strategy.cache_ttl_hours("edgar"),
@@ -48,7 +48,7 @@ class SourceIngestionService:
 
         filings = self._filings_from_documents(documents)
         if not filings:
-            filing_source = self.strategy.selected_source("sec_filings", "edgar", include_disabled=True)
+            filing_source = self.strategy.selected_source("sec_filing_metadata", "edgar", include_disabled=True)
             filings = self.edgar_client.fetch_recent_filings(target)
             filing_documents = [
                 self.edgar_client.source_document_for_filing(
@@ -92,7 +92,7 @@ class SourceIngestionService:
         return [document]
 
     def _optional_news_documents(self, target, documents: list[SourceDocument], warnings: list[str]) -> list[SourceDocument]:
-        selected = self.strategy.select("news_discovery", include_disabled=True)
+        selected = self.strategy.select("recent_news_context", include_disabled=True)
         news_source = next((source for source in selected if source.source_id == "newsapi"), None)
         if not news_source:
             return []

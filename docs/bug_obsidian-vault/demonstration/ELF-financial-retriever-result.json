@@ -18,7 +18,7 @@
                 {
                     "claim": "Advent International had a acquisition signal involving bareMinerals; BUXOM; Laura Mercier (acquired via Orveon from Shiseido Americas) with adjacent target-industry relevance.",
                     "source_type": "transaction_signal",
-                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_dimension": "potential_buyer_discovery.financial_sponsor_activity",
                     "source_strength": "C",
                     "url": "http://www.prnewswire.com/news-releases/advent-international-announces-launch-of-orveon-closing-of-agreement-with-shiseido-americas-301437334.html",
                     "filing_accession": null,
@@ -29,7 +29,7 @@
                 {
                     "claim": "Advent International had a investment signal involving Skala Cosméticos with adjacent target-industry relevance.",
                     "source_type": "transaction_signal",
-                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_dimension": "potential_buyer_discovery.financial_sponsor_activity",
                     "source_strength": "C",
                     "url": "https://www.adventinternational.com/news/advent-international-announces-strategic-investment-in-skala-cosmeticos/",
                     "filing_accession": null,
@@ -97,7 +97,7 @@
                 {
                     "claim": "CVC Capital Partners had a acquisition signal involving Shiseido Personal Care business (brands incl. SENKA and TSUBAKI) via Fine Today Shiseido / KK Asian Personal Care Holding with adjacent target-industry relevance.",
                     "source_type": "transaction_signal",
-                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_dimension": "potential_buyer_discovery.financial_sponsor_activity",
                     "source_strength": "C",
                     "url": "https://www.cvc.com/media/news/2021/2021-02-03-cvc-capital-partners-agrees-to-joint-venture-with-shiseido-in-personal-care-business/",
                     "filing_accession": null,
@@ -154,7 +154,7 @@
                 {
                     "claim": "Gryphon Investors had a acquisition signal involving Revision Skincare and Goodier Cosmetics (Revision Goodier) with adjacent target-industry relevance.",
                     "source_type": "transaction_signal",
-                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_dimension": "potential_buyer_discovery.financial_sponsor_activity",
                     "source_strength": "C",
                     "url": "https://www.gryphon-inv.com/news/gryphon-investors-announces-acquisition-of-revision-goodier/",
                     "filing_accession": null,
@@ -211,7 +211,7 @@
                 {
                     "claim": "HGGC had a investment signal involving Beauty Industry Group with adjacent target-industry relevance.",
                     "source_type": "transaction_signal",
-                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_dimension": "potential_buyer_discovery.financial_sponsor_activity",
                     "source_strength": "C",
                     "url": "https://www.prnewswire.com/news-releases/beauty-industry-group-announces-investment-from-l-catterton-301353548.html",
                     "filing_accession": null,
@@ -268,7 +268,7 @@
                 {
                     "claim": "KKR had a Acquisition (majority stake buyout) signal involving Vini Cosmetics with adjacent target-industry relevance.",
                     "source_type": "transaction_signal",
-                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_dimension": "potential_buyer_discovery.financial_sponsor_activity",
                     "source_strength": "C",
                     "url": "https://www.businesswire.com/news/home/20210620005269/en/KKR-Invests-US%24625-Million-for-Controlling-Stake-in-Vini-Cosmetics",
                     "filing_accession": null,
@@ -325,7 +325,7 @@
                 {
                     "claim": "Linden Capital Partners had a investment signal involving Formulated Solutions, LLC with adjacent target-industry relevance.",
                     "source_type": "transaction_signal",
-                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_dimension": "potential_buyer_discovery.financial_sponsor_activity",
                     "source_strength": "C",
                     "url": "https://www.linden.com/news/2021/09/linden-invests-in-formulated-solutions/",
                     "filing_accession": null,
@@ -382,7 +382,7 @@
                 {
                     "claim": "TA Associates had a Investment/exit (TA sells to strategic a signal involving Paula’s Choice with adjacent target-industry relevance.",
                     "source_type": "transaction_signal",
-                    "source_dimension": "buyer_long_list_recall.financial_sponsor_activity",
+                    "source_dimension": "potential_buyer_discovery.financial_sponsor_activity",
                     "source_strength": "C",
                     "url": "https://www.ta.com/news/unilever-to-acquire-paulas-choice-from-ta-associates/",
                     "filing_accession": null,
@@ -439,7 +439,7 @@
                 "hit_count": 7,
                 "metadata": {
                     "retriever": "PEDealActivityRetriever",
-                    "source_use_case": "buyer_recall_financial_sponsors",
+                    "source_use_case": "financial_sponsor_activity",
                     "source_roles": {
                         "deal_activity_source": "fmp",
                         "llm_web_search_source": "llm_web_search"

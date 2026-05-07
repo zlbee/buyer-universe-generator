@@ -18,6 +18,7 @@ from src.domain import (
     Evidence,
     FeatureLabel,
     FilingMetadata,
+    RetrievalRetrieverConfig,
     SourceDocument,
     SourceStrength,
     SourceType,
@@ -36,6 +37,19 @@ from src.sources.strategy import DataSourceStrategy
 logger = logging.getLogger(__name__)
 
 _TARGET_PROFILE_LLM_BUSINESS_TYPE = "target_profile_extraction"
+_TARGET_PROFILE_RETRIEVER_NAME = "TargetProfileExtractor"
+_DEFAULT_BUSINESS_DESCRIPTION_FORMS = ("10-K", "10-Q")
+_DEFAULT_COMPANY_STRATEGY_FORMS = ("10-K", "8-K", "S-1", "S-1/A", "10-Q")
+_DEFAULT_BUSINESS_DESCRIPTION_TEXT_SCOPE = "business_description"
+_DEFAULT_COMPANY_STRATEGY_TEXT_SCOPE = "company_strategy"
+_DEFAULT_LLM_MAX_ATTEMPTS = 2
+_DEFAULT_SIZE_METRIC_KEYS = (
+    "market_cap",
+    "weighted_shares_outstanding",
+    "share_class_shares_outstanding",
+    "total_employees",
+    "employee_count",
+)
 
 
 class TargetProfileExtractionError(RuntimeError):
@@ -228,6 +242,9 @@ class TargetProfileExtractor:
         self.edgar_client = edgar_client
         self.llm_client = llm_client
         self.ir_page_discovery = ir_page_discovery
+        self.retriever_config: RetrievalRetrieverConfig | None = strategy.retriever_config(
+            _TARGET_PROFILE_RETRIEVER_NAME
+        )
         self.keyword_taxonomy = load_keyword_taxonomy(settings.keyword_taxonomy_path)
 
     def build_profile(self, query: str) -> TargetProfileExtractionResult:
@@ -314,7 +331,63 @@ class TargetProfileExtractor:
         return result
 
     def _effective_extractor_version(self) -> str:
-        return f"{self.settings.target_profile_extractor_version}:ir-v1:cs-v1:kt:{self.keyword_taxonomy.fingerprint[:12]}"
+        return (
+            f"{self.settings.target_profile_extractor_version}:ir-v1:cs-v1:"
+            f"r:{self._target_profile_config_fingerprint()[:10]}:kt:{self.keyword_taxonomy.fingerprint[:10]}"
+        )
+
+    def _target_profile_config_fingerprint(self) -> str:
+        # Include resolved retrieval-rule knobs in the profile cache key so rule changes
+        # do not reuse stale LLM outputs.
+        payload = {
+            "business_description_forms": self._business_description_forms(),
+            "business_description_text_scope": self._business_description_text_scope(),
+            "company_strategy_forms": self._company_strategy_forms(),
+            "company_strategy_text_scope": self._company_strategy_text_scope(),
+            "llm_max_attempts": self._llm_max_attempts(),
+            "llm_max_input_chars": self._llm_max_input_chars(),
+            "size_metric_keys": self._size_metric_keys(),
+        }
+        encoded = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
+    def _business_description_forms(self) -> tuple[str, ...]:
+        return _configured_tuple(
+            self.retriever_config.business_description_forms if self.retriever_config else [],
+            _DEFAULT_BUSINESS_DESCRIPTION_FORMS,
+        )
+
+    def _company_strategy_forms(self) -> tuple[str, ...]:
+        return _configured_tuple(
+            self.retriever_config.company_strategy_forms if self.retriever_config else [],
+            _DEFAULT_COMPANY_STRATEGY_FORMS,
+        )
+
+    def _business_description_text_scope(self) -> str:
+        if self.retriever_config and self.retriever_config.business_description_text_scope:
+            return self.retriever_config.business_description_text_scope
+        return _DEFAULT_BUSINESS_DESCRIPTION_TEXT_SCOPE
+
+    def _company_strategy_text_scope(self) -> str:
+        if self.retriever_config and self.retriever_config.company_strategy_text_scope:
+            return self.retriever_config.company_strategy_text_scope
+        return _DEFAULT_COMPANY_STRATEGY_TEXT_SCOPE
+
+    def _llm_max_attempts(self) -> int:
+        if self.retriever_config and self.retriever_config.llm_max_attempts:
+            return self.retriever_config.llm_max_attempts
+        return _DEFAULT_LLM_MAX_ATTEMPTS
+
+    def _llm_max_input_chars(self) -> int:
+        if self.retriever_config and self.retriever_config.llm_max_input_chars:
+            return self.retriever_config.llm_max_input_chars
+        return self.settings.llm_max_input_chars
+
+    def _size_metric_keys(self) -> tuple[str, ...]:
+        return _configured_tuple(
+            self.retriever_config.size_metric_keys if self.retriever_config else [],
+            _DEFAULT_SIZE_METRIC_KEYS,
+        )
 
     def _ensure_filing_text(
         self,
@@ -325,12 +398,16 @@ class TargetProfileExtractor:
         if any(document.raw_text and document.source_dimension == "seller_profile.business_description" for document in source_documents):
             return source_documents
 
-        filing = _preferred_text_filing(ingestion.filings)
+        business_description_forms = self._business_description_forms()
+        filing = _preferred_text_filing(ingestion.filings, business_description_forms)
         if not filing:
-            warnings.append("target profile extraction skipped SEC text: no 10-K or 10-Q filing metadata available")
+            warnings.append(
+                "target profile extraction skipped SEC text: "
+                f"no {_format_form_list(business_description_forms)} filing metadata available"
+            )
             return source_documents
 
-        edgar_source = self.strategy.selected_source("seller_profile_business_description", "edgar", include_disabled=True)
+        edgar_source = self.strategy.selected_source("business_description", "edgar", include_disabled=True)
         try:
             document = self.edgar_client.fetch_filing_text_document(
                 ingestion.target,
@@ -338,6 +415,7 @@ class TargetProfileExtractor:
                 self.strategy.cache_ttl_hours("edgar"),
                 source_strength=edgar_source.source_strength if edgar_source else SourceStrength.B,
                 source_dimension=edgar_source.dimension_id if edgar_source else "seller_profile.business_description",
+                text_scope=self._business_description_text_scope(),
             )
         except Exception as error:
             warnings.append(f"target profile extraction skipped SEC text: {error}")
@@ -356,7 +434,7 @@ class TargetProfileExtractor:
             return source_documents
 
         strategy_source = self.strategy.selected_source(
-            "seller_profile_company_strategy",
+            "company_strategy",
             "edgar",
             include_disabled=True,
         )
@@ -366,16 +444,18 @@ class TargetProfileExtractor:
             warnings.append(f"edgar strategy text disabled: {strategy_source.disabled_reason}")
             return source_documents
 
-        filings = _preferred_strategy_filings(ingestion.filings)
+        company_strategy_forms = self._company_strategy_forms()
+        filings = _preferred_strategy_filings(ingestion.filings, company_strategy_forms)
         if not filings:
             warnings.append(
                 "target profile extraction skipped SEC strategy text: "
-                "no 10-K, 8-K, S-1, or 10-Q filing metadata available"
+                f"no {_format_form_list(company_strategy_forms)} filing metadata available"
             )
             return source_documents
 
         documents = list(source_documents)
         fetch_errors: list[str] = []
+        company_strategy_text_scope = self._company_strategy_text_scope()
         for filing in filings:
             cached_document = _source_document_from_cached_structured_sections(
                 ingestion.target,
@@ -384,7 +464,7 @@ class TargetProfileExtractor:
                 self.strategy.cache_ttl_hours("edgar"),
                 source_strength=strategy_source.source_strength,
                 source_dimension=strategy_source.dimension_id,
-                text_scope="company_strategy",
+                text_scope=company_strategy_text_scope,
             )
             if cached_document:
                 self.source_cache.save_document(cached_document)
@@ -398,7 +478,7 @@ class TargetProfileExtractor:
                     self.strategy.cache_ttl_hours("edgar"),
                     source_strength=strategy_source.source_strength,
                     source_dimension=strategy_source.dimension_id,
-                    text_scope="company_strategy",
+                    text_scope=company_strategy_text_scope,
                 )
             except Exception as error:
                 fetch_errors.append(f"{filing.form} {filing.accession_number}: {error}")
@@ -425,7 +505,7 @@ class TargetProfileExtractor:
             return source_documents
 
         company_page_source = self.strategy.selected_source(
-            "seller_profile_business_description",
+            "business_description",
             "company_pages",
             include_disabled=True,
         )
@@ -470,9 +550,9 @@ class TargetProfileExtractor:
         ingestion: TargetIngestionResult,
         source_documents: list[SourceDocument],
     ) -> LLMTargetFeatureOutput:
-        prompt = _build_extraction_prompt(ingestion, source_documents, self.settings.llm_max_input_chars)
+        prompt = _build_extraction_prompt(ingestion, source_documents, self._llm_max_input_chars())
         last_error: Exception | None = None
-        max_attempts = 2
+        max_attempts = self._llm_max_attempts()
         logger.info(
             "TargetProfile LLM extraction prepared: ticker=%s schema=%s prompt_chars=%s max_attempts=%s",
             ingestion.target.ticker,
@@ -560,9 +640,10 @@ class TargetProfileExtractor:
         feature_labels: dict[str, FeatureLabel] = {}
 
         _add_direct_identity_evidence(ingestion, source_documents, feature_evidence)
-        size_metrics = _size_metrics(source_documents)
+        size_metric_keys = self._size_metric_keys()
+        size_metrics = _size_metrics(source_documents, size_metric_keys)
         if size_metrics:
-            _add_size_metric_evidence(source_documents, feature_evidence)
+            _add_size_metric_evidence(source_documents, feature_evidence, size_metric_keys)
 
         llm_field_values: dict[str, Any] = {
             "business_summary": llm_output.business_summary,
@@ -683,23 +764,48 @@ def fingerprint_source_documents(source_documents: list[SourceDocument]) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def _preferred_text_filing(filings: list[FilingMetadata]) -> FilingMetadata | None:
-    return next((filing for filing in filings if filing.form == "10-K"), None) or next(
-        (filing for filing in filings if filing.form == "10-Q"),
-        None,
-    )
+def _configured_tuple(configured_values: list[str], default_values: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(configured_values) if configured_values else default_values
 
 
-def _preferred_strategy_filings(filings: list[FilingMetadata]) -> list[FilingMetadata]:
+def _format_form_list(forms: tuple[str, ...]) -> str:
+    return ", ".join(forms)
+
+
+def _preferred_text_filing(
+    filings: list[FilingMetadata],
+    preferred_forms: tuple[str, ...],
+) -> FilingMetadata | None:
+    for preferred_form in _normalized_form_order(preferred_forms):
+        filing = next(
+            (candidate for candidate in filings if candidate.form.strip().upper() == preferred_form),
+            None,
+        )
+        if filing:
+            return filing
+    return None
+
+
+def _preferred_strategy_filings(
+    filings: list[FilingMetadata],
+    preferred_forms: tuple[str, ...],
+) -> list[FilingMetadata]:
     selected: list[FilingMetadata] = []
     seen_accessions: set[str] = set()
-    for preferred_form in ("10-K", "8-K", "S-1", "S-1/A", "10-Q"):
-        filing = next((candidate for candidate in filings if candidate.form.upper() == preferred_form), None)
+    for preferred_form in _normalized_form_order(preferred_forms):
+        filing = next(
+            (candidate for candidate in filings if candidate.form.strip().upper() == preferred_form),
+            None,
+        )
         if not filing or filing.accession_number in seen_accessions:
             continue
         selected.append(filing)
         seen_accessions.add(filing.accession_number)
     return selected
+
+
+def _normalized_form_order(preferred_forms: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(form.strip().upper() for form in preferred_forms if form.strip())
 
 
 def _homepage_url_from_polygon(source_documents: list[SourceDocument]) -> str | None:
@@ -890,17 +996,10 @@ def _add_direct_identity_evidence(
             feature_evidence[field_name] = [evidence]
 
 
-def _size_metrics(source_documents: list[SourceDocument]) -> dict[str, Any]:
+def _size_metrics(source_documents: list[SourceDocument], metric_keys: tuple[str, ...]) -> dict[str, Any]:
     polygon_document = next((document for document in source_documents if document.source_id == "polygon"), None)
     if not polygon_document:
         return {}
-    metric_keys = [
-        "market_cap",
-        "weighted_shares_outstanding",
-        "share_class_shares_outstanding",
-        "total_employees",
-        "employee_count",
-    ]
     return {
         key: polygon_document.metadata[key]
         for key in metric_keys
@@ -908,9 +1007,16 @@ def _size_metrics(source_documents: list[SourceDocument]) -> dict[str, Any]:
     }
 
 
-def _add_size_metric_evidence(source_documents: list[SourceDocument], feature_evidence: dict[str, list[Evidence]]) -> None:
+def _add_size_metric_evidence(
+    source_documents: list[SourceDocument],
+    feature_evidence: dict[str, list[Evidence]],
+    metric_keys: tuple[str, ...],
+) -> None:
     polygon_document = next((document for document in source_documents if document.source_id == "polygon"), None)
     if not polygon_document:
+        return
+    size_metrics = _size_metrics(source_documents, metric_keys)
+    if not size_metrics:
         return
     feature_evidence["size_metrics"] = [
         Evidence(
@@ -921,7 +1027,7 @@ def _add_size_metric_evidence(source_documents: list[SourceDocument], feature_ev
             url=polygon_document.url,
             filing_accession=polygon_document.filing_accession,
             retrieved_at=polygon_document.retrieved_at,
-            quote_or_snippet=json.dumps(_size_metrics(source_documents), sort_keys=True),
+            quote_or_snippet=json.dumps(size_metrics, sort_keys=True),
             verified_fact=True,
         )
     ]

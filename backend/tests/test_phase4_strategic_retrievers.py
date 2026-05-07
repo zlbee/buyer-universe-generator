@@ -62,7 +62,7 @@ def test_same_sic_retriever_recalls_only_traceable_non_self_same_sic(tmp_path: P
     assert hit.data_source == ["edgar"]
     assert hit.retrieval_metadata["target_sic"] == "2844"
     assert hit.retrieval_metadata["candidate_sic"] == "2844"
-    assert hit.evidence[0].source_dimension == "buyer_long_list_recall.public_company_peer_discovery"
+    assert hit.evidence[0].source_dimension == "potential_buyer_discovery.public_company_peer_discovery"
     assert all("polygon disabled" not in warning for warning in result.warnings)
     assert any("without traceable evidence" in warning for warning in result.warnings)
 
@@ -98,7 +98,7 @@ def test_sec_client_can_fallback_to_browse_edgar_by_sic(tmp_path: Path) -> None:
         limit=5,
         ttl_hours=24,
         source_strength=SourceStrength.B,
-        source_dimension="buyer_long_list_recall.public_company_peer_discovery",
+        source_dimension="potential_buyer_discovery.public_company_peer_discovery",
     )
 
     assert len(documents) == 1
@@ -147,7 +147,7 @@ def test_sec_client_enriches_browse_sic_records_from_company_mapping(tmp_path: P
         limit=5,
         ttl_hours=24,
         source_strength=SourceStrength.B,
-        source_dimension="buyer_long_list_recall.public_company_peer_discovery",
+        source_dimension="potential_buyer_discovery.public_company_peer_discovery",
     )
 
     assert len(documents) == 1
@@ -205,7 +205,7 @@ def test_sec_client_enriches_browse_sic_records_from_submissions_when_mapping_ha
         limit=5,
         ttl_hours=24,
         source_strength=SourceStrength.B,
-        source_dimension="buyer_long_list_recall.public_company_peer_discovery",
+        source_dimension="potential_buyer_discovery.public_company_peer_discovery",
     )
 
     assert len(documents) == 1
@@ -296,7 +296,7 @@ def test_sec_client_fetches_same_sic_8k_transaction_signals(tmp_path: Path) -> N
         limit=50,
         company_limit=10,
         source_strength=SourceStrength.C,
-        source_dimension="buyer_long_list_recall.transaction_signal",
+        source_dimension="potential_buyer_discovery.transaction_signal",
         primary_items=["2.01"],
         supporting_items=["1.01"],
         require_primary_item=True,
@@ -308,7 +308,7 @@ def test_sec_client_fetches_same_sic_8k_transaction_signals(tmp_path: Path) -> N
     assert any(url.startswith("https://data.sec.gov/submissions/CIK0000002000.json") for url in seen_urls)
     assert len(documents) == 1
     assert documents[0].source_type == SourceType.sec_filing
-    assert documents[0].source_dimension == "buyer_long_list_recall.transaction_signal"
+    assert documents[0].source_dimension == "potential_buyer_discovery.transaction_signal"
     assert documents[0].metadata["form"] == "8-K"
     assert documents[0].metadata["sic"] == "2844"
     assert documents[0].metadata["filing_items"] == ["2.01", "9.01"]
@@ -624,7 +624,7 @@ def test_strategic_acquisition_intent_retriever_recalls_llm_web_search_intent_wi
     assert hit.confidence == 0.57
     assert len(hit.evidence) == 2
     assert all(evidence.verified_fact is False for evidence in hit.evidence)
-    assert hit.evidence[0].source_dimension == "buyer_long_list_recall.strategic_acquisition_intent"
+    assert hit.evidence[0].source_dimension == "potential_buyer_discovery.strategic_acquisition_intent"
     assert hit.evidence[0].source_type == "llm_web_search"
     assert hit.retrieval_metadata["sector_relevance"] == "same"
     assert hit.retrieval_metadata["llm_web_search_evidence_count"] == 2
@@ -1108,7 +1108,7 @@ def edgar_transaction_documents() -> list[SourceDocument]:
     return [
         SourceDocument(
             source_id="edgar",
-            source_dimension="buyer_long_list_recall.transaction_signal",
+            source_dimension="potential_buyer_discovery.transaction_signal",
             source_type=SourceType.sec_filing,
             source_strength=SourceStrength.C,
             target_cik="0000002000",
@@ -1134,7 +1134,7 @@ def sec_item_201_fragment_document() -> list[SourceDocument]:
     return [
         SourceDocument(
             source_id="edgar",
-            source_dimension="buyer_long_list_recall.transaction_signal",
+            source_dimension="potential_buyer_discovery.transaction_signal",
             source_type=SourceType.sec_filing,
             source_strength=SourceStrength.C,
             target_cik="0001096752",
@@ -1169,7 +1169,7 @@ def sec_item_201_fragment_document() -> list[SourceDocument]:
 def source_document(metadata: dict[str, Any], url: str | None) -> SourceDocument:
     return SourceDocument(
         source_id="edgar",
-        source_dimension="buyer_long_list_recall.public_company_peer_discovery",
+        source_dimension="potential_buyer_discovery.public_company_peer_discovery",
         source_type=SourceType.sec_company_mapping,
         source_strength=SourceStrength.B,
         target_cik=metadata.get("cik"),
@@ -1183,7 +1183,7 @@ def source_document(metadata: dict[str, Any], url: str | None) -> SourceDocument
 def news_document(title: str, published_at: str, url: str) -> SourceDocument:
     return SourceDocument(
         source_id="newsapi",
-        source_dimension="buyer_long_list_recall.transaction_news",
+        source_dimension="potential_buyer_discovery.transaction_news",
         source_type=SourceType.news_article,
         source_strength=SourceStrength.B,
         target_cik="0001600033",
@@ -1202,7 +1202,7 @@ def news_document(title: str, published_at: str, url: str) -> SourceDocument:
 def rss_document(title: str, published_at: str, url: str) -> SourceDocument:
     return SourceDocument(
         source_id="google_news_rss",
-        source_dimension="buyer_long_list_recall.transaction_news",
+        source_dimension="potential_buyer_discovery.transaction_news",
         source_type=SourceType.news_article,
         source_strength=SourceStrength.C,
         target_cik="0001600033",

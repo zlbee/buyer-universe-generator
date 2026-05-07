@@ -125,9 +125,9 @@ The current code stops at the raw candidate-hit stage. `LongListCandidate` exist
 `backend/config/retrieval_rules.yaml` is the main control plane for retrieval behavior.
 
 - `providers` define enabled/required status, API key environment variables, cache TTLs, and provider-specific retrieval limits.
-- `evidence_profiles` assign source strength by provider and use-case dimension.
-- `stages` map pipeline use cases to selected sources.
-- `stages.potential_buyer_recaller.retrievers` maps retriever classes to use cases, source roles, source priority, lookback windows, candidate caps, query caps, sector-match policy, transaction terms, and SEC form/item rules.
+- `stages` map pipeline use cases to selected sources, source roles, source priority, source dimensions, and source-strength levels.
+- `stages.target_profile_builder.retrievers.TargetProfileExtractor` configures target-profile SEC form preference, SEC text scopes, LLM extraction limits, and Polygon size metric keys.
+- `stages.potential_buyer_recaller.retrievers` maps retriever classes to use cases, lookback windows, candidate caps, query caps, sector-match policy, transaction terms, and SEC form/item rules.
 
 Current source roles:
 
@@ -145,8 +145,8 @@ Evidence strength should be interpreted as a routing and review policy, not as a
 Current behavior:
 
 - Uses SEC as the primary identity and filing source.
-- Prefers `10-K`, then `10-Q`, for business-description text.
-- Uses `10-K`, `8-K`, `S-1`/`S-1/A`, then `10-Q` for company-strategy evidence.
+- Uses configured SEC form preference for business-description text; the default is `10-K`, then `10-Q`.
+- Uses configured SEC form preference for company-strategy evidence; the default is `10-K`, `8-K`, `S-1`/`S-1/A`, then `10-Q`.
 - Optionally discovers official IR/company pages through OpenRouter web search and stores high-value company-page documents.
 - Uses Polygon for size metrics when available.
 - Uses NewsAPI for recent target context when enabled.

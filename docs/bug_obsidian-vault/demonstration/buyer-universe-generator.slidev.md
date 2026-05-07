@@ -265,7 +265,6 @@ flowchart LR
 - **Data source**:
   - **EDGAR company metadata**:
     - Official **public-company classification**.
-    - Configured through **`buyer_recall_strategic_public_companies`**.
 - **Optimization**:
   - Add broader **data sources** and richer **industry taxonomies** to cover **non-U.S.-listed companies**.
 

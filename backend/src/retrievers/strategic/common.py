@@ -42,15 +42,22 @@ def retriever_config(
 
 
 def required_source_role(
-    config: RetrievalRetrieverConfig,
+    strategy: DataSourceStrategy,
+    use_case: str,
     role: str,
     retriever_name: str,
     warnings: list[str],
 ) -> str | None:
-    source_id = config.source_roles.get(role)
-    if not source_id:
+    source = strategy.selected_source_by_role(use_case, role, include_disabled=True)
+    if not source:
         warnings.append(f"{retriever_name} skipped: retriever policy has no source role {role}")
-    return source_id
+        return None
+    return source.source_id
+
+
+def optional_source_role(strategy: DataSourceStrategy, use_case: str, role: str) -> str | None:
+    source = strategy.selected_source_by_role(use_case, role, include_disabled=True)
+    return source.source_id if source else None
 
 
 def required_positive_int(
@@ -65,9 +72,12 @@ def required_positive_int(
     return value
 
 
-def source_execution_order(config: RetrievalRetrieverConfig) -> list[str]:
-    ordered = config.source_priority or list(config.source_roles.values())
-    return unique_terms(ordered)
+def source_role_map(strategy: DataSourceStrategy, use_case: str) -> dict[str, str]:
+    return strategy.source_role_map(use_case, include_disabled=True)
+
+
+def source_execution_order(strategy: DataSourceStrategy, use_case: str) -> list[str]:
+    return unique_terms([source.source_id for source in strategy.selected_sources_by_priority(use_case, include_disabled=True)])
 
 
 def document_matches_sic(document: SourceDocument, target_sic: str) -> bool:

@@ -31,12 +31,14 @@ from src.retrievers.strategic.common import (
     first_text,
     normalize_entity_key,
     normalize_sic,
+    optional_source_role,
     parse_date,
     required_positive_int,
     required_source_role,
     retriever_config,
     selected_source,
     source_execution_order,
+    source_role_map,
     source_type_value,
     unique_terms,
 )
@@ -224,8 +226,8 @@ class PEDealActivityRetriever:
         max_queries = required_positive_int(config, "max_queries", self.name, warnings)
         page_size = required_positive_int(config, "page_size", self.name, warnings)
         max_candidates = required_positive_int(config, "max_candidates", self.name, warnings)
-        deal_source_id = required_source_role(config, "deal_activity_source", self.name, warnings)
-        llm_web_search_source_id = config.source_roles.get("llm_web_search_source")
+        deal_source_id = required_source_role(self.strategy, config.use_case, "deal_activity_source", self.name, warnings)
+        llm_web_search_source_id = optional_source_role(self.strategy, config.use_case, "llm_web_search_source")
         eligible_sector_matches = set(config.eligible_sector_matches)
         if not eligible_sector_matches:
             warnings.append(f"{self.name} skipped: retriever policy has no eligible_sector_matches")
@@ -265,7 +267,7 @@ class PEDealActivityRetriever:
         llm_skipped_firm_count = 0
         llm_batch_count = 0
 
-        for source_id in source_execution_order(config):
+        for source_id in source_execution_order(self.strategy, config.use_case):
             if source_id != deal_source_id:
                 if source_id == llm_web_search_source_id:
                     llm_source = selected_source(self.strategy, config.use_case, source_id, self.name, warnings, required=False)
@@ -417,8 +419,8 @@ class PEDealActivityRetriever:
             metadata={
                 "retriever": self.name,
                 "source_use_case": config.use_case,
-                "source_roles": config.source_roles,
-                "source_priority": config.source_priority,
+                "source_roles": source_role_map(self.strategy, config.use_case),
+                "source_priority": source_execution_order(self.strategy, config.use_case),
                 "source": deal_source_id,
                 "lookback_start": since.isoformat(),
                 "lookback_end": self.as_of_date.isoformat(),

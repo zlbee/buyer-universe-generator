@@ -25,6 +25,7 @@ from src.retrievers.strategic.common import (
     retriever_config,
     selected_source,
     source_execution_order,
+    source_role_map,
     unique_terms,
 )
 from src.sources.strategy import DataSourceStrategy
@@ -132,7 +133,7 @@ class StrategicAcquisitionIntentRetriever:
         max_documents = required_positive_int(config, "max_documents", self.name, warnings)
         max_queries = required_positive_int(config, "max_queries", self.name, warnings)
         max_evidence_per_candidate = required_positive_int(config, "max_evidence_per_candidate", self.name, warnings)
-        web_search_source_id = required_source_role(config, "llm_web_search_source", self.name, warnings)
+        web_search_source_id = required_source_role(self.strategy, config.use_case, "llm_web_search_source", self.name, warnings)
         eligible_sector_matches = set(config.eligible_sector_matches)
         if not eligible_sector_matches:
             warnings.append(f"{self.name} skipped: retriever policy has no eligible_sector_matches")
@@ -154,8 +155,8 @@ class StrategicAcquisitionIntentRetriever:
         metadata = {
             "retriever": self.name,
             "source_use_case": config.use_case,
-            "source_roles": config.source_roles,
-            "source_priority": source_execution_order(config),
+            "source_roles": source_role_map(self.strategy, config.use_case),
+            "source_priority": source_execution_order(self.strategy, config.use_case),
             "source": web_search_source_id,
             "max_candidates": max_candidates,
             "max_documents": max_documents,

@@ -11,3 +11,5 @@ frontend/dist/
 frontend/.vite/
 *.log
 *.tsbuildinfo
+
+/docs

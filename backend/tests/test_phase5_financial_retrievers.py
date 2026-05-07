@@ -37,13 +37,13 @@ def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:
 def test_data_source_policy_configures_pe_deal_activity_retriever(tmp_path: Path) -> None:
     strategy = DataSourceStrategy.from_settings(settings_for_tests(tmp_path))
 
-    sponsor_source = strategy.selected_source("buyer_recall_financial_sponsors", "fmp", include_disabled=True)
-    llm_sponsor_source = strategy.selected_source("buyer_recall_financial_sponsors", "llm_web_search", include_disabled=True)
+    sponsor_source = strategy.selected_source("financial_sponsor_activity", "fmp", include_disabled=True)
+    llm_sponsor_source = strategy.selected_source("financial_sponsor_activity", "llm_web_search", include_disabled=True)
     policy = strategy.retriever_config("PEDealActivityRetriever")
 
     assert sponsor_source is not None
     assert llm_sponsor_source is not None
-    assert sponsor_source.dimension_id == "buyer_long_list_recall.financial_sponsor_activity"
+    assert sponsor_source.dimension_id == "potential_buyer_discovery.financial_sponsor_activity"
     assert sponsor_source.source_strength == SourceStrength.B
     assert llm_sponsor_source.source_strength == SourceStrength.C
     assert llm_sponsor_source.config.retrieval.web_search_max_results == 10
@@ -51,10 +51,15 @@ def test_data_source_policy_configures_pe_deal_activity_retriever(tmp_path: Path
     assert llm_sponsor_source.config.retrieval.web_fetch_max_uses == 5
     assert llm_sponsor_source.config.retrieval.web_fetch_max_content_tokens == 12000
     assert policy is not None
-    assert policy.use_case == "buyer_recall_financial_sponsors"
-    assert policy.source_roles["deal_activity_source"] == "fmp"
-    assert policy.source_roles["llm_web_search_source"] == "llm_web_search"
-    assert policy.source_priority == ["fmp", "llm_web_search"]
+    assert policy.use_case == "financial_sponsor_activity"
+    assert strategy.source_role_map(policy.use_case, include_disabled=True) == {
+        "deal_activity_source": "fmp",
+        "llm_web_search_source": "llm_web_search",
+    }
+    assert [source.source_id for source in strategy.selected_sources_by_priority(policy.use_case, include_disabled=True)] == [
+        "fmp",
+        "llm_web_search",
+    ]
     assert policy.lookback_years == 5
     assert policy.max_companies == 30
     assert policy.web_search_batch_size == 10
@@ -95,7 +100,7 @@ def test_pe_deal_activity_retriever_recalls_seeded_pe_with_recent_industry_deals
     assert bain.source_path == ["pe_deal_activity"]
     assert bain.data_source == ["fmp"]
     assert bain.confidence == 0.76
-    assert bain.evidence[0].source_dimension == "buyer_long_list_recall.financial_sponsor_activity"
+    assert bain.evidence[0].source_dimension == "potential_buyer_discovery.financial_sponsor_activity"
     assert bain.evidence[0].source_strength == SourceStrength.B
     assert bain.retrieval_metadata["matched_seed_firm"] == "Bain Capital"
     assert bain.retrieval_metadata["same_sector_event_count"] == 1
@@ -108,7 +113,7 @@ def test_pe_deal_activity_retriever_recalls_seeded_pe_with_recent_industry_deals
     assert result.metadata["documents_checked"] == 5
     assert fmp_source.calls[1]["name"] == "cosmetics"
     assert fmp_source.calls[1]["ttl_hours"] == 24
-    assert fmp_source.calls[1]["source_dimension"] == "buyer_long_list_recall.financial_sponsor_activity"
+    assert fmp_source.calls[1]["source_dimension"] == "potential_buyer_discovery.financial_sponsor_activity"
     assert any("older than 2021-05-04" in warning for warning in result.warnings)
     assert any("non-seed acquirer" in warning for warning in result.warnings)
     assert any("unrelated FMP deal" in warning for warning in result.warnings)
@@ -459,7 +464,7 @@ def fmp_deal(
 ) -> SourceDocument:
     return SourceDocument(
         source_id="fmp",
-        source_dimension="buyer_long_list_recall.financial_sponsor_activity",
+        source_dimension="potential_buyer_discovery.financial_sponsor_activity",
         source_type=SourceType.transaction_signal,
         source_strength=SourceStrength.B,
         url=f"https://www.sec.gov/Archives/{transaction_id}",
@@ -489,7 +494,7 @@ def financial_hit() -> CandidateHit:
             Evidence(
                 claim="Bain Capital had a transaction signal involving Cosmetics Labs.",
                 source_type="transaction_signal",
-                source_dimension="buyer_long_list_recall.financial_sponsor_activity",
+                source_dimension="potential_buyer_discovery.financial_sponsor_activity",
                 source_strength=SourceStrength.B,
                 url="https://www.sec.gov/Archives/deal-1",
                 verified_fact=True,

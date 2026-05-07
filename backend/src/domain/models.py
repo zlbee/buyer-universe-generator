@@ -217,18 +217,27 @@ class RetrievalProviderConfig(StrictBaseModel):
 
 
 class RetrievalSourceSelection(StrictBaseModel):
-    """A concrete source selection for a specific pipeline use case."""
+    """A concrete source selection, including its evidence policy for one use case."""
 
     source_id: str = Field(min_length=1)
     dimension: str = Field(min_length=1)
+    source_strength: SourceStrength
+    role: str | None = None
+    priority: int | None = Field(default=None, ge=1)
+
+    @field_validator("role")
+    @classmethod
+    def normalize_role(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
 
 class RetrievalRetrieverConfig(StrictBaseModel):
-    """Retriever-level strategy that binds a recall path to configured source policies."""
+    """Retriever-level strategy that binds a recall path to runtime parameters."""
 
     use_case: str = Field(min_length=1)
-    source_roles: dict[str, str] = Field(default_factory=dict)
-    source_priority: list[str] = Field(default_factory=list)
     max_candidates: int | None = Field(default=None, ge=1)
     max_companies: int | None = Field(default=None, ge=1)
     # Optional retriever-level batch size for provider-managed web-search calls.
@@ -247,6 +256,13 @@ class RetrievalRetrieverConfig(StrictBaseModel):
     require_edgar_primary_item: bool = False
     fetch_edgar_filing_text: bool = False
     edgar_text_scope: str | None = None
+    business_description_forms: list[str] = Field(default_factory=list)
+    company_strategy_forms: list[str] = Field(default_factory=list)
+    business_description_text_scope: str | None = None
+    company_strategy_text_scope: str | None = None
+    llm_max_attempts: int | None = Field(default=None, ge=1)
+    llm_max_input_chars: int | None = Field(default=None, ge=1)
+    size_metric_keys: list[str] = Field(default_factory=list)
     rss_topic: str | None = None
     rss_require_identity_resolution: bool = True
     rss_use_llm_extraction: bool = False
@@ -254,15 +270,32 @@ class RetrievalRetrieverConfig(StrictBaseModel):
     eligible_sector_matches: list[str] = Field(default_factory=list)
     transaction_terms: list[str] = Field(default_factory=list)
 
-    @field_validator("source_roles")
-    @classmethod
-    def normalize_source_roles(cls, value: dict[str, str]) -> dict[str, str]:
-        return {role.strip(): source_id.strip() for role, source_id in value.items() if role.strip() and source_id.strip()}
-
-    @field_validator("source_priority", "eligible_sector_matches", "transaction_terms", "edgar_primary_items", "edgar_supporting_items")
+    @field_validator(
+        "eligible_sector_matches",
+        "transaction_terms",
+        "edgar_primary_items",
+        "edgar_supporting_items",
+        "business_description_forms",
+        "company_strategy_forms",
+        "size_metric_keys",
+    )
     @classmethod
     def normalize_text_list(cls, value: list[str]) -> list[str]:
         return [item.strip() for item in value if item.strip()]
+
+    @field_validator(
+        "edgar_form_type",
+        "edgar_text_scope",
+        "business_description_text_scope",
+        "company_strategy_text_scope",
+        "rss_topic",
+    )
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
 
 class RetrievalStageConfig(StrictBaseModel):
@@ -277,7 +310,6 @@ class RetrievalRules(StrictBaseModel):
 
     version: int = 1
     providers: dict[str, RetrievalProviderConfig]
-    evidence_profiles: dict[str, dict[str, RetrievalEvidenceProfile]]
     stages: dict[str, RetrievalStageConfig]
 
     @property
@@ -300,39 +332,29 @@ class RetrievalRules(StrictBaseModel):
 
     @model_validator(mode="after")
     def validate_rule_references(self) -> "RetrievalRules":
-        for source_id, profiles in self.evidence_profiles.items():
-            if source_id not in self.providers:
-                raise ValueError(f"evidence profile references unknown provider {source_id}")
-            if not profiles:
-                raise ValueError(f"evidence profile {source_id} requires at least one dimension")
-
         for stage_name, stage in self.stages.items():
             if not stage.use_cases and not stage.retrievers:
                 raise ValueError(f"stage {stage_name} must define use_cases or retrievers")
             for use_case, selections in stage.use_cases.items():
                 if not selections:
                     raise ValueError(f"use case {use_case} requires at least one source selection")
+                roles: set[str] = set()
+                priorities: set[int] = set()
                 for selection in selections:
                     if selection.source_id not in self.providers:
                         raise ValueError(f"use case {use_case} references unknown provider {selection.source_id}")
-                    if selection.dimension not in self.evidence_profiles.get(selection.source_id, {}):
-                        raise ValueError(
-                            f"use case {use_case} references unknown evidence profile "
-                            f"{selection.source_id}.{selection.dimension}"
-                        )
+                    if selection.role:
+                        if selection.role in roles:
+                            raise ValueError(f"use case {use_case} repeats source role {selection.role}")
+                        roles.add(selection.role)
+                    if selection.priority is not None:
+                        if selection.priority in priorities:
+                            raise ValueError(f"use case {use_case} repeats source priority {selection.priority}")
+                        priorities.add(selection.priority)
             for retriever_name, retriever in stage.retrievers.items():
                 selections = stage.use_cases.get(retriever.use_case)
                 if selections is None:
                     raise ValueError(f"retriever {retriever_name} references unknown use case {retriever.use_case}")
-                use_case_source_ids = {selection.source_id for selection in selections}
-                configured_source_ids = [*retriever.source_roles.values(), *retriever.source_priority]
-                for source_id in configured_source_ids:
-                    if source_id not in self.providers:
-                        raise ValueError(f"retriever {retriever_name} references unknown provider {source_id}")
-                    if source_id not in use_case_source_ids:
-                        raise ValueError(
-                            f"retriever {retriever_name} source {source_id} is not selected by use case {retriever.use_case}"
-                        )
         return self
 
 

@@ -137,6 +137,6 @@ npm run build
 
 - `backend/`: FastAPI app, domain models, source adapters, retrievers, pipeline orchestration, persistence, and CLI.
 - `frontend/`: React + TypeScript + Vite UI.
-- `backend/config/retrieval_rules.yaml`: provider routing, evidence profiles, stage use cases, and retriever parameters.
+- `backend/config/retrieval_rules.yaml`: provider routing, stage use cases, source roles, evidence strength, target-profile extraction knobs, and retriever parameters.
 - `backend/config/pe_seed_universe.yaml`: configured PE sponsor identity universe for financial buyer recall.
 - `data/`: local runtime database/cache data when using Docker Compose.
