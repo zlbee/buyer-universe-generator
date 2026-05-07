@@ -11,9 +11,9 @@ from src.config import Settings
 from src.domain import BuyerType, CandidateHit, Evidence, SourceDocument, SourceStrength, SourceType, StrategicRetrievalResult, TargetProfile
 from src.repositories.buyer_recall_cache import BuyerRecallCache
 from src.repositories.database import create_session_factory, init_db
+from src.retrieval.policy import DataSourceStrategy
 from src.retrievers import FinancialBuyerCandidateRetriever, PEDealActivityRetriever
 from src.retrievers.financial.seed_universe import PESeedFirm, PESeedUniverse
-from src.sources.strategy import DataSourceStrategy
 
 
 def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:

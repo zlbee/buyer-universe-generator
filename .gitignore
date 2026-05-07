@@ -13,3 +13,4 @@ frontend/.vite/
 *.tsbuildinfo
 
 /docs
+**/tmp

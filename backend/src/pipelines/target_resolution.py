@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from src.domain import ResolvedTarget
 from src.repositories.source_cache import SourceCache
 from src.sources.sec import SecEdgarClient
-from src.sources.strategy import DataSourceStrategy
+from src.retrieval.policy import DataSourceStrategy
 
 
 class TargetResolutionError(Exception):

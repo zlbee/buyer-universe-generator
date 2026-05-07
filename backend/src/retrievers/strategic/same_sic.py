@@ -23,7 +23,7 @@ from src.retrievers.strategic.common import (
     source_type_value,
 )
 from src.retrievers.strategic.protocols import PublicCompanySicSource
-from src.sources.strategy import DataSourceStrategy
+from src.retrieval.policy import DataSourceStrategy
 
 
 logger = logging.getLogger(__name__)

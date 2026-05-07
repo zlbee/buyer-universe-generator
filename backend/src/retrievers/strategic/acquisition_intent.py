@@ -28,7 +28,7 @@ from src.retrievers.strategic.common import (
     source_role_map,
     unique_terms,
 )
-from src.sources.strategy import DataSourceStrategy
+from src.retrieval.policy import DataSourceStrategy
 
 
 _STRATEGIC_INTENT_SCHEMA_NAME = "StrategicAcquisitionIntentWebSearch"

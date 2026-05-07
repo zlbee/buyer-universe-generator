@@ -27,12 +27,13 @@ from src.domain import (
     TargetProfileExtractionResult,
 )
 from src.llm import LLMClient, LLMResponseError, MissingLLMConfigurationError
+from src.pipelines.sec_filing_text import source_document_for_filing_text_scope
 from src.pipelines.source_ingestion import SourceIngestionService
 from src.repositories.source_cache import SourceCache
 from src.repositories.target_profile_cache import TargetProfileCache
-from src.sources.investor_relations import InvestorRelationsPageDiscovery
+from src.pipelines.investor_relations import InvestorRelationsPageDiscovery
 from src.sources.sec import SecEdgarClient
-from src.sources.strategy import DataSourceStrategy
+from src.retrieval.policy import DataSourceStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -409,7 +410,7 @@ class TargetProfileExtractor:
 
         edgar_source = self.strategy.selected_source("business_description", "edgar", include_disabled=True)
         try:
-            document = self.edgar_client.fetch_filing_text_document(
+            document = self._fetch_scoped_filing_text_document(
                 ingestion.target,
                 filing,
                 self.strategy.cache_ttl_hours("edgar"),
@@ -472,7 +473,7 @@ class TargetProfileExtractor:
                 continue
 
             try:
-                document = self.edgar_client.fetch_filing_text_document(
+                document = self._fetch_scoped_filing_text_document(
                     ingestion.target,
                     filing,
                     self.strategy.cache_ttl_hours("edgar"),
@@ -493,6 +494,40 @@ class TargetProfileExtractor:
                 warning = f"{warning}: {'; '.join(fetch_errors[:3])}"
             warnings.append(warning)
         return documents
+
+    def _fetch_scoped_filing_text_document(
+        self,
+        target,
+        filing: FilingMetadata,
+        ttl_hours: int,
+        *,
+        source_strength: SourceStrength,
+        source_dimension: str | None,
+        text_scope: str,
+    ) -> SourceDocument:
+        fetch_structured = getattr(self.edgar_client, "fetch_structured_filing_text", None)
+        if callable(fetch_structured):
+            extraction = fetch_structured(target, filing, source_dimension=source_dimension, text_scope=text_scope)
+            if not extraction:
+                raise ValueError(f"Could not retrieve structured filing section for accession {filing.accession_number}")
+            return source_document_for_filing_text_scope(
+                target,
+                filing,
+                extraction,
+                ttl_hours,
+                source_strength=source_strength,
+                source_dimension=source_dimension,
+                text_scope=text_scope,
+            )
+
+        return self.edgar_client.fetch_filing_text_document(
+            target,
+            filing,
+            ttl_hours,
+            source_strength=source_strength,
+            source_dimension=source_dimension,
+            text_scope=text_scope,
+        )
 
     def _ensure_company_page(
         self,

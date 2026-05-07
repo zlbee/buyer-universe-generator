@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from src.domain import RetrievalRetrieverConfig, SourceDocument, SourceStrength, SourceType, TargetProfile
-from src.sources.strategy import DataSourceStrategy, SelectedDataSource
+from src.retrieval.policy import DataSourceStrategy, SelectedDataSource
 
 
 def selected_source(

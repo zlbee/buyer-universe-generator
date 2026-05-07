@@ -60,6 +60,14 @@ class MarkdownItemHeading:
     end: int
 
 
+@dataclass(frozen=True)
+class SubmissionFilingEntry:
+    """One filing row from SEC submissions, normalized with provider metadata."""
+
+    filing: FilingMetadata
+    metadata: dict[str, Any]
+
+
 _ITEM_HEADING_RE = re.compile(
     r"^[ \t>#*_\-]*(?:part\s+[ivxlcdm]+\s+)?item\s+"
     r"(?P<item>\d{1,2}\s*[A-Z]?)\s*"
@@ -68,12 +76,6 @@ _ITEM_HEADING_RE = re.compile(
     re.IGNORECASE | re.MULTILINE,
 )
 _ITEM_CODE_RE = re.compile(r"(?P<major>\d{1,2})\s*\.\s*(?P<minor>\d{2})")
-_CURRENT_REPORT_ITEM_HEADING_RE = re.compile(
-    r"(?im)^[ \t>#*_\-]*(?:item\s+)?(?P<item>\d{1,2}\s*\.\s*\d{2})"
-    r"(?:[.\-:)\u2013\u2014]\s*)?(?P<title>[^\n]{0,180})$"
-)
-
-
 class SecEdgarClient(ExternalDataSourceClient):
     """Reads SEC company mapping and submissions metadata for US-listed targets."""
 
@@ -366,7 +368,7 @@ class SecEdgarClient(ExternalDataSourceClient):
         source_dimension: str | None = None,
         text_scope: str = "business_description",
     ) -> SourceDocument:
-        """Fetch structured filing sections and cache the one relevant to a profile dimension."""
+        """Compatibility wrapper for callers that still ask the SEC client for a scoped text document."""
 
         extraction = self._fetch_filing_text_with_edgartools(target, filing, text_scope, source_dimension)
         if not extraction:
@@ -400,6 +402,17 @@ class SecEdgarClient(ExternalDataSourceClient):
             expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours) if ttl_hours else None,
         )
 
+    def fetch_structured_filing_text(
+        self,
+        target: ResolvedTarget,
+        filing: FilingMetadata,
+        source_dimension: str | None = None,
+        text_scope: str = "structured_sections",
+    ) -> FilingTextExtraction | None:
+        """Fetch provider-level SEC filing sections, using text_scope only to guide provider fallbacks."""
+
+        return self._fetch_filing_text_with_edgartools(target, filing, text_scope, source_dimension)
+
     def source_document_for_mapping(
         self,
         target: ResolvedTarget,
@@ -432,7 +445,7 @@ class SecEdgarClient(ExternalDataSourceClient):
 
         SEC's lightweight ticker exchange mapping does not always include SIC.
         When a configured provider or fixture supplies SIC in the mapping payload,
-        this method exposes those rows as traceable source documents for Phase 4.
+        this method exposes those rows as traceable source documents.
         """
 
         normalized_sic = _normalize_sic(sic)
@@ -511,94 +524,20 @@ class SecEdgarClient(ExternalDataSourceClient):
         )
         return documents
 
-    def fetch_transaction_signal_documents(
-        self,
-        target_profile: Any,
-        since: date,
-        ttl_hours: int,
-        form_type: str,
-        limit: int,
-        company_limit: int,
-        source_strength: SourceStrength = SourceStrength.C,
-        source_dimension: str | None = None,
-        primary_items: list[str] | None = None,
-        supporting_items: list[str] | None = None,
-        require_primary_item: bool = False,
-        fetch_filing_text: bool = False,
-        text_scope: str | None = None,
-        as_of_date: date | None = None,
-    ) -> list[SourceDocument]:
-        """Return same-industry SEC 8-K Item filings for acquisition-history recall.
-
-        Phase 4 treats EDGAR 8-K Item 2.01 as the primary completed-acquisition source. The caller still decides
-        which item codes and text fetch behavior apply through retrieval_rules.yaml; this method only executes that
-        configured EDGAR path.
-        """
-
-        target_sic = _normalize_sic(getattr(target_profile, "sic", None))
-        if not target_sic:
-            return []
-
-        normalized_primary_items = _normalize_item_codes(primary_items or [])
-        normalized_supporting_items = _normalize_item_codes(supporting_items or [])
-        filing_end_date = as_of_date or datetime.now(UTC).date()
-        candidate_documents = self.list_public_company_profiles_by_sic(
-            target_sic,
-            limit=company_limit,
-            ttl_hours=ttl_hours,
-            source_strength=source_strength,
-            source_dimension=source_dimension,
-        )
-        documents: list[SourceDocument] = []
-        for candidate_document in candidate_documents:
-            candidate_target = _resolved_target_from_company_document(candidate_document, target_sic)
-            if not candidate_target:
-                continue
-            if _same_company(candidate_target, target_profile):
-                continue
-
-            try:
-                filing_entries = self._transaction_filing_entries_from_submissions(
-                    candidate_target,
-                    since,
-                    filing_end_date,
-                    form_type,
-                    normalized_primary_items,
-                    normalized_supporting_items,
-                    require_primary_item,
-                )
-            except Exception as error:
-                logger.warning("SEC transaction submissions lookup failed: cik=%s error=%s", candidate_target.cik, error)
-                continue
-
-            for filing, metadata in filing_entries:
-                documents.append(
-                    self._transaction_source_document_for_filing(
-                        candidate_target,
-                        filing,
-                        metadata,
-                        ttl_hours,
-                        source_strength,
-                        source_dimension,
-                        fetch_filing_text,
-                        text_scope,
-                        normalized_primary_items,
-                    )
-                )
-                if len(documents) >= limit:
-                    return documents
-        return documents
-
-    def _transaction_filing_entries_from_submissions(
+    def list_submission_filing_entries(
         self,
         target: ResolvedTarget,
         since: date,
         as_of_date: date,
         form_type: str,
-        primary_items: list[str],
-        supporting_items: list[str],
-        require_primary_item: bool,
-    ) -> list[tuple[FilingMetadata, dict[str, Any]]]:
+        required_items: list[str] | None = None,
+        supporting_items: list[str] | None = None,
+        require_required_item: bool = False,
+    ) -> list[SubmissionFilingEntry]:
+        """Return normalized SEC submissions filing rows matching generic form/item filters."""
+
+        normalized_required_items = _normalize_item_codes(required_items or [])
+        normalized_supporting_items = _normalize_item_codes(supporting_items or [])
         payload = self._fetch_submissions(target)
         recent = payload.get("filings", {}).get("recent", {})
         if not isinstance(recent, dict):
@@ -606,7 +545,7 @@ class SecEdgarClient(ExternalDataSourceClient):
 
         array_fields = {key: value for key, value in recent.items() if isinstance(value, list)}
         row_count = max((len(value) for value in array_fields.values()), default=0)
-        entries: list[tuple[FilingMetadata, dict[str, Any]]] = []
+        entries: list[SubmissionFilingEntry] = []
         for index in range(row_count):
             row = {key: _safe_index(value, index) for key, value in array_fields.items()}
             if not _form_matches(row.get("form"), form_type):
@@ -617,9 +556,9 @@ class SecEdgarClient(ExternalDataSourceClient):
                 continue
 
             filing_items = _filing_items_from_value(row.get("items"))
-            primary_matches = [item for item in filing_items if item in primary_items]
-            supporting_matches = [item for item in filing_items if item in supporting_items]
-            if require_primary_item and not primary_matches:
+            required_matches = [item for item in filing_items if item in normalized_required_items]
+            supporting_matches = [item for item in filing_items if item in normalized_supporting_items]
+            if require_required_item and not required_matches:
                 continue
 
             accession = str(row.get("accessionNumber") or "")
@@ -645,71 +584,23 @@ class SecEdgarClient(ExternalDataSourceClient):
                 "publishedAt": filing.filing_date,
                 "period_of_report": filing.period_of_report,
                 "accession_number": accession,
-                "title": f"{filing.form} Item {', '.join(primary_matches or filing_items)} - {target.canonical_name}",
+                "title": f"{filing.form} Item {', '.join(required_matches or filing_items)} - {target.canonical_name}",
                 "filing_items": filing_items,
                 "edgar_item_match": {
-                    "primary": primary_matches,
+                    "required": required_matches,
                     "supporting": supporting_matches,
-                    "required_primary_items": primary_items,
-                    "configured_supporting_items": supporting_items,
+                    "configured_required_items": normalized_required_items,
+                    "configured_supporting_items": normalized_supporting_items,
                     "basis": "sec_submissions_recent.items",
                 },
                 "primary_document": primary_document,
                 "primary_document_url": _archive_document_url(target.cik, accession, primary_document),
-                "provider_method": "sec_submissions_same_sic_8k_item_filter",
-                "industry_match_basis": "same_sic_filer",
+                "provider_method": "sec_submissions_recent_item_filter",
             }
-            entries.append((filing, {key: value for key, value in metadata.items() if value is not None}))
+            entries.append(SubmissionFilingEntry(filing, {key: value for key, value in metadata.items() if value is not None}))
         return entries
 
-    def _transaction_source_document_for_filing(
-        self,
-        target: ResolvedTarget,
-        filing: FilingMetadata,
-        metadata: dict[str, Any],
-        ttl_hours: int,
-        source_strength: SourceStrength,
-        source_dimension: str | None,
-        fetch_filing_text: bool,
-        text_scope: str | None,
-        primary_items: list[str],
-    ) -> SourceDocument:
-        raw_text = _item_signal_summary_text(metadata)
-        if fetch_filing_text:
-            archive_text = self._fetch_archive_filing_text(metadata.get("primary_document_url"), target, source_dimension)
-            if archive_text:
-                selected_text, selected_scope = _select_8k_transaction_text(archive_text, primary_items, text_scope)
-                raw_text = selected_text or raw_text
-                metadata = {
-                    **metadata,
-                    "text_retrieval_method": "sec_archive_primary_document",
-                    "text_scope": selected_scope,
-                    "raw_text_char_count": len(archive_text),
-                    "cached_text_char_count": len(raw_text or ""),
-                }
-            else:
-                metadata = {
-                    **metadata,
-                    "text_retrieval_method": "sec_archive_primary_document",
-                    "text_retrieval_error": "primary document text unavailable",
-                }
-
-        return SourceDocument(
-            source_id="edgar",
-            source_dimension=source_dimension,
-            source_type=SourceType.sec_filing,
-            source_strength=source_strength,
-            target_cik=target.cik,
-            target_ticker=target.ticker,
-            url=filing.url,
-            filing_accession=filing.accession_number,
-            raw_text=raw_text,
-            metadata=metadata,
-            retrieved_at=datetime.now(UTC),
-            expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours) if ttl_hours else None,
-        )
-
-    def _fetch_archive_filing_text(
+    def fetch_archive_filing_text(
         self,
         url: Any,
         target: ResolvedTarget,
@@ -1228,65 +1119,6 @@ def _browse_sic_raw_records_from_text(
     return raw_records
 
 
-def _browse_8k_transaction_raw_records_from_text(
-    text: str,
-    context: DataSourceRequestContext,
-    retrieved_at: datetime,
-    _response: httpx.Response,
-) -> list[DataSourceRawRecord]:
-    try:
-        root = ET.fromstring(text)
-    except ET.ParseError:
-        return []
-
-    namespace = {"atom": "http://www.w3.org/2005/Atom"}
-    raw_records: list[DataSourceRawRecord] = []
-    sic = _normalize_sic(context.request_params.get("SIC"))
-    form_type = str(context.request_params.get("type") or "8-K")
-    for index, entry in enumerate(root.findall(".//atom:entry", namespace), start=1):
-        title = _xml_text(entry, "atom:title", namespace)
-        summary = _xml_text(entry, "atom:summary", namespace)
-        updated = _xml_text(entry, "atom:updated", namespace)
-        link = entry.find("atom:link", namespace)
-        link_url = link.attrib.get("href") if link is not None else context.url
-        accession = _accession_from_text(" ".join(value for value in (link_url, title, summary) if value))
-        cik = _cik_from_text(" ".join(value for value in (title, summary, link_url) if value))
-        company_name = _company_name_from_8k_title(title)
-        raw_payload = {
-            "canonical_name": company_name,
-            "cik": cik,
-            "sic": sic,
-            "form": form_type,
-            "filing_date": _date_string(updated),
-            "publishedAt": _date_string(updated),
-            "title": title,
-            "summary": summary,
-            "provider_method": f"sec_browse_edgar_same_sic_{_source_token(form_type)}",
-            "industry_match_basis": "same_sic",
-        }
-        raw_text = " ".join(value for value in (title, summary) if value)
-        raw_records.append(
-            DataSourceRawRecord(
-                request_id=context.request_id,
-                source_id=context.source_id,
-                provider=context.provider,
-                source_dimension=context.source_dimension,
-                source_type=SourceType.sec_filing,
-                target_cik=cik,
-                record_id=str(accession or cik or title or index),
-                url=link_url,
-                filing_accession=accession,
-                title=title,
-                published_at=_date_string(updated),
-                raw_payload={key: value for key, value in raw_payload.items() if value is not None},
-                raw_text=raw_text or None,
-                metadata={"record_role": "same_sic_8k_transaction_signal", "record_index": index},
-                retrieved_at=retrieved_at,
-            )
-        )
-    return raw_records
-
-
 def _archive_filing_raw_records_from_text(
     text: str,
     context: DataSourceRequestContext,
@@ -1440,32 +1272,6 @@ def _archive_document_url(cik: str | None, accession: Any, primary_document: str
     return f"https://www.sec.gov/Archives/edgar/data/{cik_no_padding}/{accession_no_dashes}/{primary_document}"
 
 
-def _resolved_target_from_company_document(document: SourceDocument, fallback_sic: str) -> ResolvedTarget | None:
-    cik = _normalize_cik(document.metadata.get("cik") or document.target_cik)
-    name = document.metadata.get("canonical_name") or document.metadata.get("name") or document.metadata.get("company")
-    ticker = document.metadata.get("ticker") or document.target_ticker or cik
-    if not cik or not name or not ticker:
-        return None
-    return ResolvedTarget(
-        canonical_name=str(name),
-        ticker=str(ticker),
-        cik=cik,
-        exchange=str(document.metadata.get("exchange")) if document.metadata.get("exchange") else None,
-        sic=_normalize_sic(document.metadata.get("sic")) or fallback_sic,
-        resolution_confidence=0.0,
-        matched_input=str(ticker),
-        source_provenance=["edgar:same_sic_company_profile"],
-    )
-
-
-def _same_company(candidate: ResolvedTarget, target_profile: Any) -> bool:
-    target_cik = _normalize_cik(getattr(target_profile, "cik", None))
-    if target_cik and candidate.cik == target_cik:
-        return True
-    target_ticker = str(getattr(target_profile, "ticker", "") or "").strip().casefold()
-    return bool(target_ticker and candidate.ticker.strip().casefold() == target_ticker)
-
-
 def _form_matches(value: Any, form_type: str) -> bool:
     normalized_value = str(value or "").strip().upper()
     normalized_form = form_type.strip().upper()
@@ -1498,57 +1304,6 @@ def _normalize_item_code(value: str) -> str | None:
     if not match:
         return None
     return f"{int(match.group('major'))}.{match.group('minor')}"
-
-
-def _item_signal_summary_text(metadata: dict[str, Any]) -> str:
-    item_match = metadata.get("edgar_item_match")
-    primary_items: list[str] = []
-    supporting_items: list[str] = []
-    if isinstance(item_match, dict):
-        primary_items = [str(item) for item in item_match.get("primary", [])]
-        supporting_items = [str(item) for item in item_match.get("supporting", [])]
-    primary_text = ", ".join(primary_items) if primary_items else "configured current-report item"
-    supporting_text = f"; supporting Item(s) {', '.join(supporting_items)}" if supporting_items else ""
-    return (
-        f"{metadata.get('canonical_name')} filed an 8-K Item {primary_text}{supporting_text}. "
-        "Item 2.01 is Completion of Acquisition or Disposition of Assets."
-    )
-
-
-def _select_8k_transaction_text(
-    filing_text: str,
-    primary_items: list[str],
-    text_scope: str | None,
-    max_chars: int = 15000,
-) -> tuple[str | None, str]:
-    if text_scope and text_scope != "primary_item_section":
-        return filing_text[:max_chars], text_scope
-
-    selected_sections: list[str] = []
-    for item_code in primary_items:
-        section = _extract_item_section(filing_text, item_code)
-        if section:
-            selected_sections.append(section)
-    if selected_sections:
-        return "\n\n".join(selected_sections)[:max_chars], "primary_item_section"
-    return filing_text[:max_chars], "full_8k_current_report"
-
-
-def _extract_item_section(text: str, item_code: str) -> str | None:
-    headings = list(_CURRENT_REPORT_ITEM_HEADING_RE.finditer(text))
-    if not headings:
-        return None
-
-    normalized_item = _normalize_item_code(item_code)
-    for index, heading in enumerate(headings):
-        heading_item = _normalize_item_code(heading.group("item"))
-        if heading_item != normalized_item:
-            continue
-        next_heading = headings[index + 1] if index + 1 < len(headings) else None
-        end = next_heading.start() if next_heading else len(text)
-        section = text[heading.start() : end].strip()
-        return section or None
-    return None
 
 
 def _clean_archive_filing_text(value: str) -> str:
@@ -1726,6 +1481,9 @@ def _select_structured_section(
             return sections["registration_statement"], "full_s1_registration_statement"
         return None, _full_text_scope_for_form(filing.form)
 
+    if text_scope == "structured_sections":
+        return _sections_to_markdown(sections), "structured_sections"
+
     if sections.get("business"):
         return sections["business"], "item_1_business"
     return None, "full_filing_text"
@@ -1841,19 +1599,6 @@ def _company_name_from_browse_title(value: str | None) -> str | None:
     text = re.sub(r"\s*\(CIK[:=#\s]*\d{1,10}\).*", "", text, flags=re.IGNORECASE)
     text = re.sub(r"\s*CIK[:=#\s]*\d{1,10}.*", "", text, flags=re.IGNORECASE)
     return text.strip(" -|,") or None
-
-
-def _company_name_from_8k_title(value: str | None) -> str | None:
-    if not value:
-        return None
-    text = _company_name_from_browse_title(value) or value
-    text = re.sub(r"^\s*8-K(?:/A)?\s*[-:]\s*", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"\s*\((?:Filer|Subject|Filed by|Reporting)\).*", "", text, flags=re.IGNORECASE)
-    return text.strip(" -|,") or None
-
-
-def _source_token(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "", value.casefold()) or "filing"
 
 
 def _date_string(value: Any) -> str | None:

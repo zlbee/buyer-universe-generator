@@ -10,7 +10,7 @@ from src.sources.google_news_rss import GoogleNewsRssClient
 from src.sources.newsapi import NewsApiClient
 from src.sources.polygon import PolygonClient
 from src.sources.sec import SecEdgarClient
-from src.sources.strategy import DataSourceStrategy
+from src.retrieval.policy import DataSourceStrategy
 
 
 class SourceRegistry:

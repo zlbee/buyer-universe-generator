@@ -1,9 +1,6 @@
-"""Backward-compatible imports for retrieval policy.
+"""Retrieval policy and evidence materialization package."""
 
-New code should import these names from :mod:`src.retrieval.policy`; this module
-remains so older callers do not need to change in lockstep with the package move.
-"""
-
+from src.retrieval.materialization import source_document_from_raw_record
 from src.retrieval.policy import DataSourceStrategy, SelectedDataSource, load_data_source_policy, load_retrieval_rules
 
 __all__ = [
@@ -11,4 +8,5 @@ __all__ = [
     "SelectedDataSource",
     "load_data_source_policy",
     "load_retrieval_rules",
+    "source_document_from_raw_record",
 ]

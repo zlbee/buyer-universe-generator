@@ -19,13 +19,13 @@ from src.repositories.data_source_audit_log import DataSourceAuditLog
 from src.repositories.database import create_session_factory, init_db
 from src.repositories.models import DataSourceRawRecordRecord, DataSourceRequestRecord
 from src.repositories.source_cache import SourceCache
+from src.retrieval.policy import DataSourceStrategy, load_retrieval_rules
 from src.sources.fmp import FinancialModelingPrepClient
 from src.sources.google_news_rss import GoogleNewsRssClient
 from src.sources.newsapi import NewsApiClient
 from src.sources.polygon import PolygonClient
 from src.sources.registry import SourceRegistry
 from src.sources.sec import SecEdgarClient
-from src.sources.strategy import DataSourceStrategy, load_retrieval_rules
 
 
 def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:

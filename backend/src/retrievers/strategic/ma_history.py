@@ -32,7 +32,7 @@ from src.retrievers.strategic.common import (
     unique_terms,
 )
 from src.retrievers.strategic.protocols import BuyerIdentityResolver, TransactionFilingSource, TransactionNewsSource, TransactionRssNewsSource
-from src.sources.strategy import DataSourceStrategy
+from src.retrieval.policy import DataSourceStrategy
 
 
 _RSS_MNA_LLM_SCHEMA_NAME = "GoogleNewsRssMnaEventExtraction"

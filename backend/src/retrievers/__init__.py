@@ -10,6 +10,7 @@ from src.retrievers.strategic import (
     PeerCompanyRetriever,
     ProductCustomerChannelRetriever,
     SameSicRetriever,
+    SecTransactionSignalSource,
     StrategicAcquisitionIntentRetriever,
     SupplyChainRetriever,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "PEDealActivityRetriever",
     "ProductCustomerChannelRetriever",
     "SameSicRetriever",
+    "SecTransactionSignalSource",
     "StrategicAcquisitionIntentRetriever",
     "SupplyChainRetriever",
 ]

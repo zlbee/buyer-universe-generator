@@ -25,9 +25,15 @@ from src.pipelines.orchestrator import PipelineOrchestrator
 from src.repositories.buyer_recall_cache import BuyerRecallCache
 from src.repositories.database import create_session_factory, init_db
 from src.repositories.models import BuyerRecallCacheRecord
-from src.retrievers import BuyerCandidateRetriever, MAHistoryRetriever, SameSicRetriever, StrategicAcquisitionIntentRetriever
+from src.retrievers import (
+    BuyerCandidateRetriever,
+    MAHistoryRetriever,
+    SameSicRetriever,
+    SecTransactionSignalSource,
+    StrategicAcquisitionIntentRetriever,
+)
+from src.retrieval.policy import DataSourceStrategy
 from src.sources.sec import SecEdgarClient
-from src.sources.strategy import DataSourceStrategy
 
 
 def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:
@@ -288,7 +294,7 @@ def test_sec_client_fetches_same_sic_8k_transaction_signals(tmp_path: Path) -> N
         use_edgartools=False,
     )
 
-    documents = client.fetch_transaction_signal_documents(
+    documents = SecTransactionSignalSource(client).fetch_transaction_signal_documents(
         sample_profile(),
         since=date(2021, 5, 4),
         ttl_hours=24,

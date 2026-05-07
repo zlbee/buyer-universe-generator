@@ -25,6 +25,7 @@ from src.domain import (
     TargetProfileExtractionResult,
 )
 from src.llm import LLMResponseError, OpenRouterProvider
+from src.pipelines.investor_relations import IRPageDiscoveryResult, InvestorRelationsPageDiscovery
 from src.pipelines.source_ingestion import SourceIngestionService
 from src.pipelines.target_profile_extraction import TargetProfileExtractionError, TargetProfileExtractor
 from src.repositories.data_source_audit_log import DataSourceAuditLog
@@ -33,10 +34,9 @@ from src.repositories.llm_interaction_log import LLMInteractionLog
 from src.repositories.models import DataSourceRawRecordRecord, DataSourceRequestRecord, LLMInteractionRecord
 from src.repositories.source_cache import SourceCache
 from src.repositories.target_profile_cache import TargetProfileCache
+from src.retrieval.policy import DataSourceStrategy
 from src.sources.company_pages import CompanyPageClient
-from src.sources.investor_relations import IRPageDiscoveryResult, InvestorRelationsPageDiscovery
 from src.sources.sec import SecEdgarClient
-from src.sources.strategy import DataSourceStrategy
 
 
 def settings_for_tests(tmp_path: Path, **overrides: Any) -> Settings:
@@ -251,6 +251,47 @@ def test_sec_filing_text_document_uses_markdown_item_parser_for_strategy(tmp_pat
         source_dimension="seller_profile.company_strategy",
         text_scope="company_strategy",
     )
+
+    assert document.raw_text.startswith("Item 7. Management's Discussion")
+    assert "Market Risk" not in document.raw_text
+    assert document.metadata["text_scope"] == "item_7_mdna"
+    assert document.metadata["text_retrieval_method"] == "edgartools:Filing.markdown:item_parser"
+
+
+def test_target_profile_extractor_preserves_strategy_scope_for_structured_sec_fetch(tmp_path: Path) -> None:
+    mdna_sentence = (
+        "Management discusses digital commerce, brand investment, international expansion, supply chain scale, "
+        "and selective acquisition opportunities as part of the company's strategy. "
+    )
+    markdown = (
+        "# Form 10-K\n\n"
+        "Item 7. Management's Discussion and Analysis of Financial Condition and Results of Operations\n\n"
+        f"{mdna_sentence * 6}\n\n"
+        "Item 7A. Quantitative and Qualitative Disclosures About Market Risk\n\nMarket risk text."
+    )
+    fake_edgar = FakeEdgarTextModule(
+        markdown=markdown,
+        report_object=FakeTenKReport(business="Structured Item 1. Business e.l.f. Beauty sells cosmetics."),
+    )
+    settings = settings_for_tests(tmp_path)
+    engine = init_db(settings)
+    session_factory = create_session_factory(engine)
+    sec_client = SecEdgarClient(
+        settings,
+        edgar_module=fake_edgar,
+        markdown_item_parser_enabled=True,
+    )
+
+    with session_factory() as session:
+        extractor = build_test_extractor(settings, session, FakeLLMClient({}), edgar_client=sec_client)
+        document = extractor._fetch_scoped_filing_text_document(
+            sample_target(),
+            sample_filing("10-K"),
+            ttl_hours=24,
+            source_strength=SourceStrength.B,
+            source_dimension="seller_profile.company_strategy",
+            text_scope="company_strategy",
+        )
 
     assert document.raw_text.startswith("Item 7. Management's Discussion")
     assert "Market Risk" not in document.raw_text

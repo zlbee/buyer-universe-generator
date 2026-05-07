@@ -24,12 +24,13 @@ from src.retrievers import (
     PEDealActivityRetriever,
     ProductCustomerChannelRetriever,
     SameSicRetriever,
+    SecTransactionSignalSource,
     StrategicAcquisitionIntentRetriever,
     SupplyChainRetriever,
 )
-from src.sources.investor_relations import InvestorRelationsPageDiscovery
+from src.pipelines.investor_relations import InvestorRelationsPageDiscovery
 from src.sources.registry import SourceRegistry
-from src.sources.strategy import DataSourceStrategy
+from src.retrieval.policy import DataSourceStrategy
 
 
 def build_source_ingestion_service(settings: Settings, session: Session) -> SourceIngestionService:
@@ -105,7 +106,7 @@ def build_strategic_buyer_candidate_retriever(settings: Settings, session: Sessi
                 strategy,
                 newsapi_client=registry.newsapi(),
                 google_news_rss_client=registry.google_news_rss(),
-                edgar_client=edgar_client,
+                edgar_client=SecTransactionSignalSource(edgar_client),
                 buyer_identity_resolver=edgar_client,
                 llm_client=llm_provider,
             ),
